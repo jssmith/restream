@@ -57,9 +57,7 @@ object SpamDetector extends App {
 
     def printSpamUsers(): Unit = {
       for ((uid, spamCount) <- spamUsers) {
-        val (friendSends, nonfriendSends) = userSends.get(uid) match {
-          case Some(sends) => sends
-        }
+        val (friendSends, nonfriendSends) = userSends(uid)
         println(s"$spamCount spam messages detected for user $uid, sent ${friendSends+nonfriendSends} total messages; " +
           s"$friendSends to friends and $nonfriendSends to nonfriends")
       }
