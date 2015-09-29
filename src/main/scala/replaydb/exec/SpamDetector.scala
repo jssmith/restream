@@ -31,23 +31,23 @@ object SpamDetector extends App {
     def apply(e: Event): Unit = e match {
       case e: NewFriendshipEvent => addFriendship(e.userIdA, e.userIdB)
       case e: MessageEvent => {
-        var userSend: (Long, Long) = userSends.get(e.senderUserId) match {
+        val prevUserSend: (Long, Long) = userSends.get(e.senderUserId) match {
           case Some(sends) => sends
           case None => (0, 0)
         }
-        userSend = if (checkFriendship(e.senderUserId, e.recipientUserId)) {
-          (userSend._1 + 1L, userSend._2)
+        val updatedUserSend = if (checkFriendship(e.senderUserId, e.recipientUserId)) {
+          (prevUserSend._1 + 1L, prevUserSend._2)
         } else {
-          (userSend._1, userSend._2 + 1L)
+          (prevUserSend._1, prevUserSend._2 + 1L)
         }
-        if (userSend._2 > 5 && userSend._2 > userSend._1) {
+        if (updatedUserSend._2 > 5 && updatedUserSend._2 > updatedUserSend._1) {
           spamMessages = e :: spamMessages
           spamUsers.put(e.senderUserId, spamUsers.get(e.senderUserId) match {
             case Some(cnt) => cnt + 1
             case None => 1
           })
         }
-        userSends.put(e.senderUserId, userSend)
+        userSends.put(e.senderUserId, updatedUserSend)
       }
     }
     
