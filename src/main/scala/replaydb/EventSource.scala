@@ -14,7 +14,7 @@ class EventSource(startTime: Long, numUsers: Long, rnd: Random) {
   }
 
   def genEvents(n: Int, f: Event=>Unit) {
-    for (i <- 0 to n) {
+    for (i <- 0 until n) {
       val userIdA = (rnd.nextLong() & 0x7fffffffffffffffL) % numUsers + 1
       val userIdB = (rnd.nextLong() & 0x7fffffffffffffffL) % numUsers + 1
       // For now we generate new friendships and messages with equal probability
