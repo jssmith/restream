@@ -11,7 +11,7 @@ import replaydb.{TunableEventSource, UniformEventSource, util}
  * Simple spam simulation event-generator functionality
  */
 object EventGenerator extends App {
-  sealed abstract class Generator(val name: String)
+  // sealed abstract class Generator(val name: String) // TODO this line doesn't seem to do anything?
   object Generators extends Enumeration {
     type Generator = Value
     val Uniform = Value("uniform")
@@ -25,7 +25,7 @@ object EventGenerator extends App {
   val numUsers = Integer.parseInt(args(1))
   val numEvents = Integer.parseInt(args(2))
   var startTime = util.Date.df.parse("2015-01-01 00:00:00.000").getTime
-  val rnd =  new MersenneTwister(903485435L)
+  val rnd = new MersenneTwister(903485435L)
   val eventSource = generator match {
     case Generators.Uniform => new UniformEventSource(startTime, numUsers, rnd)
     case Generators.Tunable => new TunableEventSource(startTime, numUsers, rnd)
