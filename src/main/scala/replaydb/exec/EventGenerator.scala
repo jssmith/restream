@@ -21,13 +21,13 @@ object EventGenerator extends App {
   val numEvents = Integer.parseInt(args(1))
   var startTime = util.Date.df.parse("2015-01-01 00:00:00.000").getTime
 
-  val rnd =  new Random(903485435L)
+  val rnd =  new Random(seed = 903485435L)
   val eventSource = new EventSource(startTime, numUsers, rnd)
   val eventStorage = new KryoEventStorage {
     kryo.register(classOf[MessageEvent])
     kryo.register(classOf[NewFriendshipEvent])
   }
-  val pm = new ProgressMeter(1000000)
+  val pm = new ProgressMeter(printInterval = 1000000)
   val w = eventStorage.getEventWriter(new BufferedOutputStream(new FileOutputStream("/tmp/events.out")))
   try {
     eventSource.genEvents(numEvents, e => {

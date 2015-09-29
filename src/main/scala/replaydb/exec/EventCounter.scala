@@ -11,7 +11,7 @@ object EventCounter extends App {
     kryo.register(classOf[MessageEvent])
     kryo.register(classOf[NewFriendshipEvent])
   }
-  val pm = new ProgressMeter(1000000)
+  val pm = new ProgressMeter(printInterval = 1000000)
   val r = eventStorage.readEvents(new BufferedInputStream(new FileInputStream("/tmp/events.out")), e => pm.increment())
   pm.finished()
 }
