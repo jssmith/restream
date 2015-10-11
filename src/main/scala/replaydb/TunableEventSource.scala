@@ -1,13 +1,25 @@
 package replaydb
 
-import com.google.common.hash.{PrimitiveSink, Funnel, BloomFilter}
-import org.apache.commons.math3.random.{RandomDataGenerator, RandomGenerator}
-import replaydb.event.{NewFriendshipEvent, MessageEvent, Event}
+
+import com.google.common.hash.{BloomFilter, Funnel, PrimitiveSink}
+import org.apache.commons.math3.distribution.{EnumeratedIntegerDistribution}
+import org.apache.commons.math3.random.RandomGenerator
+import org.apache.commons.math3.util.FastMath
+import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
+
+import scala.util.Random
 
 class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator, alpha: Double = 1.0) extends EventSource {
   private var t = startTime
   private var messageIdSeq = 0L
-  private val userGenerator = new RandomDataGenerator(rnd)
+  private val userZipfDistribution = {
+    val users = (1 to numUsers).toArray
+    val x = users.map(1.0 / FastMath.pow(_, alpha))
+    val xs = x.sum
+    val probabilities = users.map(_/xs)
+    new EnumeratedIntegerDistribution(rnd, Random.shuffle(users.toSeq).toArray, probabilities)
+  }
+
   private val bf = BloomFilter.create(new Funnel[(Long,Long)] {
     override def funnel(from: (Long, Long), into: PrimitiveSink): Unit = {
       if (from._1 < from._2) {
@@ -24,8 +36,7 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator, 
   }
 
   private def nextUser(): Long = {
-    // TODO this slows down considerably when as the number of users increases
-    userGenerator.nextZipf(numUsers, alpha) + 1
+    userZipfDistribution.sample
   }
 
   override def genEvents(n: Int, f: (Event) => Unit): Unit = {
