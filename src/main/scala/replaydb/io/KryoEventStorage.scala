@@ -26,12 +26,14 @@ trait KryoEventStorage  {
   // demanding performance so only serialize registered types
   kryo.setRegistrationRequired(true)
 
-  def readEvents(is: InputStream, f: Event => Unit): Unit = {
+  def readEvents(is: InputStream, f: Event => Unit, limit: Long = Long.MaxValue): Unit = {
     val input = new Input(new BufferedInputStream(is))
     var done = false
-    while (!done) {
+    var ct = 0
+    while (!done && ct < limit) {
       try {
         f(kryo.readClassAndObject(input).asInstanceOf[Event])
+        ct += 1
       } catch {
         case e: KryoException =>
           input.close()
