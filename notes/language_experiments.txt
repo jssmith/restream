@@ -1,0 +1,98 @@
+
+// Overall popularity
+def_feature overall_popularity(p: Pattern) {
+	val ct = counter(pattern)
+	def score = {
+		id => ct(id) / ct()
+	}
+}
+
+def_feature overall_popularity(ct: counter) {
+	def score = {
+		id => ct(id) / ct()
+	}
+}
+
+add_feature(overall_popularity(counter("[ProductViewEvent")))
+
+add_feature(overall_popularity("[ProductViewEvent]"))
+
+
+// is this message a response? Within time period T
+
+
+def_feature is_message_response {
+	val messages = windowed_set(MessageEvent => (m.sender, m.recipient), "24 hours")
+	def apply(checkMsg: MessageEvent): Boolean = {
+		messages.contains(checkMsg.recipient, checkMsg.sender)
+	}
+}
+
+when
+	m1: message(sender = a, recipient = b, t)
+	m2: message(recipient = b, sender = a, t < t + "24 hours")
+then
+	emit message_response(message = m2, in_response_to = m1)
+
+Counter {
+	p = {
+		m1: message(sender = a, recipient = b, t)
+		m2: message(recipient = b, sender = a, t < t + "24 hours")
+	}
+
+}
+
+// Count fraction of messages sent in response
+
+def_feature recent_response_sent_frac {
+	def apply(m: MessageEvent) = {
+		val t = interval(m.t-"24 hours", m.t)
+		count(message_response(sender=m.sender_id), t) / count(message(sender=m.sender_id), t)
+	}
+}
+
+val msg_response_ct = windowed_counter(m: MessageEvent => if (is_message_response(m)) Some(m.sender_id) else None , "24 hours")
+val msg_sent_ct = windowed_counter(m: MessageEvent => m.sender_id, "24 hours")
+
+def_feature recent_response_sent_frac {
+	def apply(m: MessageEvent) = {
+		msg_response_ct(m.sender_id) / msg_sent_ct(m.sender_id)
+	}
+}
+
+
+def_feature recent_response_sent_frac {
+	def apply(m: MessageEvent) = {
+		val t = interval(m.t-"24 hours", m.t)
+		count(message_response(sender=m.sender_id), t) / count(message(sender=m.sender_id), t)
+	}
+}
+
+addFeature(frac(MessageEvent, is_response))
+
+addFeature($id, frac(MessageEvent($id), is_response))
+
+def_feature recent_response_sent_frac {
+	val all_sent = windowed_counter(m: MessageEvent => m.sender, "24 hours")
+	val response_sent = windowed_counter(m: MessageEvent => is_message_response(m) ? Some(m.sender) : None, "24 hours")
+	def apply(m: MessageEvent) = {
+		val t = interval(m.t-"24 hours", m.t)
+		count(message_response(sender=m.sender_id), t) / count(message(sender=m.sender_id), t)
+	}
+}
+
+
+def_feature recent_response_sent_frac {
+	val all_sent = windowed_counter(m: MessageEvent => m.sender, "24 hours")
+	val response_sent = windowed_counter(m: MessageEvent => is_message_response(m) ? Some(m.sender) : None, "24 hours")
+	def apply(m: MessageEvent) = {
+		response_sent(m.sender_id) / all_sent(m.sender_id)
+	}
+}
+
+when
+	mrc: message_response_counter(sender = a)
+	mr: message_response(message.sender = a)
+then
+	update mrc set ct = ct + 1
+

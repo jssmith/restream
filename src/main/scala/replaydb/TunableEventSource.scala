@@ -8,7 +8,6 @@ import org.apache.commons.math3.util.FastMath
 import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 
 import scala.collection.immutable.HashMap
-import scala.collection.mutable
 import scala.util.Random
 
 class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator, alpha: Double = 1.0, spammerFraction: Double = 0.1) extends EventSource {
