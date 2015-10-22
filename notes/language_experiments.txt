@@ -103,10 +103,149 @@ addEmitter(MessageEvent(id = 1), println(_))
 addEmitter(MessageEvent(id = 1).map(e=>println(e)))
 
 
+
+
 // Best Buy
 
 // overall popularity
 addFeature overallPopularity ($id => frac(ProductView, _.sku == $id))
+
+addFeature(overallPopularity ($id => frac(MakePattern(classOf[ProductView]), _.sku == $id))
+
+def frac[MatchType](x: BasePattern[MatchType], predicate: MatchType => Boolean) = {
+	count(x.filter(predicate)) / count(b)
+}
+
+
+
+addFeature(frac(MessageEvent in last 7 days, is_response))
+addFeature($id => frac(MessageEvent(sender=$id, in last 7 days), is_response)
+addFeature(frac(MessageEvent in last 7 days, in last 24 hours))
+
+// how many of the messages sent in the past 7 days have received responses
+addFeature($id => frac(MessageEvent(sender=$id, in last 7 days), received_response))
+def received_response(m: MessageEvent) {
+	exists MessageEvent(sender=m.recipient, recipient = m.sender,  ts > m.ts and ts < now)
+}
+
+addFeature(frac(MessageEvent in last 7 days, is_response))
+
+
+object Exists {
+	def apply
+}
+
+def isResponse(m1: MessageEvent) = {
+	Exists(SingleEventPatternSpec(classOf[MessageEvent], m2 => m2.sender=m1.recipient && m2.recipient = m1.sender, ts in m.ts.'interval previous 24 hours'))
+}
+
+class ParametrizedPatternSpec[T] {
+	def matches()
+}
+
+def fracSentInResponse7Days(id: Long) = {
+	frac(RCFromPattern(MessageEvent in last 7 days), isResponse)
+}
+
+class TimeFilteredRC extends RC[T]
+
+
+addFeature(overallPopularity ($id => frac(MakePattern(classOf[ProductView]), _.sku == $id))
+
+addFeature("overallPopularity" ($id => frac(MakeRCFromPattern(classOf[ProductView]), pv: ProductView => pv.sku == $id))
+
+def overallPopularity(id: Long) = {
+	frac(RCFromPattern(SingleEventPatternSpec(classOf[ProductView])), pv: ProductView => pv.sku == $id))	
+}
+
+val frac = defFeature {
+	
+}
+
+val overallPopularity = defFeature {
+	val f: Long=>Double = frac(RCFromPattern(SingleEventPatternSpec(classOf[ProductView])), pv: ProductView => pv.sku == $id))
+	f
+}
+
+trait PatternExecutable {
+	update(e: Event) 
+}
+
+
+class PatternRC[T](parent: RC, ps: PatternSpec) extends RC[T] {
+	def call(e: Event, addOrRemove) = {
+		// when matches call registered
+	}
+}
+
+
+object RCFromPattern[T] {
+	private def getOrCreate(p: PatternSpec): RC[T] {
+		// if exists...
+		// if not exists
+		val rc = new PatternRC(parent = globalEventStream, pattern = ps)
+	}
+	def apply(ps: PatternSpec): RC[T] = {
+		val rc = getOrCreate(ps)
+		rc
+	}
+}
+
+registerFeature(overallPopularity)
+
+def score(ids: Array[Long]) = {
+	ids.map(overallPopularity)
+}
+
+
+def frac[T](x: RC[T], predicate: T => Boolean): Double = {
+	Count(x.filter(predicate))().toDouble / Count(b)().toDouble
+}
+
+val frac: ((x: RC[T], predicate)) => Double = defFn {
+	val a = ct(predicate)
+	val b = ct(predicate)
+	Count(x.filter(predicate))().toDouble / Count(b)().toDouble	
+}
+
+
+class RC[T] {
+	def filter(p: T => Boolean): RC = {
+		new FilteredRC(this, p)
+	}
+}
+
+class FilteredRC[T] extends RC[T] (parent: RC[T], predicate: T=>Boolean) {
+	def call(event: T) {
+		if (predicate(event)) {
+			callOnRegistered(event) // calls on all registered
+		}
+	}
+}
+
+// library
+def count[T](x: Collection[T]) = t.size
+
+class Count[T] (parent: RC[T]) extends RCallable {
+	var ct = 0
+	parent.register(this)
+	def call(event: T) {
+		ct += 1
+	}
+	def apply() = ct
+}
+
+object Count {
+	private def getOrCreate(c: RC) = {
+		map lookup else newCount(c)
+	}
+	def apply(c: RC) = {
+		val c = getOrCreate(c)
+		c
+	}
+}
+
+
 
 // term popularity
 addFeature termPopularity {  $id =>
