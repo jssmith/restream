@@ -28,6 +28,17 @@ def_feature is_message_response {
 	}
 }
 
+def_feature is_message_response {
+	def apply(checkMsg: MessageEvent): Boolean = {
+	select ct > 0 from (
+		select count(*) from messages m where
+			m.sender = checkMsg.recipient and
+			m.recipient = checkMsg.sender
+			and ts > checkMsg.ts - interval '24' hour and ts < ...)
+	}
+}
+
+
 when
 	m1: message(sender = a, recipient = b, t)
 	m2: message(recipient = b, sender = a, t < t + "24 hours")
@@ -68,9 +79,123 @@ def_feature recent_response_sent_frac {
 	}
 }
 
-addFeature(frac(MessageEvent, is_response))
+// spam examples
+def frac(x: base, p: predicate) = {
+	count(x.filter(p)) / count(b)
+}
+
+def is_response(m: MessageEvent) {
+	exists MessageEvent(sender=m.recipient, recipient = m.sender, ts in m.ts.'interval previous 24 hours')
+}
+
+addFeature(frac(MessageEvent in last 7 days, is_response))
+addFeature($id => frac(MessageEvent(sender=$id, in last 7 days), is_response)
+addFeature(frac(MessageEvent in last 7 days, in last 24 hours))
+
+// how many of the messages sent in the past 7 days have received responses
+addFeature($id => frac(MessageEvent(sender=$id, in last 7 days), received_response))
+def received_response(m: MessageEvent) {
+	exists MessageEvent(sender=m.recipient, recipient = m.sender,  ts > m.ts and ts < now)
+}
+
+// print all messages sent by id 1
+addEmitter(MessageEvent(id = 1), println(_))
+addEmitter(MessageEvent(id = 1).map(e=>println(e)))
+
+
+// Best Buy
+
+// overall popularity
+addFeature overallPopularity ($id => frac(ProductView, _.sku == $id))
+
+// term popularity
+addFeature termPopularity {  $id =>
+	getTerms($ctx.queryStr).map(term => frac(ProductView(getTerms(query).contains(term)), _.skuSelected == $id)).product
+// alternatives
+//	getTerms($ctx.queryStr).map(term => frac(ProductView(query containsToken term), _.skuSelected == $id)).product
+//	getTerms($ctx.queryStr).map(term => frac(ProductView(instr(query, term), _.skuSelected == $id)).product
+}
+
+// naive bayes
+addFeature naiveBayes { $id =>
+	termPopularity($id) * overallPopularity($id)
+}
+
+(id: Int) => { id*id }
+
+addFeature tfIdfFeature { $id => 
+	getTerms($ctx.query).map { term =>
+		latestActiveProducts = set(latest ProductUpdate unique on sku).filter(_.active)
+		val tf = count (getTerms(latestActiveProducts.filter(id = sku).name).filter(_==term))
+		val df = count (lastestActiveProducts.filter(p => getTerms(p.name).contains(term)))
+		val n = count (latestActiveProducts)
+		sqrt(tf) * sq(1 + log (n / 1 + df))
+	}	
+}
+
+// rank and score
+val activeProductIds = set(latest ProductUpdate unique on sku).map(_.id)
+def topN(query: String, weights: Array[Double]) = {
+	activeProductIds.map(id => (id, features.map(f => f.score(id)) zipWith(weights).map(_*_).sum )).topN
+}
+
+
+// evaluate
+addEmitter(pv: ProductView) {
+	print topN(pv.query) contains pv.skuSelected
+}
+
+// generate training data
+addEmitter(pv: ProductView) {
+	List((pv.skuSelected, 1), (activeProductIds.random, 0)).map(x => (x,features.map(_.score(id._1))))
+}
+
+
+
+		val tf = count occurrences of term in (latest ProductUpdate(sku = $id)).name
+		val tf = count occurrences of term in (latest ProductUpdate(sku = $id)).name
+		val df = set(latest ProductUpdate unique on sku).filter(p=> p.active && getTerms(p.name).contains(term)).size
+		val n = set(latest ProductUpdate unique on sku).filter(_.active).size
+
+
+addFeature($id => frac(MessageEvent(sender=$id, in last 7 days), is_response))
+
+with recentmsg as (
+	select * from messages m
+	where ts between now()-interval '7' days and now()
+	and m.sender_id = $id)
+select 
+	(select count(*) from recentmsg) / 
+	(select sum(least(ct,1)) from (select rm.message_id, count(*) ct from messages m join recentmsg rm where
+			m.sender = rm.recipient and
+			m.recipient = rm.sender
+			and m.ts > rm.ts - interval '24' hour and m.ts < rm.ts
+			group by rm.message_id))
+
+
+
+select count(*), count(case when )
+from (
+	select * from messages m
+	where ts between now()-interval '7' days and now()
+	and m.sender_id = $id) X
+join (
+	select ct > 0 from (
+		select count(*) from messages m where
+			m.sender = checkMsg.recipient and
+			m.recipient = checkMsg.sender
+			and ts > checkMsg.ts - interval '24' hour and ts < ...)
+			) Y on 
 
 addFeature($id, frac(MessageEvent($id), is_response))
+
+def_feature recent_response_sent_frac {
+	def apply(m: MessageEvent) = {
+		val t = interval(m.t-"24 hours", m.t)
+		count(message_response(sender=m.sender_id), t) / count(message(sender=m.sender_id), t)
+	}
+}
+
 
 def_feature recent_response_sent_frac {
 	val all_sent = windowed_counter(m: MessageEvent => m.sender, "24 hours")
