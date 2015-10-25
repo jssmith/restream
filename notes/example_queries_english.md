@@ -29,7 +29,7 @@ This example involves providing search results and product recommendation in an 
 
 ## Dating recommendations ##
 
-Some of the examples below are also documented in the Antelope [code].
+Some of the examples below are also documented in the Antelope [code][dating-code].
 
 ### Events ###
 
