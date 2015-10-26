@@ -1,0 +1,45 @@
+Number of outstanding votes - time range begin + end
+
+def outstanding_ct(id) = {
+	Count({{Vote(from=_,to=id), interval(now-T,now)}}) - Count({{Vote(from=A, to=id) followed by Vote(from=id, to=A), interval(now-T,now)}})
+}
+
+
+def avg_response_time(id) = {
+	Avg({{Vote(from=A, to=id, t=tA) followed by Vote(from=id, to=A, t = tB)}} => tB-tA)
+}
+
+def avg_response_time(id) = {
+	// now add recent time
+	Avg({{Vote(from=A, to=id, t=tA) followed by Vote(from=id, to=A, t = tB), interval(now-T,now)}} => tB-tA)
+}
+
+def avg_response_time(id) = {
+	// now add recent time
+	Avg({{Vote(from=A, to=id, t=tA) not followed by Vote(from=id, to=A, t = tB), interval(now-T,now)}} => match_probability(A,id))
+}
+
+
+===================
+
+def fraction_conversations_initiated(id) = {
+	val a = Count({{MessageSent(from=id, to=B) followed by (MessageSent(from=id,to=B, t in interval (now-7 days,now))|MessageSent(from=B,to=id)*)}})
+	val b = Count({{MessageSent(from=A, to=id) followed by (MessageSent(from=id,to=A, t in interval (now-7 days, now)))(MessageSent(from=id,to=A)|MessageSent(from=B,to=id)*)}})
+	a / (a + b)
+}
+
+def fraction_conversations_initiated(id) = {
+	frac({{MessageSent(from=id,to=B), interval(now-7d,now)}}.map(_.B).distinct, m => conversation(Pair(id,m.to)).initiator == id)
+}
+
+def converation(p: Pair) = {
+	
+}
+
+class donversation(userPair) {
+	
+}
+
+Conversation(MessageSent(A,B)=>Pair(A,B))
+
+Conversations(Pair(A,B))
