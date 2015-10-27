@@ -51,7 +51,7 @@ Some of the examples below are also documented in the Antelope [code][dating-cod
 - **Same Region(`userIdA`,`userIdB`)** - is the last update of geographic region for `userIdA` the same as the last update of geographic region for `userIdB`?
 - **Bordering Region(`userIdA`,`userIdB`)** - is the last update of geographic region for `userIdA` one that borders the last update of geographic region for `userIdB`?
 - **User Activity(`userId`)** - how long ago was `userId` last active (login event, action event of any sort).
-- **Age difference absolute value(`userIdA`, userIdB`)** - absolute value of difference between last updated age for `userIdA` and last updated age for `userIdB`.
+- **Age difference absolute value(`userIdA`, `userIdB`)** - absolute value of difference between last updated age for `userIdA` and last updated age for `userIdB`.
 - **Are ages in same bucket(`userIdA`,`userIdB`)** - is the age of `userIdA` in the same 5-range as the age of `userIdB` (i.e., ⌊`ageOf(userIdA)`/5⌋ = ⌊`ageOf(userIdB)`/5⌋)?
 - **Positive vote fraction(`userId`)** - fraction of `VoteEvents` where `userId` is voting that result in a `positive` vote value. Compute for all time, recent window, exponentially smoothed with time constant κ.
 - **Number of votes exceeds threshold(`userId`,`threshold`)** - is the number of votes made greater than the `threshold` value. Compute for all time, recent window, exponentially smoothed with time constant κ.
