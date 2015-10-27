@@ -28,6 +28,8 @@ def fraction_conversations_initiated(id) = {
 	a / (a + b)
 }
 
+
+
 def fraction_conversations_initiated(id) = {
 	frac({{MessageSent(from=id,to=B), interval(now-7d,now)}}.map(_.B).distinct, m => conversation(Pair(id,m.to)).initiator == id)
 }
