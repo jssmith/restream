@@ -23,6 +23,12 @@ body {
   color: $darkGray;
 }
 
+code {
+  background-color: #C2EBFF;
+  border-radius: 2px;
+  padding: 1px;
+}
+
 .container {
   margin: 0 auto;
   max-width: 740px;
