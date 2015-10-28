@@ -14,7 +14,7 @@ def avg_response_time(id) = {
 	Avg({{Vote(from=A, to=id, t=tA) followed by Vote(from=id, to=A, t = tB), interval(now-T,now)}} => tB-tA)
 }
 
-def avg_response_time(id) = {
+def avg_match_probability(id) = {
 	// now add recent time
 	Avg({{Vote(from=A, to=id, t=tA) not followed by Vote(from=id, to=A, t = tB), interval(now-T,now)}} => match_probability(A,id))
 }
