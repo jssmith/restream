@@ -1,7 +1,7 @@
-package replaydb.experiment.rcollection
+package replaydb.language.rcollection
 
-import replaydb.experiment.event.Event
-import replaydb.experiment.pattern.Pattern
+import replaydb.language.event.Event
+import replaydb.language.pattern.Pattern
 
 /**
  * Created by erik on 10/27/15.

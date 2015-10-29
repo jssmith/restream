@@ -135,6 +135,12 @@ object Exists {
 	def apply
 }
 
+def avg_response_time(id) = {
+	// now add recent time
+	Avg({{Vote(from=A, to=id, t=tA) followed by Vote(from=id, to=A, t = tB), interval(now-T,now)}} => tB-tA)
+}
+
+
 def isResponse(m1: MessageEvent) = {
 	Exists(SingleEventPatternSpec(classOf[MessageEvent], m2 => m2.sender=m1.recipient && m2.recipient = m1.sender, ts in m.ts.'interval previous 24 hours'))
 }

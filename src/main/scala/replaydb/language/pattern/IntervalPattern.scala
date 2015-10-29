@@ -1,11 +1,8 @@
-package replaydb.experiment.pattern
+package replaydb.language.pattern
 
-import replaydb.experiment.Interval
-import replaydb.experiment.event.Event
+import replaydb.language.Interval
+import replaydb.language.event.Event
 
-/**
- * Created by erik on 10/27/15.
- */
 class IntervalPattern(basePattern: Pattern, interval: Interval) extends Pattern {
 
   override def toString: String = {

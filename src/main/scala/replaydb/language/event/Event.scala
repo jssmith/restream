@@ -1,7 +1,7 @@
-package replaydb.experiment.event
+package replaydb.language.event
 
-import replaydb.experiment.Timestamp
-import replaydb.experiment.pattern.SingleEventPattern
+import replaydb.language.Timestamp
+import replaydb.language.pattern.SingleEventPattern
 
 /**
  * Created by erik on 10/27/15.

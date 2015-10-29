@@ -1,6 +1,6 @@
-package replaydb.experiment
+package replaydb.language
 
-import replaydb.experiment.event.{Event, MessageEvent}
+import replaydb.language.event.{Event, MessageEvent}
 
 object Test extends App {
 

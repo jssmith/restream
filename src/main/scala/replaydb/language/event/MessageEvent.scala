@@ -1,6 +1,6 @@
-package replaydb.experiment.event
+package replaydb.language.event
 
-import replaydb.experiment.Timestamp
+import replaydb.language.Timestamp
 
 /**
  * Created by erik on 10/27/15.

@@ -1,4 +1,4 @@
-package replaydb.experiment
+package replaydb.language
 
 object Timestamp {
 

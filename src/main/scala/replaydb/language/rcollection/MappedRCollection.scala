@@ -1,4 +1,4 @@
-package replaydb.experiment.rcollection
+package replaydb.language.rcollection
 
 /**
  * Created by erik on 10/27/15.
