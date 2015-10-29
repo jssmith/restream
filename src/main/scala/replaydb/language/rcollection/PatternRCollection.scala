@@ -3,9 +3,6 @@ package replaydb.language.rcollection
 import replaydb.language.event.Event
 import replaydb.language.pattern.Pattern
 
-/**
- * Created by erik on 10/27/15.
- */
 class PatternRCollection(parent: Pattern) extends RCollection[Event] {
 
   // should be less restrictive
@@ -19,6 +16,7 @@ class PatternRCollection(parent: Pattern) extends RCollection[Event] {
 
   def iterator: Iterator[Event] = {
     val parentSet = parent.get_matches
-    parentSet.iterator
+//    parentSet.iterator
+    null
   }
 }

@@ -1,7 +1,8 @@
 package replaydb.language.pattern
 
-import replaydb.language.Interval
+import replaydb.language.{Match, Interval}
 import replaydb.language.event.Event
+import scala.collection.immutable.Set
 
 class IntervalPattern(basePattern: Pattern, interval: Interval) extends Pattern {
 
@@ -9,7 +10,7 @@ class IntervalPattern(basePattern: Pattern, interval: Interval) extends Pattern 
     basePattern.toString + s", from $interval"
   }
 
-  override def get_matches: Set[Event] = {
+  override def get_matches: Set[Match[Event]] = {
     Set() // not yet implemented...
   }
 }

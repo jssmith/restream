@@ -1,8 +1,8 @@
-package replaydb.language.pattern
+package replaydb.language
 
 import replaydb.language.event.Event
 
-class Match[EventType <: Event](primaryEvent: EventType, eventSequence: Seq[EventType] = null) {
+class Match[+EventType <: Event](primaryEvent: EventType, eventSequence: Seq[EventType] = null) {
 
   val events = if (eventSequence == null) Seq(primaryEvent) else eventSequence
 
@@ -16,7 +16,7 @@ class Match[EventType <: Event](primaryEvent: EventType, eventSequence: Seq[Even
 }
 
 object Match {
-  implicit def matchToEvent(m: Match): Event = {
+  implicit def matchToEvent[T <: Event](m: Match[T]): T = {
     m.getPrimary
   }
 }

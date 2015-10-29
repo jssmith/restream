@@ -7,8 +7,8 @@ import replaydb.language.pattern.SingleEventPattern
  * Created by erik on 10/27/15.
  */
 object Event {
-  implicit def patternFromEvent(e: Event): SingleEventPattern = {
-    new SingleEventPattern(e)
+  implicit def patternFromEvent[T <: Event](e: T): SingleEventPattern[T] = {
+    new SingleEventPattern[T](e)
   }
 }
 

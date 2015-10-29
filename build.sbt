@@ -4,6 +4,8 @@ version := "0.1-SNAPSHOT"
 
 scalaVersion := "2.11.7"
 
+scalacOptions += "-feature"
+
 libraryDependencies ++= Seq(
   "com.twitter" %% "chill" % "0.7.1",
   "org.apache.commons" % "commons-math3" % "3.5",
