@@ -2,7 +2,7 @@ package replaydb.language
 
 import replaydb.language.bindings._
 import replaydb.language.time._
-import replaydb.language.event.{Event, MessageEvent}
+import replaydb.language.event.{VoteEvent, Event, MessageEvent}
 import replaydb.language.pattern.Pattern
 import replaydb.language.time.Timestamp
 
@@ -35,16 +35,17 @@ object Test extends App {
 //    followedBy myThirdEvent after 3.minutes)
 //  println("Pattern is: " + p + "\n")
 
-  // TODO need to support some variant of 'within' for the overall pattern
+//  val bindA = Binding[Long]("A")
+//  val bindB = Binding[Long]("B")
+//  val myEvent = MessageEvent(bindA, bindB)
+//  val mySecondEvent = MessageEvent(bindB, bindA)
+//  val myThirdEvent = MessageEvent(2L, 3L)
+//  val p = (myEvent followedBy mySecondEvent within (7.hours + 2.minutes)
+//    followedBy myThirdEvent after 3.minutes) withinLast 2.days
+//  println("Pattern is: " + p)
 
-  val bindA = Binding[Long]("A")
-  val bindB = Binding[Long]("B")
-  val myEvent = MessageEvent(bindA, bindB)
-  val mySecondEvent = MessageEvent(bindB, bindA)
-  val myThirdEvent = MessageEvent(2L, 3L)
-  val p = (myEvent followedBy mySecondEvent within (7.hours + 2.minutes)
-    followedBy myThirdEvent after 3.minutes) withinLast 2.days
-  println("Pattern is: " + p)
+  val id = 314159L
+  val p = VoteEvent(Binding("A"), id) followedBy VoteEvent(id, Binding("A"))
 }
 
 //object EventStore {

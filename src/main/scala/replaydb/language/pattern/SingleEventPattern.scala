@@ -1,7 +1,7 @@
 package replaydb.language.pattern
 
 import replaydb.language.bindings.TimeIntervalBinding
-import replaydb.language.{Match}
+import replaydb.language.Match
 import replaydb.language.event.Event
 
 // Matches a single event (not a sequence) though you may specify multiple
@@ -29,8 +29,8 @@ class SingleEventPattern[T <: Event](event: T, otherEvents: T*) extends Pattern 
 
   override def toString: String = {
     if (events.size == 1)
-      event.toString + " " + _interval
+      event.toString + " " + (if (_interval == null) "" else _interval)
     else
-      events.mkString("(", " OR ", ")") + " " + _interval
+      events.mkString("(", " OR ", ")") + " " + (if (_interval == null) "" else _interval)
   }
 }
