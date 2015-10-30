@@ -1,9 +1,9 @@
 package replaydb.language.event
 
-import replaydb.language.bindings.Binding
+import replaydb.language.bindings.{TimeIntervalBinding, Binding}
 import replaydb.language.time.Timestamp
 
-class VoteEvent(val voterID: Binding[Long], val voteeID: Binding[Long], ts: Binding[Timestamp]) extends Event(ts) {
+class VoteEvent(val voterID: Binding[Long], val voteeID: Binding[Long], ts: TimeIntervalBinding) extends Event(ts) {
   override def equals(a: Any): Boolean = {
     val other = a.asInstanceOf[VoteEvent]
     voterID == other.voterID && voteeID == other.voteeID && ts == other.ts
@@ -19,6 +19,11 @@ class VoteEvent(val voterID: Binding[Long], val voteeID: Binding[Long], ts: Bind
 
 object VoteEvent {
   def apply(voterID: Binding[Long], voteeID: Binding[Long]): VoteEvent = {
-    new VoteEvent(voterID, voterID, null)
+    apply(voterID, voteeID, null)
+  }
+
+  def apply(voterID: Binding[Long], voteeID: Binding[Long],
+             ts: TimeIntervalBinding): VoteEvent = {
+    new VoteEvent(voterID, voteeID, ts)
   }
 }

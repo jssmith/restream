@@ -1,6 +1,6 @@
 package replaydb.language.event
 
-import replaydb.language.bindings.Binding
+import replaydb.language.bindings.{TimeIntervalBinding, Binding}
 import replaydb.language.time.Timestamp
 
 //class MessageEvent(val sendID: Long, val recvID: Long, ts: Timestamp) extends Event(ts) {
@@ -13,7 +13,7 @@ import replaydb.language.time.Timestamp
 //  }
 //}
 
-class MessageEvent(val sendID: Binding[Long], val recvID: Binding[Long], ts: Binding[Timestamp]) extends Event(ts) {
+class MessageEvent(val sendID: Binding[Long], val recvID: Binding[Long], ts: TimeIntervalBinding) extends Event(ts) {
   override def equals(a: Any): Boolean = {
     val other = a.asInstanceOf[MessageEvent]
     sendID == other.sendID && recvID == other.recvID && ts == other.ts

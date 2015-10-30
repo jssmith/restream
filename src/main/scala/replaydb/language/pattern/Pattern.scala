@@ -18,9 +18,9 @@ object Pattern {
     new SingleEventPattern[T](e)
   }
 
-  def apply[T <: Event](e: T, es: T*): SingleEventPattern[T] = {
-    new SingleEventPattern[T](e, es:_*)
-  }
+//  def apply[T <: Event](e: T, es: T*): SingleEventPattern[T] = {
+//    new SingleEventPattern[T](e, es:_*)
+//  }
 }
 
 abstract class Pattern {

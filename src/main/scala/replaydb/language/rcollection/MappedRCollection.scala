@@ -1,8 +1,5 @@
 package replaydb.language.rcollection
 
-/**
- * Created by erik on 10/27/15.
- */
 class MappedRCollection[A, B](parent: RCollection[A], mapF: (A) => B) extends RCollection[B] {
   def map[C](f: (B) => C): MappedRCollection[B, C] = {
     new MappedRCollection[B, C](this, f)

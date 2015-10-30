@@ -6,19 +6,19 @@ import replaydb.language.event.{VoteEvent, Event, MessageEvent}
 import replaydb.language.pattern.Pattern
 import replaydb.language.time.Timestamp
 
-class SpecificMessageEvent(sendID: Long, recvID: Long, ts: Timestamp)
-  extends MessageEvent(sendID, recvID, ts) {
-
-  override def toString: String = {
-    s"SpecificMessageEvent(from $sendID to $recvID at $ts)"
-  }
-}
-
-class OtherEvent(id: Long, ts: Timestamp) extends Event(ts) {
-  override def toString: String = {
-    s"OtherEvent(from $id at $ts)"
-  }
-}
+//class SpecificMessageEvent(sendID: Long, recvID: Long, ts: Timestamp)
+//  extends MessageEvent(sendID, recvID, ts) {
+//
+//  override def toString: String = {
+//    s"SpecificMessageEvent(from $sendID to $recvID at $ts)"
+//  }
+//}
+//
+//class OtherEvent(id: Long, ts: Timestamp) extends Event(ts) {
+//  override def toString: String = {
+//    s"OtherEvent(from $id at $ts)"
+//  }
+//}
 
 object Test extends App {
 
@@ -45,7 +45,14 @@ object Test extends App {
 //  println("Pattern is: " + p)
 
   val id = 314159L
-  val p = VoteEvent(Binding("A"), id) followedBy VoteEvent(id, Binding("A"))
+  val bindingTA = TimeIntervalBinding.global("TA")
+  val p = VoteEvent(Binding("A"), id, bindingTA) followedBy
+    VoteEvent(id, Binding("A"), TimeIntervalBinding("TB", bindingTA, 0.millis, Long.MaxValue.millis))
+  println("Pattern is: " + p)
+//  p.map({
+//    case ve: VoteEvent => 0L // somehow, Binding("TB").value - Binding("TA").value
+//    case _ =>
+//  })
 }
 
 //object EventStore {

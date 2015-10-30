@@ -28,4 +28,6 @@ object NamedTimeIntervalBinding {
     (1 to 15).map(_ => rand.nextPrintableChar()).mkString("")
   }
 
+
+
 }

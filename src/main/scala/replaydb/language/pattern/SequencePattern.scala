@@ -13,7 +13,9 @@ class SequencePattern(parent: SingleEventPattern[_ <: Event]) extends Pattern {
   var intervals: Seq[Interval] = Seq()
 
   // TODO this is kind of weird right now... trying to set a binding relative to now, until the beginning of time
-  parent.interval = new TimeIntervalBinding(Binding.now, Long.MinValue.millis, 0.millis)
+  if (parent.interval == null) {
+    parent.interval = new TimeIntervalBinding(Binding.now, Long.MinValue.millis, 0.millis)
+  }
 
   def followedBy(p: SingleEventPattern[_ <: Event]): SequencePattern = {
     patterns :+= p
