@@ -8,6 +8,10 @@ class ConstantBinding[T](val value: T) extends Binding[T] {
   }
 
   override def toString: String = {
-    value.toString
+    if (value.isInstanceOf[String]) {
+      "\"" + value + "\""
+    } else {
+      value.toString
+    }
   }
 }

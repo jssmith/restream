@@ -42,3 +42,25 @@ class TimeOffset(val lengthMillis: Long) {
   }
 
 }
+
+object TimeOffset {
+
+  val MinTime: TimeOffset = new TimeOffset(Long.MinValue) {
+    override def toString: String = {
+      "min"
+    }
+
+    override def unary_- = MaxTime
+  }
+
+  val MaxTime: TimeOffset = new TimeOffset(Long.MaxValue) {
+    override def toString: String = {
+      "max"
+    }
+
+    override def unary_- = MinTime
+  }
+
+  def max = MaxTime
+  def min = MinTime
+}

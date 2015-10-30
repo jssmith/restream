@@ -30,7 +30,7 @@ object TimeIntervalBinding {
   // Returns a TimeIntervalBinding matching against NOW which matches everything
   // back to the beginning of time
   def global: TimeIntervalBinding = {
-    new TimeIntervalBinding(Long.MinValue.millis, 0.millis)
+    new TimeIntervalBinding(TimeOffset.min, 0)
   }
 
   def global(name: String): NamedTimeIntervalBinding = {

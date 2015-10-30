@@ -20,6 +20,14 @@ package object time {
     new TimeWrappedDouble(v)
   }
 
+  implicit def intToTimeOffset(v: Int): TimeOffset = {
+    new TimeOffset(v)
+  }
+
+  implicit def longToTimeOffset(v: Long): TimeOffset = {
+    new TimeOffset(v)
+  }
+
   val MillisPerSecond = 1000
   val MillisPerMinute = 60 * MillisPerSecond
   val MillisPerHour = 60 * MillisPerMinute

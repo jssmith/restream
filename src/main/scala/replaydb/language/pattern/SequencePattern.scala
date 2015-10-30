@@ -9,12 +9,10 @@ import replaydb.language.time.{TimeOffset, Interval}
 class SequencePattern(parent: SingleEventPattern[_ <: Event]) extends Pattern {
 
   var patterns: Seq[SingleEventPattern[_ <: Event]] = Seq(parent)
-  // intervals[i] is the allowable time interval between patterns[i] and patterns[i-1] 
-  var intervals: Seq[Interval] = Seq()
 
   // TODO this is kind of weird right now... trying to set a binding relative to now, until the beginning of time
   if (parent.interval == null) {
-    parent.interval = new TimeIntervalBinding(Binding.now, Long.MinValue.millis, 0.millis)
+    parent.interval = new TimeIntervalBinding(Binding.now, TimeOffset.min, 0)
   }
 
   def followedBy(p: SingleEventPattern[_ <: Event]): SequencePattern = {
@@ -31,12 +29,10 @@ class SequencePattern(parent: SingleEventPattern[_ <: Event]) extends Pattern {
     this
   }
 
-  // TODO should add checks to make sure intervals actually get set
-
   def after(minTime: TimeOffset): SequencePattern = {
     // TODO possibly not the best way to represent an unbounded interval...
     // for both of these should probably have some special TimePeriod value
-    within(minTime, new TimeOffset(Long.MaxValue))
+    within(minTime, TimeOffset.max)
   }
 
   def within(maxTime: TimeOffset): SequencePattern = {
@@ -71,13 +67,6 @@ class SequencePattern(parent: SingleEventPattern[_ <: Event]) extends Pattern {
 //    ret
     Seq()
   }
-  
-//  def setNextInterval(interval: Interval): Unit = {
-//    if (intervals.size == patterns.size) {
-//      throw new RuntimeException("Can't have an interval without a corresponding pattern!")
-//    }
-//    intervals :+= interval
-//  }
 
 //  override def toString: String = {
 //    patterns.head.toString +

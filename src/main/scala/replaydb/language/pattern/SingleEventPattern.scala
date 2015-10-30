@@ -4,13 +4,14 @@ import replaydb.language.bindings.TimeIntervalBinding
 import replaydb.language.Match
 import replaydb.language.event.Event
 
-// Matches a single event (not a sequence) though you may specify multiple
-// match possibilities
+// Matches a single event (not a sequence)
 class SingleEventPattern[T <: Event](val event: T) extends Pattern {
 
 //  var _interval: TimeIntervalBinding = _
   def interval = event.ts
-  def interval_=(binding: TimeIntervalBinding) = event.ts = binding
+  def interval_=(binding: TimeIntervalBinding) = {
+    event.ts = binding
+  }
 
   def followedBy(p: SingleEventPattern[_ <: Event]): SequencePattern = {
     val sp = new SequencePattern(this)

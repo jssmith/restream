@@ -13,7 +13,8 @@ import replaydb.language.time.Timestamp
 //  }
 //}
 
-class MessageEvent(val sendID: Binding[Long], val recvID: Binding[Long], ts: TimeIntervalBinding) extends Event(ts) {
+class MessageEvent(val sendID: Binding[Long], val recvID: Binding[Long], _ts: TimeIntervalBinding) extends Event(_ts) {
+
   override def equals(a: Any): Boolean = {
     val other = a.asInstanceOf[MessageEvent]
     sendID == other.sendID && recvID == other.recvID && ts == other.ts

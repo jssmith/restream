@@ -13,6 +13,7 @@ trait Binding[T] {
 // time, but then you need to deal with scoping...
 
 object Binding {
+
   def apply[T](name: String): NamedVarBinding[T] = {
     new NamedVarBinding[T](name)
   }
@@ -22,5 +23,7 @@ object Binding {
   def now: NamedTimeIntervalBinding = { TimeNowBinding }
 
 }
+
+
 
 

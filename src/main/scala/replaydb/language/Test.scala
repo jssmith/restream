@@ -3,7 +3,7 @@ package replaydb.language
 import replaydb.language.bindings._
 import replaydb.language.time._
 import replaydb.language.event.{VoteEvent, Event, MessageEvent}
-import replaydb.language.pattern.Pattern
+import replaydb.language.pattern.{SequencePattern, Pattern}
 import replaydb.language.time.Timestamp
 
 //class SpecificMessageEvent(sendID: Long, recvID: Long, ts: Timestamp)
@@ -37,19 +37,22 @@ object Test extends App {
 
 //  val bindA = Binding[Long]("A")
 //  val bindB = Binding[Long]("B")
-//  val myEvent = MessageEvent(bindA, bindB)
-//  val mySecondEvent = MessageEvent(bindB, bindA)
+//  val myEvent = MessageEvent("A".bind, "B".bind)
+//  val mySecondEvent = MessageEvent("B".bind, "A".bind)
 //  val myThirdEvent = MessageEvent(2L, 3L)
 //  val p = (myEvent followedBy mySecondEvent within (7.hours + 2.minutes)
 //    followedBy myThirdEvent after 3.minutes) withinLast 2.days
 //  println("Pattern is: " + p)
 
   val id = 314159L
-  val bindingTA = TimeIntervalBinding.global("TA")
-  val p = VoteEvent(Binding("A"), id, bindingTA) followedBy
-    VoteEvent(id, Binding("A"), TimeIntervalBinding("TB", bindingTA, 0.millis, Long.MaxValue.millis))
+  val p: SequencePattern = VoteEvent("A".bind, id, TimeIntervalBinding.global("TA")) followedBy
+    VoteEvent(id, "A".bind, TimeIntervalBinding("TB", "TA".bind, 0, TimeOffset.max))
   println("Pattern is: " + p)
-//  p.map({
+
+  val p2: SequencePattern = VoteEvent("A".bind, id) followedBy VoteEvent(id, "A".bind) after 0.seconds
+  println("Pattern2 is: " + p2)
+
+  p.map((e: Event) => { 0L } )
 //    case ve: VoteEvent => 0L // somehow, Binding("TB").value - Binding("TA").value
 //    case _ =>
 //  })
