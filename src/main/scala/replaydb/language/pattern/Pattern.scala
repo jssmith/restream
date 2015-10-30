@@ -1,6 +1,6 @@
 package replaydb.language.pattern
 
-import replaydb.language.{Match, Interval}
+import replaydb.language.Match
 import replaydb.language.event.Event
 import replaydb.language.rcollection.PatternRCollection
 import scala.collection.immutable.Set
@@ -25,14 +25,14 @@ object Pattern {
 
 abstract class Pattern {
 
-  def followed_by(p: SingleEventPattern[_]): SequencePattern = {
+  def followedBy(p: SingleEventPattern[_]): SequencePatternWithoutInterval = {
     val sp = new SequencePattern(this)
-    sp followed_by p
+    sp followedBy p
   }
 
 //  def with_interval(interval: Interval): IntervalPattern = {
 //    new IntervalPattern(this, interval)
 //  }
 
-  def get_matches: Seq[Match[Event]]
+  def getMatches: Seq[Match[Event]]
 }

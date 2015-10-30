@@ -1,7 +1,8 @@
 package replaydb.language.event
 
-import replaydb.language.Timestamp
+import replaydb.language.bindings.Binding
 import replaydb.language.pattern.SingleEventPattern
+import replaydb.language.time.Timestamp
 
 /**
  * Created by erik on 10/27/15.
@@ -12,6 +13,6 @@ object Event {
   }
 }
 
-class Event(val ts: Timestamp) {
+class Event(val ts: Binding[Timestamp]) {
 
 }

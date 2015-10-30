@@ -5,16 +5,16 @@ import replaydb.language.event.Event
 
 // Matches a single event (not a sequence) though you may specify multiple
 // match possibilities
-class SingleEventPattern[EventType <: Event](event: EventType, otherEvents: EventType*) extends Pattern {
+class SingleEventPattern[T <: Event](event: T, otherEvents: T*) extends Pattern {
   // TODO how to represent the constraints on the values of fields if there are variables?
 
   var events = Set(otherEvents:_*) + event
 
-  def or[ET >: EventType <: Event](p: ET): SingleEventPattern[ET] = {
+  def or[S >: T <: Event](p: S): SingleEventPattern[S] = {
     new SingleEventPattern(p, events.toSeq:_*)
   }
 
-  override def get_matches: Seq[Match[EventType]] = {
+  override def getMatches: Seq[Match[T]] = {
 //    EventStore.get.filter(_.equals(event))
     Seq()
   }

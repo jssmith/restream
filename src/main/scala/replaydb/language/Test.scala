@@ -1,7 +1,10 @@
 package replaydb.language
 
+import replaydb.language.bindings._
+import replaydb.language.time._
 import replaydb.language.event.{Event, MessageEvent}
 import replaydb.language.pattern.Pattern
+import replaydb.language.time.Timestamp
 
 class SpecificMessageEvent(sendID: Long, recvID: Long, ts: Timestamp)
   extends MessageEvent(sendID, recvID, ts) {
@@ -13,24 +16,24 @@ class SpecificMessageEvent(sendID: Long, recvID: Long, ts: Timestamp)
 
 class OtherEvent(id: Long, ts: Timestamp) extends Event(ts) {
   override def toString: String = {
-    s"OtherEvent(from $id at $ts"
+    s"OtherEvent(from $id at $ts)"
   }
 }
 
 object Test extends App {
 
-  val myEvent = new MessageEvent(0, 1, Timestamp.any)
-  val mySecondEvent = new MessageEvent(1, 0, Timestamp.any)
-  val myThirdEvent = new MessageEvent(2, 3, Timestamp.any)
-  val mySpecificEvent = new SpecificMessageEvent(4, 5, Timestamp.any)
-  val myOtherEvent = new OtherEvent(5, Timestamp.any)
-  val p = (myEvent or myOtherEvent) followed_by (mySecondEvent or mySpecificEvent) followed_by myThirdEvent
+  val bindA = Binding[Long]("A")
+  val bindB = Binding[Long]("B")
+  val bindT = Binding[Timestamp]("T")
+  val bindT2 = new NamedTimeIntervalBinding("T2", bindT, 5 minutes, 10 minutes)
+  val myEvent = new MessageEvent(bindA, bindB, bindT)
+  val mySecondEvent = new MessageEvent(bindB, bindA, bindT2)
+  val myThirdEvent = new MessageEvent(2L, 3L, new TimeIntervalBinding(bindT2, 5 minutes, 10 minutes))
+//  val mySpecificEvent = new SpecificMessageEvent(4, 5, Timestamp.any)
+//  val myOtherEvent = new OtherEvent(5, Timestamp.any)
+  val p = (myEvent followedBy mySecondEvent within 7.hours
+    followedBy myThirdEvent after 3.minutes)
   println("Pattern is: " + p)
-//  println("Found " + p.count + " matches")
-//  for (m <- p) { println(m) }
-//  val mapped = p.map((e: Event) => e.toString + " was matched!")
-//  for (m <- mapped) { println(m) }
-
 }
 
 object EventStore {

@@ -11,11 +11,11 @@ class PatternRCollection(parent: Pattern) extends RCollection[Event] {
   }
 
   def count: Long = {
-    parent.get_matches.size
+    parent.getMatches.size
   }
 
   def iterator: Iterator[Event] = {
-    val parentSet = parent.get_matches
+    val parentSet = parent.getMatches
 //    parentSet.iterator
     null
   }
