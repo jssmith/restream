@@ -1,14 +1,19 @@
 package replaydb.language.time
 
-class TimeOffset(lengthMillis: Long) {
+class TimeOffset(val lengthMillis: Long) {
 
   override def toString: String = {
-    // TODO probably not what we want
     if (lengthMillis == 0) "0s" else nicePrint(lengthMillis)
   }
 
-  def nicePrint(millis: Long): String = {
-    if (millis / MillisPerWeek >= 1) {
+  def nicePrint(_millis: Long): String = {
+    var prefix = ""
+    var millis = _millis
+    if (millis < 0) {
+      prefix = "-"
+      millis = if (millis == Long.MinValue) Long.MaxValue else -millis
+    }
+    prefix + (if (millis / MillisPerWeek >= 1) {
       s"${millis / MillisPerWeek}w${nicePrint(millis % MillisPerWeek)}"
     } else if (millis / MillisPerDay >= 1) {
       s"${millis / MillisPerDay}d${nicePrint(millis % MillisPerDay)}"
@@ -22,7 +27,18 @@ class TimeOffset(lengthMillis: Long) {
       s"${millis}ms"
     } else {
       ""
-    }
+    })
+  }
+
+  def unary_+ = this
+  def unary_- = new TimeOffset(-lengthMillis)
+
+  def +(x: TimeOffset): TimeOffset = {
+    new TimeOffset(lengthMillis + x.lengthMillis)
+  }
+
+  def -(x: TimeOffset): TimeOffset = {
+    new TimeOffset(lengthMillis - x.lengthMillis)
   }
 
 }

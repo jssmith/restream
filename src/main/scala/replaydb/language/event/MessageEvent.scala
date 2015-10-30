@@ -19,13 +19,16 @@ class MessageEvent(val sendID: Binding[Long], val recvID: Binding[Long], ts: Bin
     sendID == other.sendID && recvID == other.recvID && ts == other.ts
   }
   override def toString: String = {
-    s"MessageEvent(from $sendID to $recvID at ($ts))"
+    if (ts == null) {
+      s"MessageEvent(from $sendID to $recvID)"
+    } else {
+      s"MessageEvent(from $sendID to $recvID at ($ts))"
+    }
   }
 }
 
-// is this how this is supposed to work?
 object MessageEvent {
-  def apply(sendID: Long, recvID: Long, ts: Timestamp): MessageEvent = {
-    new MessageEvent(sendID, recvID, ts)
+  def apply(sendID: Binding[Long], recvID: Binding[Long]): MessageEvent = {
+    new MessageEvent(sendID, recvID, null)
   }
 }

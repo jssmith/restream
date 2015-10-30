@@ -6,7 +6,7 @@ object Interval {
   }
 }
 
-class Interval(minTime: TimeOffset, maxTime: TimeOffset) {
+class Interval(val minTime: TimeOffset, val maxTime: TimeOffset) {
   override def toString: String = {
     s"$minTime to $maxTime"
   }

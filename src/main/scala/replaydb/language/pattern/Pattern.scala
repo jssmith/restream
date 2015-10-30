@@ -10,7 +10,7 @@ object Pattern {
     new PatternRCollection(p)
   }
 
-  implicit def SequencePatternFromPattern(p: Pattern): SequencePattern = {
+  implicit def SequencePatternFromPattern(p: SingleEventPattern[_ <: Event]): SequencePattern = {
     new SequencePattern(p)
   }
 
@@ -24,11 +24,6 @@ object Pattern {
 }
 
 abstract class Pattern {
-
-  def followedBy(p: SingleEventPattern[_]): SequencePatternWithoutInterval = {
-    val sp = new SequencePattern(this)
-    sp followedBy p
-  }
 
 //  def with_interval(interval: Interval): IntervalPattern = {
 //    new IntervalPattern(this, interval)

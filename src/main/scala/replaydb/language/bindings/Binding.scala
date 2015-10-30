@@ -17,6 +17,10 @@ object Binding {
     new NamedVarBinding[T](name)
   }
 
+  // ????
+  val TimeNowBinding = new TimeNowBinding
+  def now: NamedTimeIntervalBinding = { TimeNowBinding }
+
 }
 
 
