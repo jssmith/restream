@@ -3,8 +3,8 @@ package replaydb.runtimedev
 import replaydb.event.Event
 
 // define the data classes
-case class ProductView(sku: Long, ts: Long) extends Event
-case class ProductUpdate(sku: Long, ts: Long) extends Event
+case class ProductView(ts: Long, sku: Long) extends Event
+case class ProductUpdate(ts: Long, sku: Long) extends Event
 
 class OverallPopularity extends ReplayRunnable {
   val totalViewCt: ReplayCounter = null
