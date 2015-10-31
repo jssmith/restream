@@ -6,7 +6,7 @@ import replaydb.language.pattern.Pattern
 
 class PatternRCollection[T <: Event](parent: Pattern[T]) extends RCollection[T] {
 
-  override def map[B](f: T => B): MappedRCollection[T, B] = {
+  override def map[B <: Event](f: T => B): MappedRCollection[T, B] = {
     new MappedRCollection[T, B](this, f)
   }
 

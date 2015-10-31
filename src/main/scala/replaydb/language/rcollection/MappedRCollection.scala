@@ -1,9 +1,10 @@
 package replaydb.language.rcollection
 
+import replaydb.language.event.Event
 import replaydb.language.Match
 
-class MappedRCollection[S, T](parent: RCollection[S], mapF: S => T) extends RCollection[T] {
-  def map[U](f: T => U): MappedRCollection[T, U] = {
+class MappedRCollection[S <: Event, T <: Event](parent: RCollection[S], mapF: S => T) extends RCollection[T] {
+  def map[U <: Event](f: T => U): MappedRCollection[T, U] = {
     new MappedRCollection[T, U](this, f)
   }
 
