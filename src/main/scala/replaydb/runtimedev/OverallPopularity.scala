@@ -24,7 +24,7 @@ class OverallPopularity extends ReplayRunnable {
 
   def updateC(pv: ProductView): Unit = {
     val productCt: Long = productViewCt.get(pv.sku, pv.ts).get.get(pv.ts)
-    val otherProductCt = productViewCt.get(allProducts.getRandom(pv.ts).get, pv.ts).get.get(pv.ts)
+    val otherProductCt = productViewCt.get(allProducts.getRandom(pv.ts).get._1, pv.ts).get.get(pv.ts)
     val allCt = totalViewCt.get(pv.ts)
     printf("1,%d,%d", productCt, allCt)
     printf("0,%d,%d", otherProductCt, allCt)

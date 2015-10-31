@@ -2,6 +2,7 @@ package replaydb.runtimedev
 
 import org.scalatest.FlatSpec
 import replaydb.event.Event
+import replaydb.runtimedev.monotonicImpl._
 
 class ReplayRuntimeSpec extends FlatSpec {
   "A ReplayRuntime" should "just compile" in {
@@ -9,27 +10,31 @@ class ReplayRuntimeSpec extends FlatSpec {
     var endCt = 0L
     class Analysis {
       import ReplayRuntime._
-      val c: ReplayCounter = new ReplayCounter {
-        var ct = 0L
-        var lastTs = Long.MinValue
-        private def checkTimeIncrease(ts: Long): Unit = {
-          if (ts < lastTs) {
-            throw new RuntimeException("time decreased")
-          }
-          lastTs = ts
-        }
-        override def add(value: Long, ts: Long): Unit = {
-          checkTimeIncrease(ts)
-          ct += value
-        }
-        override def get(ts: Long): Long = {
-          checkTimeIncrease(ts)
-          ct
-        }
-      }
+      val c: ReplayCounter = new ReplayCounterImpl
+      val cSku: ReplayMap[Long,ReplayCounter] = new ReplayMapImpl[Long, ReplayCounter](new ReplayCounterImpl)
+      val allSkus: ReplayMap[Long,Int] = new ReplayMapImpl[Long,Int](0)
 
-      bind { pv: ProductView => c.add(1, pv.ts) }
-      bind { pv: ProductView => println(s"Have product view at time ${pv.ts}. Count is ${c.get(pv.ts)}.") }
+      bind { pu: ProductUpdate =>
+        allSkus.put(pu.sku, 1, pu.ts)
+      }
+      bind { pv: ProductView =>
+        c.add(1, pv.ts)
+        cSku.update(1, _.add(1, pv.ts), pv.ts)
+      }
+      bind { pv: ProductView =>
+        val ts = pv.ts
+        val ct = c.get(ts)
+        def printTraining(sku: Long, outcome: Boolean) = {
+          val featureValue = if (ct > 0) {
+            0D
+          } else {
+            cSku.get(sku, ts).orNull.get(ts).toDouble / ct.toDouble
+          }
+          println(s"$outcome,$featureValue")
+        }
+        printTraining(pv.sku, outcome = true)
+        printTraining(allSkus.getRandom(ts).orNull._1, outcome = false)
+      }
       bind { se: StopEvent  => endCt = c.get(se.ts)}
       def update(x: Event) = emit(x)
     }

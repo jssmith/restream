@@ -51,7 +51,9 @@ class ReplayRuntimeImpl(val c: Context) {
       cq"zz : $tpt => ..$statements".asInstanceOf[CaseDef]
     }.toList ++ List(cq"_ => ".asInstanceOf[CaseDef])
     val me = Match(x.tree, cases)
-    c.Expr[Unit](c.untypecheck(me))
+    val res = c.Expr[Unit](c.untypecheck(me))
+//    println(res)
+    res
   }
 }
 
