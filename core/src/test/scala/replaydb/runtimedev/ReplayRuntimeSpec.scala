@@ -14,29 +14,30 @@ class ReplayRuntimeSpec extends FlatSpec {
       val cSku: ReplayMap[Long,ReplayCounter] = new ReplayMapImpl[Long, ReplayCounter](new ReplayCounterImpl)
       val allSkus: ReplayMap[Long,Int] = new ReplayMapImpl[Long,Int](0)
 
-      bind { pu: ProductUpdate =>
-        allSkus.put(pu.sku, 1, pu.ts)
-      }
-      bind { pv: ProductView =>
-        c.add(1, pv.ts)
-        cSku.update(1, _.add(1, pv.ts), pv.ts)
-      }
-      bind { pv: ProductView =>
-        val ts = pv.ts
-        val ct = c.get(ts)
-        def printTraining(sku: Long, outcome: Boolean) = {
-          val featureValue = if (ct > 0) {
-            0D
-          } else {
-            cSku.get(sku, ts).orNull.get(ts).toDouble / ct.toDouble
-          }
-          println(s"$outcome,$featureValue")
+      def update(x: Event) = emit(x) {
+        bind { pu: ProductUpdate =>
+          allSkus.put(pu.sku, 1, pu.ts)
         }
-        printTraining(pv.sku, outcome = true)
-        printTraining(allSkus.getRandom(ts).orNull._1, outcome = false)
+        bind { pv: ProductView =>
+          c.add(1, pv.ts)
+          cSku.update(1, _.add(1, pv.ts), pv.ts)
+        }
+        bind { pv: ProductView =>
+          val ts = pv.ts
+          val ct = c.get(ts)
+          def printTraining(sku: Long, outcome: Boolean) = {
+            val featureValue = if (ct > 0) {
+              0D
+            } else {
+              cSku.get(sku, ts).orNull.get(ts).toDouble / ct.toDouble
+            }
+            println(s"$outcome,$featureValue")
+          }
+          printTraining(pv.sku, outcome = true)
+          printTraining(allSkus.getRandom(ts).orNull._1, outcome = false)
+        }
+        bind { se: StopEvent  => endCt = c.get(se.ts)}
       }
-      bind { se: StopEvent  => endCt = c.get(se.ts)}
-      def update(x: Event) = emit(x)
     }
 
     val a = new Analysis
@@ -63,32 +64,32 @@ class ReplayRuntimeSpec extends FlatSpec {
       val initiations: ReplayMap[(Long,Long), Long] = new ReplayMapImpl(???) // TODO don't actually have an update function
       val userAverages: ReplayMap[Long, ReplayAvg] = new ReplayMapImpl(new ReplayAvg(new ReplayCounterImpl))
 
-      bind {
-        me: MessageEvent =>
-          initiations.put((me.senderUserId, me.recipientUserId), me.ts, me.ts)
+      def update(x: Event) = emit(x) {
+        bind {
+          me: MessageEvent =>
+            initiations.put((me.senderUserId, me.recipientUserId), me.ts, me.ts)
+        }
+        bind {
+          me: MessageEvent =>
+            initiations.get((me.recipientUserId, me.senderUserId), me.ts) match {
+              case Some(startTime) =>
+                userAverages.update(me.senderUserId, _.add(me.ts - startTime, me.ts), me.ts)
+              case None =>
+            }
+        }
+        bind {
+          e: PrintUserEvent =>
+            updateLastPrinted(userAverages.get(e.userId, e.ts) match {
+              case Some(avgVal) =>
+                val avg: Double = avgVal.get(e.ts).get
+                println(s"${e.userId} has average response time $avg")
+                Some(avg)
+              case None =>
+                println(s"${e.userId} has no responses")
+                None
+            })
+        }
       }
-      bind {
-        me: MessageEvent =>
-          initiations.get((me.recipientUserId, me.senderUserId), me.ts) match {
-            case Some(startTime) =>
-              userAverages.update(me.senderUserId, _.add(me.ts - startTime, me.ts), me.ts)
-            case None =>
-          }
-      }
-      bind {
-        e: PrintUserEvent =>
-          updateLastPrinted(userAverages.get(e.userId, e.ts) match {
-            case Some(avgVal) =>
-              val avg: Double = avgVal.get(e.ts).get
-              println(s"${e.userId} has average response time $avg")
-              Some(avg)
-            case None =>
-              println(s"${e.userId} has no responses")
-              None
-          })
-      }
-
-      def update(x: Event) = emit(x)
     }
 
     val a = new Analysis
@@ -108,37 +109,37 @@ class ReplayRuntimeSpec extends FlatSpec {
       val initiations: ReplayMap[(Long, Long), Int] = new ReplayMapImpl(???)
       val userAverages: ReplayMap[Long, ReplayAvg] = new ReplayMapImpl(new ReplayAvg(new ReplayCounterImpl))
 
-      bind {
-        me: MessageEvent =>
-          initiations.put((me.senderUserId, me.recipientUserId), 1, me.ts)
-      }
+      def update(x: Event) = emit(x) {
+        bind {
+          me: MessageEvent =>
+            initiations.put((me.senderUserId, me.recipientUserId), 1, me.ts)
+        }
 
-      bind {
-        me: MessageEvent =>
-          userAverages.update(me.senderUserId,
-            _.add(
-              initiations.get((me.recipientUserId, me.senderUserId), me.ts) match {
-                case Some(_) => 1
-                case None => 0
-              }, me.ts
-            ), me.ts
-          )
-      }
+        bind {
+          me: MessageEvent =>
+            userAverages.update(me.senderUserId,
+              _.add(
+                initiations.get((me.recipientUserId, me.senderUserId), me.ts) match {
+                  case Some(_) => 1
+                  case None => 0
+                }, me.ts
+              ), me.ts
+            )
+        }
 
-      bind {
-        e: PrintUserEvent =>
-          updateLastPrinted(userAverages.get(e.userId, e.ts) match {
-            case Some(fracResponseVal) =>
-              val frac: Double = fracResponseVal.get(e.ts).get
-              println(s"${e.userId} has fraction sent in response $frac")
-              Some(frac)
-            case None =>
-              println(s"${e.userId} has no responses")
-              None
-          })
+        bind {
+          e: PrintUserEvent =>
+            updateLastPrinted(userAverages.get(e.userId, e.ts) match {
+              case Some(fracResponseVal) =>
+                val frac: Double = fracResponseVal.get(e.ts).get
+                println(s"${e.userId} has fraction sent in response $frac")
+                Some(frac)
+              case None =>
+                println(s"${e.userId} has no responses")
+                None
+            })
+        }
       }
-
-      def update(x: Event) = emit(x)
     }
 
     val a = new Analysis

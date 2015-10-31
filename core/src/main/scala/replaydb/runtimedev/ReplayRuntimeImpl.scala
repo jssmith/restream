@@ -28,7 +28,7 @@ class ReplayRuntimeImpl(val c: Context) {
     c.Expr[Unit](q"")
   }
 
-  def emitImpl(x: Expr[Any]): c.Expr[Any] = {
+  def emitImpl(x: Expr[Any])(bindings: Expr[Any]): c.Expr[Any] = {
     val bindings = ReplayRuntime.getBindings(c.internal.enclosingOwner.owner).
       asInstanceOf[ArrayBuffer[c.Expr[Any]]]
     val m = mutable.HashMap[Type, ArrayBuffer[(TermName,Tree)]]()
@@ -69,5 +69,6 @@ object ReplayRuntime {
   }
 
   def bind(x: Any): Unit = macro ReplayRuntimeImpl.bindImpl
-  def emit(x:Any): Any = macro ReplayRuntimeImpl.emitImpl
+  def emit(x:Any)(bindings: Any): Any = macro ReplayRuntimeImpl.emitImpl
+
 }
