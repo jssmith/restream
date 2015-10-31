@@ -45,14 +45,17 @@ object Test extends App {
 //  println("Pattern is: " + p)
 
   val id = 314159L
-  val p: SequencePattern = VoteEvent("A".bind, id, TimeIntervalBinding.global("TA")) followedBy
+  val p = VoteEvent("A".bind, id, TimeIntervalBinding.global("TA")) followedBy
     VoteEvent(id, "A".bind, TimeIntervalBinding("TB", "TA".bind, 0, TimeOffset.max))
   println("Pattern is: " + p)
 
-  val p2: SequencePattern = VoteEvent("A".bind, id) followedBy VoteEvent(id, "A".bind) after 0.seconds
+  val p2 = VoteEvent("A".bind, id) followedBy VoteEvent(id, "A".bind) after 0.seconds
   println("Pattern2 is: " + p2)
 
-  p.map((e: Event) => { 0L } )
+  val p3 = VoteEvent("A".bind, id) followedBy MessageEvent(id, "A".bind) after 0.seconds
+  println("Pattern3 is: " + p3)
+
+//  p.map((e: Event) => { 0L } )
 //    case ve: VoteEvent => 0L // somehow, Binding("TB").value - Binding("TA").value
 //    case _ =>
 //  })

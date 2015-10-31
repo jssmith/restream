@@ -2,7 +2,7 @@ package replaydb.language.pattern
 
 import replaydb.language.time.{TimeOffset, Interval}
 
-class SequencePatternWithoutInterval(parent: SequencePattern) {
+//class SequencePatternWithoutInterval(parent: SequencePattern) {
 
 //  // TODO these should all be restricted to positive (forward in time) only?
 //
@@ -25,4 +25,4 @@ class SequencePatternWithoutInterval(parent: SequencePattern) {
 //    parent
 //  }
 
-}
+//}

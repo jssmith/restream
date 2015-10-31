@@ -6,44 +6,42 @@ import replaydb.language.bindings.{Binding, TimeNowBinding, TimeIntervalBinding,
 import replaydb.language.event.Event
 import replaydb.language.time.{TimeOffset, Interval}
 
-class SequencePattern(parent: SingleEventPattern[_ <: Event]) extends Pattern {
+class SequencePattern[T <: Event](last: SingleEventPattern[T], others: SingleEventPattern[T]*) extends Pattern[T] {
 
-  var patterns: Seq[SingleEventPattern[_ <: Event]] = Seq(parent)
+  var patterns = Seq(others:_*) :+ last
 
   // TODO this is kind of weird right now... trying to set a binding relative to now, until the beginning of time
-  if (parent.interval == null) {
-    parent.interval = new TimeIntervalBinding(Binding.now, TimeOffset.min, 0)
+  if (last.interval == null && others.isEmpty) {
+    last.interval = new TimeIntervalBinding(Binding.now, TimeOffset.min, 0)
   }
 
-  def followedBy(p: SingleEventPattern[_ <: Event]): SequencePattern = {
-    patterns :+= p
+  def followedBy[S >: T <: Event](p: SingleEventPattern[S]): SequencePattern[S] = {
+//    patterns :+= p
+    new SequencePattern[S](p, patterns:_*)
 //    new SequencePatternWithoutInterval(this)
-    this
+//    this
   }
 
-  var withinLastSet = false
-
-  def withinLast(maxTimeAgo: TimeOffset): SequencePattern = {
-    withinLastSet = true
-    parent.interval.min = -maxTimeAgo
-    this
-  }
-
-  def after(minTime: TimeOffset): SequencePattern = {
+//  def withinLast(maxTimeAgo: TimeOffset): SequencePattern = {
+//    parent.interval.min = -maxTimeAgo
+//    this
+//  }
+//
+  def after(minTime: TimeOffset): SequencePattern[T] = {
     // TODO possibly not the best way to represent an unbounded interval...
     // for both of these should probably have some special TimePeriod value
     within(minTime, TimeOffset.max)
   }
 
-  def within(maxTime: TimeOffset): SequencePattern = {
+  def within(maxTime: TimeOffset): SequencePattern[T] = {
     within(new TimeOffset(0L), maxTime)
   }
 
-  def within(interval: Interval): SequencePattern = {
+  def within(interval: Interval): SequencePattern[T] = {
     within(interval.minTime, interval.maxTime)
   }
 
-  def within(min: TimeOffset, max: TimeOffset): SequencePattern = {
+  def within(min: TimeOffset, max: TimeOffset): SequencePattern[T] = {
     val previousPattern = patterns.dropRight(1).last
     previousPattern.interval match {
       case b: NamedTimeIntervalBinding => patterns.last.interval =
@@ -57,7 +55,7 @@ class SequencePattern(parent: SingleEventPattern[_ <: Event]) extends Pattern {
     this
   }
 
-  override def getMatches: Seq[Match[Event]] = {
+  override def getMatches: Seq[Match[T]] = {
     // TODO this is clearly not correct
 //    var ret = Seq[Match[Event]]()
 //    for (mtch1 <- p1.get_matches; mtch2 <- p2.get_matches) {

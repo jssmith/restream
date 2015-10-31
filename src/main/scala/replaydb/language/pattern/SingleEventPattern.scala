@@ -5,7 +5,7 @@ import replaydb.language.Match
 import replaydb.language.event.Event
 
 // Matches a single event (not a sequence)
-class SingleEventPattern[T <: Event](val event: T) extends Pattern {
+class SingleEventPattern[+T <: Event](val event: T) extends Pattern[T] {
 
 //  var _interval: TimeIntervalBinding = _
   def interval = event.ts
@@ -13,10 +13,15 @@ class SingleEventPattern[T <: Event](val event: T) extends Pattern {
     event.ts = binding
   }
 
-  def followedBy(p: SingleEventPattern[_ <: Event]): SequencePattern = {
-    val sp = new SequencePattern(this)
+  def followedBy[S >: T <: Event](p: SingleEventPattern[S]): SequencePattern[S] = {
+    val sp = new SequencePattern[S](this)
     sp followedBy p
   }
+
+//  def followedBy(p: SingleEventPattern[_ <: Event]): SequencePattern = {
+//    val sp = new SequencePattern(this)
+//    sp followedBy p
+//  }
 
 //  def or[S >: T <: Event](p: S): SingleEventPattern[S] = {
 //    new SingleEventPattern(p, events.toSeq:_*)
