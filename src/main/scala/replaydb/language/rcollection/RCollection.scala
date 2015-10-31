@@ -1,6 +1,10 @@
 package replaydb.language.rcollection
 
-abstract class RCollection[B] extends Iterable[B] {
-  def map[C](f: (B) => C): MappedRCollection[B, C]
+import replaydb.language.Match
+import replaydb.language.event.Event
+
+abstract class RCollection[T <: Event] extends Iterable[T] {
+  def map[S](f: T => S): MappedRCollection[T, S]
   def count: Long
+  def iterator: Iterator[Match[T]]
 }

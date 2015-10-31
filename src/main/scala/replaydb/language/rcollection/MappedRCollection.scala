@@ -1,20 +1,26 @@
 package replaydb.language.rcollection
 
-class MappedRCollection[A, B](parent: RCollection[A], mapF: (A) => B) extends RCollection[B] {
-  def map[C](f: (B) => C): MappedRCollection[B, C] = {
-    new MappedRCollection[B, C](this, f)
+import replaydb.language.Match
+
+class MappedRCollection[S, T](parent: RCollection[S], mapF: S => T) extends RCollection[T] {
+  def map[U](f: T => U): MappedRCollection[T, U] = {
+    new MappedRCollection[T, U](this, f)
   }
+
   def count: Long = {
     parent.count
   }
-  def iterator: Iterator[B] = {
-    new Iterator[B] {
+
+  override def iterator: Iterator[Match[T]] = {
+    // TODO this iterator model won't actually work... not accounting for pushing
+    new Iterator[Match[T]] {
       val parentIterator = parent.iterator
       def hasNext: Boolean = {
         parentIterator.hasNext
       }
-      def next(): B = {
-        mapF(parentIterator.next())
+      def next(): Match[T] = {
+        val mappedValues = parentIterator.next().getEvents.map(mapF)
+        new Match[T](mappedValues.head, mappedValues.tail)
       }
     }
   }
