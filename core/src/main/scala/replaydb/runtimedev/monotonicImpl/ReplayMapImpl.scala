@@ -7,10 +7,6 @@ import scala.util.Random
 
 class ReplayMapImpl[K, V](default: => V) extends ReplayMap[K,V] with Monotonic {
   val m = mutable.Map[K,V]()
-  override def put(key: K, value: V, ts: Long): Unit = {
-    checkTimeIncrease(ts)
-    m.put(key, value)
-  }
 
   override def getRandom(ts: Long): Option[(K, V)] = {
     checkTimeIncrease(ts)
@@ -22,13 +18,15 @@ class ReplayMapImpl[K, V](default: => V) extends ReplayMap[K,V] with Monotonic {
     }
   }
 
-  override def update(key: K, fn: (V) => Unit, ts: Long): Unit = {
+  override def update(ts: Long, key: K, fn: (V) => V): Unit = {
     checkTimeIncrease(ts)
-    fn(m.getOrElseUpdate(key, default))
+    val newVal = fn(m.getOrElseUpdate(key, default))
+    m.put(key, newVal)
   }
 
-  override def get(key: K, ts: Long): Option[V] = {
+  override def get(ts: Long, key: K): Option[V] = {
     checkTimeIncrease(ts)
     m.get(key)
   }
+
 }

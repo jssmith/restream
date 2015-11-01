@@ -17,14 +17,15 @@ object EventGenerator extends App {
     val Uniform = Value("uniform")
     val Tunable = Value("tunable")
   }
-  if (args.length != 3) {
-    println("Usage: MessageGenerator [ uniform | tunable ] numUsers numEvents")
+  if (args.length != 4) {
+    println("Usage: MessageGenerator [ uniform | tunable ] numUsers numEvents numSplits")
     System.exit(1)
   }
   val generator = Generators.withName(args(0))
   val numUsers = Integer.parseInt(args(1))
   val numEvents = Integer.parseInt(args(2))
   var startTime = util.Date.df.parse("2015-01-01 00:00:00.000").getTime
+  val numSplits = Integer.parseInt(args(3))
   val rnd = new MersenneTwister(903485435L)
   val eventSource = generator match {
     case Generators.Uniform => new UniformEventSource(startTime, numUsers, rnd)
@@ -33,9 +34,9 @@ object EventGenerator extends App {
   val eventStorage = new SocialNetworkStorage
   val pm = new ProgressMeter(printInterval = generator match {
     case Generators.Uniform => 1000000
-    case Generators.Tunable => 10000
+    case Generators.Tunable => 1000000
   })
-  val w = eventStorage.getEventWriter(new BufferedOutputStream(new FileOutputStream("/tmp/events.out")))
+  val w = eventStorage.getSplitEventWriter("/tmp/events.out", numSplits)
   try {
     eventSource.genEvents(numEvents, e => {
       w.write(e)

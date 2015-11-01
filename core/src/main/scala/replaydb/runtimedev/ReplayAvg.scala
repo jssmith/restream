@@ -1,18 +1,16 @@
 package replaydb.runtimedev
 
-class ReplayAvg(counterSrc: => ReplayCounter) {
-  val sum: ReplayCounter = counterSrc
-  val ct: ReplayCounter = counterSrc
-  def add(value: Long, ts: Long) = {
-    sum.add(value, ts)
-    ct.add(1, ts)
-  }
-  def get(ts: Long): Option[Double] = {
-    val n = ct.get(ts)
-    if (n > 0) {
-      Some(sum.get(ts).toDouble / n.toDouble)
+case class ReplayAvg(sum: Long, ct: Long) {
+  def getAvg(): Option[Double] = {
+    if (ct > 0) {
+      Some(sum.toDouble / ct.toDouble)
     } else {
       None
     }
   }
+}
+
+object ReplayAvg {
+  def default = new ReplayAvg(0, 0)
+  def add(value: Long) = (prev: ReplayAvg) => new ReplayAvg(prev.sum + value, prev.ct + 1)
 }

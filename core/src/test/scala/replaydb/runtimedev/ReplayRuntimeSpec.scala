@@ -1,7 +1,7 @@
 package replaydb.runtimedev
 
 import org.scalatest.FlatSpec
-import replaydb.event.{MessageEvent, Event}
+import replaydb.event.{ProductView, ProductUpdate, MessageEvent, Event}
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev.monotonicImpl._
 
@@ -11,16 +11,16 @@ class ReplayRuntimeSpec extends FlatSpec {
     var endCt = 0L
     class Analysis {
       val c: ReplayCounter = new ReplayCounterImpl
-      val cSku: ReplayMap[Long,ReplayCounter] = new ReplayMapImpl[Long, ReplayCounter](new ReplayCounterImpl)
+      val cSku: ReplayMap[Long,Long] = new ReplayMapImpl[Long, Long](0L)
       val allSkus: ReplayMap[Long,Int] = new ReplayMapImpl[Long,Int](0)
 
       def update(x: Event) = emit(x) {
         bind { pu: ProductUpdate =>
-          allSkus.put(pu.sku, 1, pu.ts)
+          allSkus.update(ts = pu.ts, key = pu.sku, fn = _ => 1)
         }
         bind { pv: ProductView =>
           c.add(1, pv.ts)
-          cSku.update(1, _.add(1, pv.ts), pv.ts)
+          cSku.update(ts = pv.ts, key = pv.sku, fn = _ + 1)
         }
         bind { pv: ProductView =>
           val ts = pv.ts
@@ -29,9 +29,8 @@ class ReplayRuntimeSpec extends FlatSpec {
             val featureValue = if (ct > 0) {
               0D
             } else {
-              cSku.get(sku, ts).orNull.get(ts).toDouble / ct.toDouble
+              cSku.get(sku, ts).getOrElse(0L).toDouble / ct.toDouble
             }
-            println(s"$outcome,$featureValue")
           }
           printTraining(pv.sku, outcome = true)
           printTraining(allSkus.getRandom(ts).orNull._1, outcome = false)
@@ -61,31 +60,28 @@ class ReplayRuntimeSpec extends FlatSpec {
     class Analysis extends HasUserPrinter[Double] {
       import replaydb.event.MessageEvent
 
-      val initiations: ReplayMap[(Long,Long), Long] = new ReplayMapImpl(???) // TODO don't actually have an update function
-      val userAverages: ReplayMap[Long, ReplayAvg] = new ReplayMapImpl(new ReplayAvg(new ReplayCounterImpl))
+      val initiations: ReplayMap[(Long,Long), Long] = new ReplayMapImpl[(Long,Long),Long](Long.MaxValue)
+      val userAverages: ReplayMap[Long, ReplayAvg] = new ReplayMapImpl[Long,ReplayAvg](ReplayAvg.default)
 
       def update(x: Event) = emit(x) {
         bind {
           me: MessageEvent =>
-            initiations.put((me.senderUserId, me.recipientUserId), me.ts, me.ts)
+            initiations.update(ts = me.ts, key = (me.senderUserId, me.recipientUserId), prevMinTs => Math.min(prevMinTs, me.ts))
         }
         bind {
           me: MessageEvent =>
-            initiations.get((me.recipientUserId, me.senderUserId), me.ts) match {
+            initiations.get(ts = me.ts, key = (me.recipientUserId, me.senderUserId)) match {
               case Some(startTime) =>
-                userAverages.update(me.senderUserId, _.add(me.ts - startTime, me.ts), me.ts)
+                userAverages.update(ts = me.ts, key = me.senderUserId, fn = ReplayAvg.add(me.ts - startTime))
               case None =>
             }
         }
         bind {
           e: PrintUserEvent =>
-            updateLastPrinted(userAverages.get(e.userId, e.ts) match {
+            updateLastPrinted(userAverages.get(ts = e.ts, key = e.userId) match {
               case Some(avgVal) =>
-                val avg: Double = avgVal.get(e.ts).get
-                println(s"${e.userId} has average response time $avg")
-                Some(avg)
+                avgVal.getAvg()
               case None =>
-                println(s"${e.userId} has no responses")
                 None
             })
         }
@@ -106,36 +102,30 @@ class ReplayRuntimeSpec extends FlatSpec {
 
   it should "implement fraction sent in response" in {
     class Analysis extends HasUserPrinter[Double] {
-      val initiations: ReplayMap[(Long, Long), Int] = new ReplayMapImpl(???)
-      val userAverages: ReplayMap[Long, ReplayAvg] = new ReplayMapImpl(new ReplayAvg(new ReplayCounterImpl))
+      val initiations: ReplayMap[(Long, Long), Int] = new ReplayMapImpl(0)
+      val userAverages: ReplayMap[Long, ReplayAvg] = new ReplayMapImpl(ReplayAvg.default)
 
       def update(x: Event) = emit(x) {
         bind {
           me: MessageEvent =>
-            initiations.put((me.senderUserId, me.recipientUserId), 1, me.ts)
+            initiations.update(ts = me.ts, key = (me.senderUserId, me.recipientUserId), fn = _ => 1)
         }
 
         bind {
           me: MessageEvent =>
-            userAverages.update(me.senderUserId,
-              _.add(
-                initiations.get((me.recipientUserId, me.senderUserId), me.ts) match {
-                  case Some(_) => 1
-                  case None => 0
-                }, me.ts
-              ), me.ts
-            )
+            userAverages.update(ts = me.ts, key = me.senderUserId,
+              fn = ReplayAvg.add(initiations.get(ts = me.ts, key = (me.recipientUserId, me.senderUserId)) match {
+                case Some(_) => 1
+                case None => 0
+              }))
         }
 
         bind {
           e: PrintUserEvent =>
-            updateLastPrinted(userAverages.get(e.userId, e.ts) match {
+            updateLastPrinted(userAverages.get(ts = e.ts, key = e.userId) match {
               case Some(fracResponseVal) =>
-                val frac: Double = fracResponseVal.get(e.ts).get
-                println(s"${e.userId} has fraction sent in response $frac")
-                Some(frac)
+                fracResponseVal.getAvg()
               case None =>
-                println(s"${e.userId} has no responses")
                 None
             })
         }

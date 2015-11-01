@@ -1,16 +1,15 @@
 package replaydb.exec
 
-import java.io.{FileInputStream, BufferedInputStream}
+import java.io.{BufferedInputStream, FileInputStream}
 
-import replaydb.event.{MessageEvent, NewFriendshipEvent, Event}
+import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 import replaydb.io.SocialNetworkStorage
+import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
 import replaydb.runtimedev.monotonicImpl.{ReplayCounterImpl, ReplayMapImpl}
 import replaydb.util.ProgressMeter
-
-import replaydb.runtimedev.ReplayRuntime._
-
-object SpamDetector extends App {
+/*
+object ParallelSpamDetector extends App {
 
   class UserPair(val a: Long, val b: Long) {
     override def equals(o: Any) = o match {
@@ -25,26 +24,29 @@ object SpamDetector extends App {
   case class PrintSpamCounter(ts: Long) extends Event
 
   class Stats {
-    val friendships: ReplayMap[UserPair, Int] = new ReplayMapImpl[UserPair, Int](0)
-    val friendSendRatio: ReplayMap[Long, (Long, Long)] =
-      new ReplayMapImpl[Long, (Long, Long)]((0L,0L))
+
+    val friendships: ReplayMap[UserPair, Int] = new ReplayMapImpl(0)
+    val friendSendRatio: ReplayMap[Long, (ReplayCounter, ReplayCounter)] =
+      new ReplayMapImpl((new ReplayCounterImpl, new ReplayCounterImpl))
     val spamCounter: ReplayCounter = new ReplayCounterImpl
     def update(e: Event) = emit(e) {
       bind { e: NewFriendshipEvent =>
-        friendships.update(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
+        friendships.put(new UserPair(e.userIdA, e.userIdB), 1, e.ts)
       }
       bind { me: MessageEvent =>
         val ts = me.ts
-        friendships.get(ts = ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
-          case Some(_) => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
-          case None => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
+        friendships.get(new UserPair(me.senderUserId, me.recipientUserId), ts) match {
+          case Some(_) => friendSendRatio.update(me.senderUserId, _._1.add(1, ts), ts)
+          case None => friendSendRatio.update(me.senderUserId, _._2.add(1, ts), ts)
         }
       }
       bind {
         me: MessageEvent =>
           val ts = me.ts
-          friendSendRatio.get(ts = ts, key = me.senderUserId) match {
-            case Some((toFriends, toNonFriends)) =>
+          friendSendRatio.get(me.senderUserId, ts) match {
+            case Some((toFriendsCt, toNonFriendsCt)) =>
+              val toFriends = toFriendsCt.get(ts)
+              val toNonFriends = toNonFriendsCt.get(ts)
               if (toFriends + toNonFriends > 5) {
                 if (toNonFriends > toFriends) {
                   spamCounter.add(1, ts)
@@ -63,10 +65,19 @@ object SpamDetector extends App {
   val stats = new Stats
   var lastTimestamp = 0L
   val pm = new ProgressMeter(printInterval = 1000000, () => { stats.update(new PrintSpamCounter(lastTimestamp)); ""})
-  val r = eventStorage.readEvents(new BufferedInputStream(new FileInputStream("/tmp/events.out")), e => {
-    stats.update(e)
-    lastTimestamp = e.ts
-    pm.increment()
-  })
+  val threads = (0 until 4) map {
+    n => new Thread(new Runnable {
+      override def run(): Unit = {
+        eventStorage.readEvents(new BufferedInputStream(new FileInputStream(s"/tmp/events.out-$n")), e => {
+          stats.update(e)
+          lastTimestamp = e.ts
+          pm.increment()
+        })
+      }
+    }, s"process-events-$n")
+  }
+  threads.foreach(_.start())
+  threads.foreach(_.join())
   pm.finished()
 }
+*/
