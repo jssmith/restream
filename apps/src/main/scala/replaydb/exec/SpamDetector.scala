@@ -29,7 +29,7 @@ object SpamDetector extends App {
     val friendSendRatio: ReplayMap[Long, (Long, Long)] =
       new ReplayMapImpl[Long, (Long, Long)]((0L,0L))
     val spamCounter: ReplayCounter = new ReplayCounterImpl
-    def update(e: Event) = emit(e) {
+    def getRuntimeInterface = emit {
       bind { e: NewFriendshipEvent =>
         friendships.update(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
       }
@@ -61,10 +61,11 @@ object SpamDetector extends App {
 
   val eventStorage = new SocialNetworkStorage
   val stats = new Stats
+  val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
-  val pm = new ProgressMeter(printInterval = 1000000, () => { stats.update(new PrintSpamCounter(lastTimestamp)); ""})
+  val pm = new ProgressMeter(printInterval = 1000000, () => { si.update(new PrintSpamCounter(lastTimestamp)); ""})
   val r = eventStorage.readEvents(new BufferedInputStream(new FileInputStream("/tmp/events.out")), e => {
-    stats.update(e)
+    si.update(e)
     lastTimestamp = e.ts
     pm.increment()
   })

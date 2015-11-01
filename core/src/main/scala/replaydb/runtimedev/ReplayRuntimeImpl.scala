@@ -23,35 +23,110 @@ class ReplayRuntimeImpl(val c: Context) {
     }
   }
 
+  def dataflowAnalysis(bindings: Iterable[c.Expr[Any]]): Array[Array[c.Expr[Any]]] = {
+    trait Dataflow {
+      val obj: Tree
+    }
+    case class ReadDataflow (obj: Tree) extends Dataflow
+    case class WriteDataflow (obj: Tree) extends Dataflow
+    case class BindingDesc (binding: c.Expr[Any], dataflow: List[Dataflow])
+    class DependencyDetector {
+      val df = ArrayBuffer[BindingDesc]()
+      def add(x: c.Expr[Any]) = {
+        val dataflow: List[Dataflow] = x.tree.collect {
+          case Apply(Select(obj,meth: Name), _) if obj.tpe <:< typeOf[ReplayState] =>
+            meth match {
+              case TermName("get") | TermName("getOption") | TermName("getRandom") =>
+                ReadDataflow(obj)
+              case TermName("update") | TermName("merge") | TermName("add") =>
+                WriteDataflow(obj)
+              case _ =>
+                throw new RuntimeException(s"unexpected method $meth")
+            }
+        }
+        df += new BindingDesc(x, dataflow)
+      }
+      def analyze(): List[List[BindingDesc]] = {
+        val writers = mutable.HashMap[String,ArrayBuffer[BindingDesc]]()
+        for (bd <- df) {
+          for (wdf <- bd.dataflow.filter(_.isInstanceOf[WriteDataflow])) {
+            writers.getOrElseUpdate(wdf.obj.toString, ArrayBuffer[BindingDesc]()) += bd
+          }
+        }
+        var dependencies: ArrayBuffer[(BindingDesc, mutable.HashSet[BindingDesc])] = df.map { bd =>
+          (bd, mutable.HashSet[BindingDesc]() ++ bd.dataflow.filter(_.isInstanceOf[ReadDataflow]).flatMap(rdf => writers.getOrElse(rdf.obj.toString, List())))
+        }
+        val bindings = ArrayBuffer[List[BindingDesc]]()
+        while (dependencies.nonEmpty) {
+          val nodeps = dependencies.filter(_._2.isEmpty).map(_._1)
+          if (nodeps.isEmpty) {
+            throw new RuntimeException("cyclic dependencies")
+          }
+          bindings += nodeps.toList
+          dependencies = dependencies.filter(_._2.nonEmpty)
+          for (dep <- dependencies) {
+            dep._2 --= nodeps
+          }
+        }
+        bindings.toList
+      }
+    }
+
+    val dd = new DependencyDetector
+    for (binding <- bindings) {
+      dd.add(binding)
+    }
+    dd.analyze().map(bl => bl.map(_.binding).toArray).toArray
+  }
+
   def bindImpl(x: c.Expr[Any]): c.Expr[Unit] = {
     ReplayRuntime.addBinding(c.internal.enclosingOwner.owner, x)
     c.Expr[Unit](q"")
   }
 
-  def emitImpl(x: Expr[Any])(bindings: Expr[Any]): c.Expr[Any] = {
+  def emitImpl(bindings: Expr[Any]): c.Expr[RuntimeInterface] = {
     val bindings = ReplayRuntime.getBindings(c.internal.enclosingOwner.owner).
       asInstanceOf[ArrayBuffer[c.Expr[Any]]]
-    val m = mutable.HashMap[Type, ArrayBuffer[(TermName,Tree)]]()
-    for (b <- bindings) {
-      b.tree match {
-        case Function(params, body) =>
-          if (params.size == 1 && params(0).tpt.tpe <:< typeOf[Event]) {
-            m.getOrElseUpdate(params(0).tpt.tpe, ArrayBuffer[(TermName,Tree)]()) += ((params(0).name, body))
-          } else {
-            throw new RuntimeException("unrecognized function with parameters " + params)
-          }
-        case _ => throw new RuntimeException("expected function")
+    val bindingsAnalyzed = dataflowAnalysis(bindings)
+    val numPhases = bindingsAnalyzed.size
+
+    val phaseCases = (for (i <- 0 until bindingsAnalyzed.size) yield {
+      val m = mutable.HashMap[Type, ArrayBuffer[(TermName,Tree)]]()
+      for (b <- bindingsAnalyzed(i)) {
+        b.tree match {
+          case Function(params, body) =>
+            if (params.size == 1 && params(0).tpt.tpe <:< typeOf[Event]) {
+              m.getOrElseUpdate(params(0).tpt.tpe, ArrayBuffer[(TermName,Tree)]()) += ((params(0).name, body))
+            } else {
+              throw new RuntimeException("unrecognized function with parameters " + params)
+            }
+          case _ => throw new RuntimeException("expected function")
+        }
       }
-    }
-    val cases = m.map{ case (tpt, trees) =>
-      val statements = trees.map { case(termName, body) =>
-        val rt = replaceTransform(termName, TermName("zz"))
-        rt.transform(body)
-      }
-      cq"zz : $tpt => ..$statements".asInstanceOf[CaseDef]
-    }.toList ++ List(cq"_ => ".asInstanceOf[CaseDef])
-    val me = Match(x.tree, cases)
-    val res = c.Expr[Unit](c.untypecheck(me))
+
+      val cases = m.map{ case (tpt, trees) =>
+        val statements = trees.map { case(termName, body) =>
+          val rt = replaceTransform(termName, TermName("zz"))
+          rt.transform(body)
+        }
+        cq"zz : $tpt => ..$statements".asInstanceOf[CaseDef]
+      }.toList ++ List(cq"_ => ".asInstanceOf[CaseDef])
+      val me = Match(q"e", cases)
+      cq"$i => $me".asInstanceOf[CaseDef]
+    }).toList
+    val me = Match(q"phase", phaseCases)
+
+    val ri =
+      q"""
+         new RuntimeInterface {
+           def numPhases: Int = $numPhases
+           def update(phase: Int, e: Event): Unit = {
+             $me
+           }
+         }
+       """
+
+    val res = c.Expr[RuntimeInterface](c.untypecheck(ri))
 //    println(res)
     res
   }
@@ -69,6 +144,6 @@ object ReplayRuntime {
   }
 
   def bind(x: Any): Unit = macro ReplayRuntimeImpl.bindImpl
-  def emit(x:Any)(bindings: Any): Any = macro ReplayRuntimeImpl.emitImpl
+  def emit(bindings: Any): RuntimeInterface = macro ReplayRuntimeImpl.emitImpl
 
 }
