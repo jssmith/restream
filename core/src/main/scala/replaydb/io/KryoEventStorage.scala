@@ -53,12 +53,16 @@ trait KryoEventStorage  {
   }
 
   def getSplitEventWriter(fnBase: String, n: Int) = new EventWriter {
-    val outputs = ((0 until n) map (n => s"$fnBase-$n") map (
-      fn => new Output(new BufferedOutputStream(new FileOutputStream(fn))))).toArray
+    val outputs = if (n > 1) {
+      ((0 until n) map (n => s"$fnBase-$n") map (
+        fn => getEventWriter(new FileOutputStream(fn)))).toArray
+    } else {
+      Array(getEventWriter(new FileOutputStream(fnBase)))
+    }
     var index = 0
 
     override def write(e: Event): Unit = {
-      kryo.writeClassAndObject(outputs(index), e)
+      outputs(index).write(e)
       index = (index + 1) % n
     }
 
