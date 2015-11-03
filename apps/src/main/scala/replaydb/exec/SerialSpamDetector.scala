@@ -9,7 +9,7 @@ import replaydb.runtimedev._
 import replaydb.runtimedev.monotonicImpl.{ReplayCounterImpl, ReplayMapImpl}
 import replaydb.util.ProgressMeter
 
-object SpamDetector extends App {
+object SerialSpamDetector extends App {
 
   class UserPair(val a: Long, val b: Long) {
     override def equals(o: Any) = o match {

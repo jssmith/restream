@@ -1,5 +1,7 @@
 import sbt._
 import sbt.Keys._
+import sbtassembly._
+import sbtassembly.AssemblyKeys._
 
 object BuildSettings {
   val buildSettings = Defaults.coreDefaultSettings ++ Seq(
@@ -11,7 +13,11 @@ object BuildSettings {
       "-language:implicitConversions",
       "-language:experimental.macros",
       "-deprecation"
-    )
+    ),
+    assemblyMergeStrategy in assembly := {
+      case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    }
   )
 }
 
