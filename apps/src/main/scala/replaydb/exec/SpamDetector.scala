@@ -1,14 +1,13 @@
 package replaydb.exec
 
-import java.io.{FileInputStream, BufferedInputStream}
+import java.io.FileInputStream
 
-import replaydb.event.{MessageEvent, NewFriendshipEvent, Event}
+import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 import replaydb.io.SocialNetworkStorage
+import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
 import replaydb.runtimedev.monotonicImpl.{ReplayCounterImpl, ReplayMapImpl}
 import replaydb.util.ProgressMeter
-
-import replaydb.runtimedev.ReplayRuntime._
 
 object SpamDetector extends App {
 
@@ -64,7 +63,7 @@ object SpamDetector extends App {
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
   val pm = new ProgressMeter(printInterval = 1000000, () => { si.update(new PrintSpamCounter(lastTimestamp)); ""})
-  val r = eventStorage.readEvents(new BufferedInputStream(new FileInputStream("/tmp/events.out")), e => {
+  val r = eventStorage.readEvents(new FileInputStream("/tmp/events.out"), e => {
     si.update(e)
     lastTimestamp = e.ts
     pm.increment()

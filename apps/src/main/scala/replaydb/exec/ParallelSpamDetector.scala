@@ -1,14 +1,14 @@
 package replaydb.exec
 
-import java.io.{BufferedInputStream, FileInputStream}
+import java.io.FileInputStream
 
 import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.ReplayRuntime._
-import replaydb.runtimedev._
-import replaydb.runtimedev.monotonicImpl.{ReplayCounterImpl, ReplayMapImpl}
+import replaydb.runtimedev.threadedImpl.{ReplayCounterImpl, ReplayMapImpl, RunProgressCoordinator}
+import replaydb.runtimedev.{ReplayCounter, ReplayMap, _}
 import replaydb.util.ProgressMeter
-/*
+
 object ParallelSpamDetector extends App {
 
   class UserPair(val a: Long, val b: Long) {
@@ -24,29 +24,26 @@ object ParallelSpamDetector extends App {
   case class PrintSpamCounter(ts: Long) extends Event
 
   class Stats {
-
-    val friendships: ReplayMap[UserPair, Int] = new ReplayMapImpl(0)
-    val friendSendRatio: ReplayMap[Long, (ReplayCounter, ReplayCounter)] =
-      new ReplayMapImpl((new ReplayCounterImpl, new ReplayCounterImpl))
+    val friendships: ReplayMap[UserPair, Int] = new ReplayMapImpl[UserPair, Int](0)
+    val friendSendRatio: ReplayMap[Long, (Long, Long)] =
+      new ReplayMapImpl[Long, (Long, Long)]((0L,0L))
     val spamCounter: ReplayCounter = new ReplayCounterImpl
-    def update(e: Event) = emit(e) {
+    def getRuntimeInterface: RuntimeInterface = emit {
       bind { e: NewFriendshipEvent =>
-        friendships.put(new UserPair(e.userIdA, e.userIdB), 1, e.ts)
+        friendships.update(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
       }
       bind { me: MessageEvent =>
         val ts = me.ts
-        friendships.get(new UserPair(me.senderUserId, me.recipientUserId), ts) match {
-          case Some(_) => friendSendRatio.update(me.senderUserId, _._1.add(1, ts), ts)
-          case None => friendSendRatio.update(me.senderUserId, _._2.add(1, ts), ts)
+        friendships.get(ts = ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
+          case Some(_) => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
+          case None => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
         }
       }
       bind {
         me: MessageEvent =>
           val ts = me.ts
-          friendSendRatio.get(me.senderUserId, ts) match {
-            case Some((toFriendsCt, toNonFriendsCt)) =>
-              val toFriends = toFriendsCt.get(ts)
-              val toNonFriends = toNonFriendsCt.get(ts)
+          friendSendRatio.get(ts = ts, key = me.senderUserId) match {
+            case Some((toFriends, toNonFriends)) =>
               if (toFriends + toNonFriends > 5) {
                 if (toNonFriends > toFriends) {
                   spamCounter.add(1, ts)
@@ -61,23 +58,47 @@ object ParallelSpamDetector extends App {
     }
   }
 
-  val eventStorage = new SocialNetworkStorage
+  val numPartitions = 4
+  val partitionFnBase = "/tmp/events.out"
   val stats = new Stats
+  val si = stats.getRuntimeInterface
+  val numPhases = si.numPhases
   var lastTimestamp = 0L
-  val pm = new ProgressMeter(printInterval = 1000000, () => { stats.update(new PrintSpamCounter(lastTimestamp)); ""})
-  val threads = (0 until 4) map {
-    n => new Thread(new Runnable {
-      override def run(): Unit = {
-        eventStorage.readEvents(new BufferedInputStream(new FileInputStream(s"/tmp/events.out-$n")), e => {
-          stats.update(e)
-          lastTimestamp = e.ts
-          pm.increment()
-        })
-      }
-    }, s"process-events-$n")
-  }
+  val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases)
+  val overallProgressMeter = new ProgressMeter(1000000, name = Some("Overall Progress"))
+  val xInterval = 100000
+  val threads =
+    for (partitionId <- 0 until numPartitions; phaseId <- 0 until si.numPhases) yield {
+      new Thread(new Runnable {
+        val b = barrier.getCoordinatorInterface(partitionId, phaseId)
+        override def run(): Unit = {
+          val pm = new ProgressMeter(printInterval = 1000000, () => s"$partitionId-$phaseId\n${MemoryStats.getStats()}")
+          var limitTs = b.requestProgress(0)
+          var ct = 0L
+          val eventStorage = new SocialNetworkStorage
+          eventStorage.readEvents(new FileInputStream(s"$partitionFnBase-$partitionId"), e => {
+            while (e.ts > limitTs) {
+              limitTs = b.requestProgress(e.ts)
+            }
+            si.update(phaseId, e)
+            ct += 1
+            if (ct % xInterval == 0) {
+              b.update(e.ts - 1)
+              if (phaseId == numPhases - 1) {
+                overallProgressMeter.synchronized { overallProgressMeter.add(xInterval) }
+              }
+            }
+            lastTimestamp = e.ts
+            pm.increment()
+          })
+          overallProgressMeter.synchronized { overallProgressMeter.add((ct % xInterval).toInt) }
+          b.finished()
+          pm.finished()
+        }
+      }, s"process-events-$partitionId-$phaseId")
+    }
   threads.foreach(_.start())
   threads.foreach(_.join())
-  pm.finished()
+  overallProgressMeter.synchronized{ overallProgressMeter.finished() }
+  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue))
 }
-*/
