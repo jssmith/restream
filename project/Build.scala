@@ -45,4 +45,15 @@ object ReplayDBBuild extends Build {
       name := "replaydb-apps"
     )
   ) dependsOn (core)
+
+  lazy val spark_apps = Project("spark-apps", file("spark-apps"),
+    settings = buildSettings ++ Seq(
+      name := "replaydb-spark-apps",
+      libraryDependencies ++= Seq(
+        "org.apache.spark" %% "spark-core" % "1.5.1" % "provided",
+        "org.apache.spark" %% "spark-sql" % "1.5.1" % "provided",
+        "org.apache.spark" %% "spark-hive" % "1.5.1" % "provided"
+      )
+    )
+  ) dependsOn (core)
 }
