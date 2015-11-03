@@ -64,29 +64,29 @@ object ParallelSpamDetector extends App {
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
   var lastTimestamp = 0L
-  val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases)
+  val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, maxEventsPerPhase = 20000)
   val overallProgressMeter = new ProgressMeter(1000000, name = Some("Overall Progress"))
-  val xInterval = 100000
+  val xInterval = 1000
   val threads =
     for (partitionId <- 0 until numPartitions; phaseId <- 0 until si.numPhases) yield {
       new Thread(new Runnable {
         val b = barrier.getCoordinatorInterface(partitionId, phaseId)
         override def run(): Unit = {
-          val pm = new ProgressMeter(printInterval = 1000000, () => s"$partitionId-$phaseId\n${MemoryStats.getStats()}")
-          var limitTs = b.requestProgress(0)
+          val pm = new ProgressMeter(printInterval = 1000000, () => s"${MemoryStats.getStats()}", name = Some(s"$partitionId-$phaseId"))
           var ct = 0L
+          var limitTs = b.requestProgress(0, ct)
           val eventStorage = new SocialNetworkStorage
           eventStorage.readEvents(new FileInputStream(s"$partitionFnBase-$partitionId"), e => {
             while (e.ts > limitTs) {
-              limitTs = b.requestProgress(e.ts)
+              limitTs = b.requestProgress(e.ts, ct)
             }
             si.update(phaseId, e)
             ct += 1
             if (ct % xInterval == 0) {
-              b.update(e.ts - 1)
               if (phaseId == numPhases - 1) {
                 overallProgressMeter.synchronized { overallProgressMeter.add(xInterval) }
               }
+              b.update(e.ts - 1, ct)
             }
             lastTimestamp = e.ts
             pm.increment()
