@@ -1,7 +1,7 @@
 package replaydb.runtimedev.threadedImpl
 
 class ThreadAvg(name: String) {
-  val printThresholdDelta = 100000
+  val printThresholdDelta = 10000000
   var printThreshold: Long = printThresholdDelta
   class Avg (var ct: Long, var sum: Long) {
     var lastPrintCt = 0L

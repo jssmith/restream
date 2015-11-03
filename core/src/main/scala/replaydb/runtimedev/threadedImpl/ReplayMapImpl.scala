@@ -3,8 +3,9 @@ package replaydb.runtimedev.threadedImpl
 import replaydb.runtimedev.{ReplayMap, ReplayValue}
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
-class ReplayMapImpl[K, V](default: => V) extends ReplayMap[K, V] {
+class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] {
   val m = new java.util.concurrent.ConcurrentHashMap[K, ReplayValue[V]]()
   override def get(ts: Long, key: K): Option[V] = {
     val x = m.get(key)

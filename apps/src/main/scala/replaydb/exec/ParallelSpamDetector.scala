@@ -55,13 +55,17 @@ object ParallelSpamDetector extends App {
     }
   }
 
-  val numPartitions = 4
-  val partitionFnBase = "/tmp/events.out"
-
-  val coordinationInterval = if (args.length >= 1) { args(0).toInt } else { 1000 }
-  val maxInProgressEvents = if (args.length >= 2) { args(1).toInt } else { 20000 }
-  println(s"coordination interval = $coordinationInterval")
-  println(s"max in progress events = $maxInProgressEvents")
+  if (args.length != 4) {
+    println(
+      """Usage: ParallelSpamDetector baseFilename numPartitions coordinationInterval maxInProgressEvents
+        |  Suggested values: numPartitions = 4, coordinationInterval = 2000, maxInProgressEvents = 20000
+      """.stripMargin)
+    System.exit(1)
+  }
+  val partitionFnBase = args(0)
+  val numPartitions = args(1).toInt
+  val coordinationInterval = args(2).toInt
+  val maxInProgressEvents = args(3).toInt
 
   val stats = new Stats
   val si = stats.getRuntimeInterface

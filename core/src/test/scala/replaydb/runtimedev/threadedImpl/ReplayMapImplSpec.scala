@@ -4,7 +4,7 @@ import org.scalatest.FlatSpec
 
 class ReplayMapImplSpec extends FlatSpec {
   "A ReplayMap2Impl" should "implement some counters on a single key" in {
-    val m = new ReplayMapImpl[Int, Int](0)
+    val m = new ReplayMapImpl[Int, java.lang.Integer](0)
     assert(m.get(ts = 10, key = 1) === None)
     m.update(ts = 50, key = 1, _ => 10)
     assert(m.get(ts = 49, key = 1) === None)
@@ -16,7 +16,7 @@ class ReplayMapImplSpec extends FlatSpec {
   }
 
   it should "implement some counters on multiple keys" in {
-    val m = new ReplayMapImpl[Int, Int](5)
+    val m = new ReplayMapImpl[Int, java.lang.Integer](5)
     m.update(ts = 50, key = 1, _ + 7)
     m.update(ts = 50, key = 2, _ * 3)
     m.update(ts = 100, key = 1, _ * 3)
