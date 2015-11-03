@@ -5,7 +5,7 @@ import java.io.FileInputStream
 import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.ReplayRuntime._
-import replaydb.runtimedev.threadedImpl.{ReplayCounterImpl, ReplayMapImpl, RunProgressCoordinator}
+import replaydb.runtimedev.threadedImpl.{MultiReaderEventSource, ReplayCounterImpl, ReplayMapImpl, RunProgressCoordinator}
 import replaydb.runtimedev.{ReplayCounter, ReplayMap, _}
 import replaydb.util.ProgressMeter
 
@@ -67,6 +67,9 @@ object ParallelSpamDetector extends App {
   val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, maxEventsPerPhase = 20000)
   val overallProgressMeter = new ProgressMeter(1000000, name = Some("Overall Progress"))
   val xInterval = 1000
+  val readerThreads = (for (partitionId <- 0 until numPartitions) yield {
+    new MultiReaderEventSource(s"$partitionFnBase-$partitionId", numPhases, bufferSize = 100000)
+  }).toArray
   val threads =
     for (partitionId <- 0 until numPartitions; phaseId <- 0 until si.numPhases) yield {
       new Thread(new Runnable {
@@ -75,8 +78,7 @@ object ParallelSpamDetector extends App {
           val pm = new ProgressMeter(printInterval = 1000000, () => s"${MemoryStats.getStats()}", name = Some(s"$partitionId-$phaseId"))
           var ct = 0L
           var limitTs = b.requestProgress(0, ct)
-          val eventStorage = new SocialNetworkStorage
-          eventStorage.readEvents(new FileInputStream(s"$partitionFnBase-$partitionId"), e => {
+          readerThreads(partitionId).readEvents(e => {
             while (e.ts > limitTs) {
               limitTs = b.requestProgress(e.ts, ct)
             }
@@ -97,7 +99,9 @@ object ParallelSpamDetector extends App {
         }
       }, s"process-events-$partitionId-$phaseId")
     }
+  readerThreads.foreach(_.start())
   threads.foreach(_.start())
+  readerThreads.foreach(_.join())
   threads.foreach(_.join())
   overallProgressMeter.synchronized{ overallProgressMeter.finished() }
   println("Final spam count: " + stats.spamCounter.get(Long.MaxValue))

@@ -23,7 +23,7 @@ class ProgressMeter(val printInterval: Long = 5000, val extraInfo: () => String 
 
   def add(delta: Int): Unit = {
     ct += delta
-    if (ct > nextPrintPoint) {
+    if (ct >= nextPrintPoint) {
       println(s"""${formatName}progress $ct""")
       val extraStr = extraInfo()
       if (extraStr != "") {
