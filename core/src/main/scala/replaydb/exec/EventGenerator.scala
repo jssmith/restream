@@ -19,7 +19,7 @@ object EventGenerator extends App {
   }
 
   if (args.length < 3 || args.length > 4) {
-    println("Usage: MessageGenerator ( uniform | tunable ) numUsers numEvents [ numSplits ]")
+    println("Usage: EventGenerator ( uniform | tunable ) numUsers numEvents [ numSplits ]")
     System.exit(1)
   }
 

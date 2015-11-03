@@ -6,14 +6,14 @@ import replaydb.event.Event
 import replaydb.io.SocialNetworkStorage
 
 class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) extends Thread {
-  val buffer = new Array[Event](bufferSize)
-  val positions = new Array[Int](numReaders)
+  private val buffer = new Array[Event](bufferSize)
+  private val positions = new Array[Long](numReaders)
 
-  var pos = 0L
-  var done = false
-  var numReadersRegistered = 0
+  private var pos = 0L
+  private var done = false
+  private var numReadersRegistered = 0
 
-  def nextReaderNum(): Int = {
+  private def nextReaderNum(): Int = {
     if (numReadersRegistered < numReaders) {
       val ret = numReadersRegistered
       numReadersRegistered += 1
@@ -25,22 +25,28 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
 
   override def run(): Unit = {
     val eventStorage = new SocialNetworkStorage
+    val updateDelta = 100
+    var localPos = pos
+    var posUpdate = localPos + updateDelta
 
     var limit = positions.min + bufferSize
     eventStorage.readEvents(new FileInputStream(fn), e => {
-      if (pos >= limit) {
+      if (localPos >= limit) {
         positions.synchronized {
-          while ({ limit = positions.min + bufferSize; pos >= limit }) {
+          while ({ limit = positions.min + bufferSize; localPos >= limit }) {
 //            println(s"main thread blocked pos=$pos limit=$limit")
             positions.wait()
           }
         }
       }
-      buffer((pos % bufferSize).toInt) = e
-      // TODO this synchronization could be expensive
-      this.synchronized {
-        pos = pos + 1
-        this.notifyAll()
+      buffer((localPos % bufferSize).toInt) = e
+      localPos += 1
+      if (localPos == posUpdate) {
+        this.synchronized {
+          pos = localPos
+          this.notifyAll()
+        }
+        posUpdate += updateDelta
       }
     })
     this.synchronized {
@@ -51,17 +57,22 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
 
   def readEvents(f: Event => Unit): Unit = {
     val readerId = nextReaderNum()
-    var readerPos = 0
+    val readerUpdateDelta = 100
+    var readerPos = 0L
+    var readerPosUpdate = readerPos + readerUpdateDelta
     var localDone = false
     var posLimit = this.synchronized { pos }
     do {
       while (readerPos < posLimit) {
-        f(buffer(readerPos % bufferSize))
+        f(buffer((readerPos % bufferSize).toInt))
         readerPos += 1
-        positions.synchronized {
-          positions(readerId) = readerPos
-//          println("notify on positions")
-          positions.notifyAll()
+        if (readerPos == readerPosUpdate) {
+          positions.synchronized {
+            positions(readerId) = readerPos
+//            println("notify on positions")
+            positions.notifyAll()
+          }
+          readerPosUpdate += readerUpdateDelta
         }
       }
       this.synchronized {

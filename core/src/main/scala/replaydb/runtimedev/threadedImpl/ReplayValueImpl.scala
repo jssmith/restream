@@ -25,40 +25,44 @@ class ReplayValueImpl[T](default: => T) extends ReplayValue[T] {
   var lastRead = Long.MinValue
 
   override def merge(ts: Long, merge: T => T): Unit = {
-    if (ts <= lastRead) {
-      throw new IllegalArgumentException(s"add at $ts must follow get at $lastRead")
+    this.synchronized {
+      if (ts <= lastRead) {
+        throw new IllegalArgumentException(s"add at $ts must follow get at $lastRead")
+      }
+      updates.add(new MergeRecord[T](ts = ts, merge = merge))
     }
-    updates.add(new MergeRecord[T](ts = ts, merge = merge))
   }
 
   override def getOption(ts: Long): Option[T] = {
-    lastRead = math.max(lastRead, ts)
-    if (updates.size > 0) {
-      val toMerge = ArrayBuffer[MergeRecord[T]]()
-      while (updates.size() > 0 && updates.peek().ts <= ts) {
-        toMerge += updates.poll()
-      }
-      if (toMerge.nonEmpty) {
-        val cumSum: ValueRecord[T] = if (history != null && history.nonEmpty) {
-          history.last
-        } else {
-          new ValueRecord(Long.MinValue, default)
+    this.synchronized {
+      lastRead = math.max(lastRead, ts)
+      if (updates.size > 0) {
+        val toMerge = ArrayBuffer[MergeRecord[T]]()
+        while (updates.size() > 0 && updates.peek().ts <= ts) {
+          toMerge += updates.poll()
         }
-        val sortedUpdates = toMerge.scanLeft(cumSum)((a: ValueRecord[T], b: MergeRecord[T]) => new ValueRecord(b.ts, b.merge(a.value)))
-        if (history != null) {
-          history ++= sortedUpdates
-        } else {
-          history = new ArrayBuffer[ValueRecord[T]] ++ sortedUpdates
+        if (toMerge.nonEmpty) {
+          val cumSum: ValueRecord[T] = if (history != null && history.nonEmpty) {
+            history.last
+          } else {
+            new ValueRecord(Long.MinValue, default)
+          }
+          val sortedUpdates = toMerge.scanLeft(cumSum)((a: ValueRecord[T], b: MergeRecord[T]) => new ValueRecord(b.ts, b.merge(a.value)))
+          if (history != null) {
+            history ++= sortedUpdates
+          } else {
+            history = new ArrayBuffer[ValueRecord[T]] ++ sortedUpdates
+          }
         }
       }
+      if (history != null) {
+        for (cr <- history.reverseIterator) {
+          if (cr.ts <= ts) {
+            return Some(cr.value)
+          }
+        }
+      }
+      None
     }
-    if (history != null) {
-      for (cr <- history.reverseIterator) {
-        if (cr.ts <= ts) {
-          return Some(cr.value)
-        }
-      }
-    }
-    None
   }
 }

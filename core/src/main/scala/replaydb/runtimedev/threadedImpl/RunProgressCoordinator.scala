@@ -1,6 +1,6 @@
 package replaydb.runtimedev.threadedImpl
 
-class RunProgressCoordinator(numPartitions: Int, numPhases: Int, maxEventsPerPhase: Int) {
+class RunProgressCoordinator(numPartitions: Int, numPhases: Int, maxInProgressEvents: Int) {
   trait CoordinatorInterface {
     def update(ts: Long, ct: Long): Unit
     def requestProgress(ts: Long, ct: Long): Long
@@ -38,7 +38,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, maxEventsPerPha
           ctProgressMarks.notifyAll()
           if (phaseId + 1 < numPhases) {
             var minFollowCt = 0L
-            while ({ minFollowCt = ctProgressMarks(phaseId + 1).min; minFollowCt < ct - maxEventsPerPhase / numPartitions }) {
+            while ({ minFollowCt = ctProgressMarks(phaseId + 1).min; minFollowCt < ct - maxInProgressEvents / numPartitions }) {
               ctProgressMarks.wait()
             }
           }

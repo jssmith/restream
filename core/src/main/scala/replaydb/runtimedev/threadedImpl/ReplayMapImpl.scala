@@ -5,13 +5,13 @@ import replaydb.runtimedev.{ReplayMap, ReplayValue}
 import scala.collection.mutable
 
 class ReplayMapImpl[K, V](default: => V) extends ReplayMap[K, V] {
-  val m = mutable.HashMap[K, ReplayValue[V]]()
+  val m = new java.util.concurrent.ConcurrentHashMap[K, ReplayValue[V]]()
   override def get(ts: Long, key: K): Option[V] = {
-    this.synchronized {
-      m.get(key) match {
-        case Some(x) => x.getOption(ts)
-        case None => None
-      }
+    val x = m.get(key)
+    if (x == null) {
+      None
+    } else {
+      x.getOption(ts)
     }
   }
 
@@ -20,8 +20,10 @@ class ReplayMapImpl[K, V](default: => V) extends ReplayMap[K, V] {
   }
 
   override def update(ts: Long, key: K, fn: (V) => V): Unit = {
-    this.synchronized {
-      m.getOrElseUpdate(key, new ReplayValueImpl[V](default)).merge(ts, fn)
-    }
+    m.computeIfAbsent(key, new java.util.function.Function[K,ReplayValue[V]] {
+      override def apply(t: K): ReplayValue[V] = {
+        new ReplayValueImpl[V](default)
+      }
+    }).merge(ts, fn)
   }
 }

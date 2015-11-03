@@ -1,18 +1,16 @@
 package replaydb.exec
 
-import java.io.FileInputStream
-
 import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
-import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
 import replaydb.runtimedev.monotonicImpl.{ReplayCounterImpl, ReplayMapImpl}
+import replaydb.runtimedev.threadedImpl.MultiReaderEventSource
 import replaydb.util.ProgressMeter
 
 /**
- * Single-threaded implementation of spam detector
+ * Uses a separate thread to deserialize saved event history, increasing performance.
  */
-object SerialSpamDetector extends App {
+object SerialSpamDetector2 extends App {
 
   class UserPair(val a: Long, val b: Long) {
     override def equals(o: Any) = o match {
@@ -61,12 +59,13 @@ object SerialSpamDetector extends App {
     }
   }
 
-  val eventStorage = new SocialNetworkStorage
   val stats = new Stats
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
   val pm = new ProgressMeter(printInterval = 1000000, () => { si.update(new PrintSpamCounter(lastTimestamp)); ""})
-  val r = eventStorage.readEvents(new FileInputStream("/tmp/events.out"), e => {
+  val es = new MultiReaderEventSource("/tmp/events.out", 1, 100000)
+  es.start()
+  es.readEvents(e => {
     si.update(e)
     lastTimestamp = e.ts
     pm.increment()

@@ -10,6 +10,9 @@ class ProgressMeter(val printInterval: Long = 5000, val extraInfo: () => String 
   var ct: Long = 0L
   var nextPrintPoint = printInterval
 
+  var lastPrintTime = startTime
+  var lastPrintCt = 0L
+
   private def formatName: String = {
     name match {
       case Some(s) => s"$s: "
@@ -24,7 +27,10 @@ class ProgressMeter(val printInterval: Long = 5000, val extraInfo: () => String 
   def add(delta: Int): Unit = {
     ct += delta
     if (ct >= nextPrintPoint) {
-      println(s"""${formatName}progress $ct""")
+      val printTime = System.currentTimeMillis()
+      println(s"""${formatName}progress $ct, current rate ${(ct - lastPrintCt)*1000/(printTime - lastPrintTime)}""")
+      lastPrintTime = printTime
+      lastPrintCt = ct
       val extraStr = extraInfo()
       if (extraStr != "") {
         println("  " + extraStr)

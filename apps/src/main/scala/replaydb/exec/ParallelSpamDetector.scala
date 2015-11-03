@@ -1,9 +1,6 @@
 package replaydb.exec
 
-import java.io.FileInputStream
-
 import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
-import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev.threadedImpl.{MultiReaderEventSource, ReplayCounterImpl, ReplayMapImpl, RunProgressCoordinator}
 import replaydb.runtimedev.{ReplayCounter, ReplayMap, _}
@@ -60,13 +57,18 @@ object ParallelSpamDetector extends App {
 
   val numPartitions = 4
   val partitionFnBase = "/tmp/events.out"
+
+  val coordinationInterval = if (args.length >= 1) { args(0).toInt } else { 1000 }
+  val maxInProgressEvents = if (args.length >= 2) { args(1).toInt } else { 20000 }
+  println(s"coordination interval = $coordinationInterval")
+  println(s"max in progress events = $maxInProgressEvents")
+
   val stats = new Stats
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
   var lastTimestamp = 0L
-  val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, maxEventsPerPhase = 20000)
+  val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, maxInProgressEvents = maxInProgressEvents)
   val overallProgressMeter = new ProgressMeter(1000000, name = Some("Overall Progress"))
-  val xInterval = 1000
   val readerThreads = (for (partitionId <- 0 until numPartitions) yield {
     new MultiReaderEventSource(s"$partitionFnBase-$partitionId", numPhases, bufferSize = 100000)
   }).toArray
@@ -84,16 +86,18 @@ object ParallelSpamDetector extends App {
             }
             si.update(phaseId, e)
             ct += 1
-            if (ct % xInterval == 0) {
+            if (ct % coordinationInterval == 0) {
               if (phaseId == numPhases - 1) {
-                overallProgressMeter.synchronized { overallProgressMeter.add(xInterval) }
+                overallProgressMeter.synchronized { overallProgressMeter.add(coordinationInterval) }
               }
               b.update(e.ts - 1, ct)
             }
             lastTimestamp = e.ts
             pm.increment()
           })
-          overallProgressMeter.synchronized { overallProgressMeter.add((ct % xInterval).toInt) }
+          if (phaseId == numPhases - 1) {
+            overallProgressMeter.synchronized { overallProgressMeter.add((ct % coordinationInterval).toInt) }
+          }
           b.finished()
           pm.finished()
         }
