@@ -5,7 +5,7 @@ import java.io.FileInputStream
 import replaydb.event.Event
 import replaydb.io.SocialNetworkStorage
 
-class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) extends Thread {
+class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) extends Thread(s"read-$fn") {
   private val buffer = new Array[Event](bufferSize)
   private val positions = new Array[Long](numReaders)
 

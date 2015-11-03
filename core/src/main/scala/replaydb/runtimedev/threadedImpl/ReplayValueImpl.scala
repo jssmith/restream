@@ -41,6 +41,7 @@ class ReplayValueImpl[T](default: => T) extends ReplayValue[T] {
         while (updates.size() > 0 && updates.peek().ts <= ts) {
           toMerge += updates.poll()
         }
+        ReplayValueImpl.mergeAvg.add(toMerge.size)
         if (toMerge.nonEmpty) {
           val cumSum: ValueRecord[T] = if (history != null && history.nonEmpty) {
             history.last
@@ -54,15 +55,27 @@ class ReplayValueImpl[T](default: => T) extends ReplayValue[T] {
             history = new ArrayBuffer[ValueRecord[T]] ++ sortedUpdates
           }
         }
+      } else {
+        ReplayValueImpl.mergeAvg.add(0)
       }
+      var checkedCt = 0
       if (history != null) {
         for (cr <- history.reverseIterator) {
+          checkedCt += 1
           if (cr.ts <= ts) {
+            ReplayValueImpl.hitAvg.add(checkedCt)
             return Some(cr.value)
           }
         }
       }
+      ReplayValueImpl.missAvg.add(checkedCt)
       None
     }
   }
+}
+
+object ReplayValueImpl {
+  val mergeAvg = new ThreadAvg("ValueMerge")
+  val missAvg = new ThreadAvg("ValueMiss")
+  val hitAvg = new ThreadAvg("ValueHit")
 }
