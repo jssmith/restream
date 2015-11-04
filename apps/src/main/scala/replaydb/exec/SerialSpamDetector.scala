@@ -61,15 +61,22 @@ object SerialSpamDetector extends App {
     }
   }
 
+  if (args.length != 1) {
+    println("Usage: SerialSpamDetector filename")
+    System.exit(1)
+  }
+
+  val inputFilename = args(0)
   val eventStorage = new SocialNetworkStorage
   val stats = new Stats
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
   val pm = new ProgressMeter(printInterval = 1000000, () => { si.update(new PrintSpamCounter(lastTimestamp)); ""})
-  val r = eventStorage.readEvents(new FileInputStream("/tmp/events.out"), e => {
+  val r = eventStorage.readEvents(new FileInputStream(inputFilename), e => {
     si.update(e)
     lastTimestamp = e.ts
     pm.increment()
   })
   pm.finished()
+  println("final spam count: " + stats.spamCounter.get(Long.MaxValue))
 }

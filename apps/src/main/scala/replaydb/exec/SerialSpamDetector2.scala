@@ -59,11 +59,17 @@ object SerialSpamDetector2 extends App {
     }
   }
 
+  if (args.length != 1) {
+    println("Usage: SerialSpamDetector2 filename")
+    System.exit(1)
+  }
+
+  val inputFilename = args(0)
   val stats = new Stats
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
   val pm = new ProgressMeter(printInterval = 1000000, () => { si.update(new PrintSpamCounter(lastTimestamp)); ""})
-  val es = new MultiReaderEventSource("/tmp/events.out", 1, 100000)
+  val es = new MultiReaderEventSource(inputFilename, 1, 100000)
   es.start()
   es.readEvents(e => {
     si.update(e)
@@ -71,4 +77,5 @@ object SerialSpamDetector2 extends App {
     pm.increment()
   })
   pm.finished()
+  println("final spam count: " + stats.spamCounter.get(Long.MaxValue))
 }

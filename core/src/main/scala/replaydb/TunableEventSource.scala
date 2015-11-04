@@ -4,11 +4,10 @@ package replaydb
 import com.google.common.hash.{BloomFilter, Funnel, PrimitiveSink}
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import org.apache.commons.math3.random.RandomGenerator
-import org.apache.commons.math3.util.FastMath
+import org.apache.commons.math3.util.{FastMath, MathArrays}
 import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 
 import scala.collection.immutable.HashMap
-import scala.util.Random
 
 class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator, alpha: Double = 1.0, spammerFraction: Double = 0.1) extends EventSource {
   private var t = startTime
@@ -18,9 +17,9 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator, 
     val x = users.map(1.0 / FastMath.pow(_, alpha))
     val xs = x.sum
     val probabilities = x.map(_/xs)
-    val usersShuffled = Random.shuffle(users.toSeq).toArray
-    (new EnumeratedIntegerDistribution(rnd, usersShuffled, probabilities),
-      HashMap() ++ (usersShuffled.map(_.toLong) zip probabilities))
+    MathArrays.shuffle(users, rnd)
+    (new EnumeratedIntegerDistribution(rnd, users, probabilities),
+      HashMap() ++ (users.map(_.toLong) zip probabilities))
   }
 
   private val bf = BloomFilter.create(new Funnel[(Long,Long)] {
