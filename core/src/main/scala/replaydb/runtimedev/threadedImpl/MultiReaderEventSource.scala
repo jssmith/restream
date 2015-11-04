@@ -50,6 +50,7 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
       }
     })
     this.synchronized {
+      pos = localPos
       done = true
       this.notifyAll()
     }
@@ -81,6 +82,6 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
           this.wait()
         }
       }
-    } while (!localDone)
+    } while (readerPos < posLimit || !localDone)
   }
 }
