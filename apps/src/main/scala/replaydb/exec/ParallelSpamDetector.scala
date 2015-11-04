@@ -70,7 +70,6 @@ object ParallelSpamDetector extends App {
   val stats = new Stats
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
-  var lastTimestamp = 0L
   val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, maxInProgressEvents = maxInProgressEvents)
   val overallProgressMeter = new ProgressMeter(1000000, name = Some("Overall Progress"))
   val readerThreads = (for (partitionId <- 0 until numPartitions) yield {
@@ -81,6 +80,7 @@ object ParallelSpamDetector extends App {
       new Thread(new Runnable {
         val b = barrier.getCoordinatorInterface(partitionId, phaseId)
         override def run(): Unit = {
+          var lastTimestamp = 0L
           val pm = new ProgressMeter(printInterval = 1000000, () => s"${MemoryStats.getStats()}", name = Some(s"$partitionId-$phaseId"))
           var ct = 0L
           var limitTs = b.requestProgress(0, ct)
@@ -98,6 +98,9 @@ object ParallelSpamDetector extends App {
             }
             lastTimestamp = e.ts
             pm.increment()
+            if (ct % 1000000 == 0 && partitionId == numPartitions - 1 && phaseId == numPhases - 1) {
+              si.update(new PrintSpamCounter(lastTimestamp))
+            }
           })
           if (phaseId == numPhases - 1) {
             overallProgressMeter.synchronized { overallProgressMeter.add((ct % coordinationInterval).toInt) }

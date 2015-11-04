@@ -77,5 +77,5 @@ object SerialSpamDetector2 extends App {
     pm.increment()
   })
   pm.finished()
-  println("final spam count: " + stats.spamCounter.get(Long.MaxValue))
+  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue))
 }
