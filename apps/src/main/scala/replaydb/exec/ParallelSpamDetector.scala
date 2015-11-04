@@ -49,9 +49,9 @@ object ParallelSpamDetector extends App {
             case None =>
           }
       }
-      bind {
-        e: PrintSpamCounter => println(s"spam count is ${spamCounter.get(e.ts)}")
-      }
+//      bind {
+//        e: PrintSpamCounter => println(s"spam count is ${spamCounter.get(e.ts)}")
+//      }
     }
   }
 
@@ -66,6 +66,7 @@ object ParallelSpamDetector extends App {
   val stats = new Stats
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
+  println("num phases: " + numPhases)
   var lastTimestamp = 0L
   val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, maxInProgressEvents = maxInProgressEvents)
   val overallProgressMeter = new ProgressMeter(1000000, name = Some("Overall Progress"))

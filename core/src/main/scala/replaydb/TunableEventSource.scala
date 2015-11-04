@@ -61,6 +61,7 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator, 
         val userPair = (userIdA, userIdB)
         if (!bf.mightContain(userPair) && rnd.nextBoolean()) {
           bf.put(userPair)
+          f(new NewFriendshipEvent(t, userIdB, userIdA)) // TODO a little hacky..
           new NewFriendshipEvent(t, userIdA, userIdB)
         } else {
           new MessageEvent(t, nextMessageId(), userIdA, userIdB, "")

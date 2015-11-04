@@ -6,4 +6,6 @@ case class MessageEvent (
   senderUserId: Long,
   recipientUserId: Long,
   content: String
-) extends Event
+) extends Event {
+  override def id = senderUserId
+}

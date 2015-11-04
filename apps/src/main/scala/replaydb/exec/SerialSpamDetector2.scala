@@ -22,7 +22,7 @@ object SerialSpamDetector2 extends App {
     }
   }
 
-  case class PrintSpamCounter(ts: Long) extends Event
+  case class PrintSpamCounter(ts: Long) extends Event { override def id = 0L }
 
   class Stats {
     val friendships: ReplayMap[UserPair, Int] = new ReplayMapImpl[UserPair, Int](0)

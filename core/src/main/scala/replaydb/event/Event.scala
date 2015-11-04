@@ -9,6 +9,7 @@ trait Event {
    * @return
    */
   def ts: Long
+  def id: Long
 }
 
 object Event {

@@ -16,35 +16,34 @@ import org.apache.spark.sql.functions._
 object SpamDetectorSparkSQL {
 
   val instantiator = new ScalaKryoInstantiator
-  val kryo = instantiator.newKryo()
-  kryo.register(classOf[MessageEvent])
-  kryo.register(classOf[NewFriendshipEvent])
 
-  val conf = new SparkConf().setAppName("ReplayDB Testing").setMaster("local[4]")
+  val conf = new SparkConf().setAppName("Spam Detector in SparkSQL").setMaster("local[4]")
   val sc = new SparkContext(conf)
   val hiveContext = new HiveContext(sc)
   import hiveContext.implicits._
 
   def main(args: Array[String]) {
-    val events = loadFiles(Seq("/tmp/events.out"))
+    val numPartitions = if (args.length >= 1) { args(0).toInt } else { 1 }
+    val fileInputs = if (numPartitions > 1)
+      for (i <- 0 until numPartitions) yield s"/tmp/events.out-$i"
+    else
+      Seq("/tmp/events.out")
+    val events = loadFiles(fileInputs)
 
-    val messageEventDF = events.filter(_.isInstanceOf[MessageEvent]).
+    val msgDF = events.filter(_.isInstanceOf[MessageEvent]).
       map(_.asInstanceOf[MessageEvent]).toDF().cache()
-//    messageEventDF.registerTempTable("msgs")
+    //    msgDF.registerTempTable("msgs")
 
-    val newFriendEventDF = events.filter(_.isInstanceOf[NewFriendshipEvent]).
+    val nfeDF = events.filter(_.isInstanceOf[NewFriendshipEvent]).
       map(_.asInstanceOf[NewFriendshipEvent]).toDF().cache()
-    newFriendEventDF.registerTempTable("nfes")
 
-    val grouped = messageEventDF.groupBy("senderUserId", "recipientUserId").count()
-//    grouped.show()
-//    println("after grouping we have: " + grouped.count)
-    grouped.registerTempTable("msgs")
+    val grouped = msgDF.groupBy("senderUserId", "recipientUserId").count()
+    //    grouped.show()
+    //    println("after grouping we have: " + grouped.count)
 
-    val allMsgsToFriends = hiveContext.sql("SELECT * FROM msgs JOIN nfes ON " +
-      "((msgs.senderUserId == nfes.userIdA AND msgs.recipientUserId == nfes.userIdB) " +
-      "OR (msgs.senderUserId == nfes.userIdB AND msgs.recipientUserId == nfes.userIdA))")
-//    println("messages to friends: " + allMsgsToFriends.count)
+    val allMsgsToFriends = grouped.join(nfeDF,
+      grouped("senderUserID")===nfeDF("userIdA") and grouped("recipientUserId")===nfeDF("userIdB"))
+//        println("messages to friends: " + allMsgsToFriends.count)
 
     val msgsToFriends = allMsgsToFriends.groupBy("senderUserId").sum("count")
     val msgsTotal = grouped.groupBy("senderUserId").sum("count")
@@ -58,11 +57,16 @@ object SpamDetectorSparkSQL {
     spammers.select((msgsTotal("sum(count)") - msgsToFriends("sum(count)")).as("nonFriendMsgs")).
       agg(sum($"nonFriendMsgs")).show
 
-//    println("count: " + events.count + ", message: " + messageEventDF.count + ", friend: " + newFriendEventDF.count)
+    //    println("count: " + events.count + ", message: " + msgDF.count + ", friend: " + ndfDF.count)
   }
 
   def loadFiles(filenames: Seq[String]): RDD[Event] = {
     def load(filename: String): Iterator[Event] = {
+
+      val kryo = instantiator.newKryo()
+      kryo.register(classOf[MessageEvent])
+      kryo.register(classOf[NewFriendshipEvent])
+
       new Iterator[Event] {
         val input = new Input(new BufferedInputStream(new FileInputStream(filename)))
         var done = false
@@ -96,4 +100,5 @@ object SpamDetectorSparkSQL {
     sc.parallelize(filenames, partitions).flatMap(load)
   }
 }
+
 

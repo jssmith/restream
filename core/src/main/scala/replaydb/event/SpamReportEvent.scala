@@ -4,4 +4,6 @@ case class SpamReportEvent (
   ts: Long,
   userId: Long,
   messageId: Long
-) extends Event
+) extends Event {
+  override def id = userId
+}
