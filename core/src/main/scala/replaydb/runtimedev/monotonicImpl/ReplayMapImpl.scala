@@ -29,4 +29,8 @@ class ReplayMapImpl[K, V](default: => V) extends ReplayMap[K,V] with Monotonic {
     m.get(key)
   }
 
+  override def gcOlderThan(ts: Long): Int = {
+    0 // TODO no concept of garbage collection here...?
+  }
+
 }

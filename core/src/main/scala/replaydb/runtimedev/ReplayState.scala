@@ -1,3 +1,5 @@
 package replaydb.runtimedev
 
-trait ReplayState
+trait ReplayState {
+  def gcOlderThan(ts: Long): Int
+}

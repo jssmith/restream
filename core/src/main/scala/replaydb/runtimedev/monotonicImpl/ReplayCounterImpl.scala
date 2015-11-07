@@ -12,4 +12,8 @@ class ReplayCounterImpl extends ReplayCounter with Monotonic {
     checkTimeIncrease(ts)
     ct
   }
+
+  override def gcOlderThan(ts: Long): Int = {
+    0 // No concept of GC here
+  }
 }

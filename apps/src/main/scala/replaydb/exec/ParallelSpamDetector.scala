@@ -25,6 +25,12 @@ object ParallelSpamDetector extends App {
     val friendSendRatio: ReplayMap[Long, (Long, Long)] =
       new ReplayMapImpl[Long, (Long, Long)]((0L,0L))
     val spamCounter: ReplayCounter = new ReplayCounterImpl
+
+    // TODO Ideally this becomes automated by the code generation portion
+    def getAllReplayStates: Seq[ReplayState] = {
+      List(friendships, friendSendRatio, spamCounter)
+    }
+
     def getRuntimeInterface: RuntimeInterface = emit {
       bind { e: NewFriendshipEvent =>
         friendships.update(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
@@ -55,10 +61,10 @@ object ParallelSpamDetector extends App {
     }
   }
 
-  if (args.length != 4) {
+  if (args.length != 5) {
     println(
-      """Usage: ParallelSpamDetector baseFilename numPartitions coordinationInterval maxInProgressEvents
-        |  Suggested values: numPartitions = 4, coordinationInterval = 2000, maxInProgressEvents = 20000
+      """Usage: ParallelSpamDetector baseFilename numPartitions coordinationInterval maxInProgressEvents gcInterval
+        |  Suggested values: numPartitions = 4, coordinationInterval = 2000, maxInProgressEvents = 20000, gcInterval = 500000
       """.stripMargin)
     System.exit(1)
   }
@@ -66,11 +72,13 @@ object ParallelSpamDetector extends App {
   val numPartitions = args(1).toInt
   val coordinationInterval = args(2).toInt
   val maxInProgressEvents = args(3).toInt
+  val gcInterval = args(4).toInt
 
   val stats = new Stats
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
   val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, maxInProgressEvents = maxInProgressEvents)
+  barrier.registerReplayStates(stats.getAllReplayStates)
   val overallProgressMeter = new ProgressMeter(1000000, name = Some("Overall Progress"))
   val readerThreads = (for (partitionId <- 0 until numPartitions) yield {
     new MultiReaderEventSource(s"$partitionFnBase-$partitionId", numPhases, bufferSize = 100000)
@@ -98,8 +106,13 @@ object ParallelSpamDetector extends App {
             }
             lastTimestamp = e.ts
             pm.increment()
-            if (ct % 1000000 == 0 && partitionId == numPartitions - 1 && phaseId == numPhases - 1) {
-              si.update(new PrintSpamCounter(lastTimestamp))
+            if (partitionId == numPartitions - 1 && phaseId == numPhases - 1) {
+              if (ct % gcInterval == 0) {
+                b.gcAllReplayState()
+              }
+              if (ct % 1000000 == 0) {
+                si.update(new PrintSpamCounter(lastTimestamp))
+              }
             }
           })
           if (phaseId == numPhases - 1) {
