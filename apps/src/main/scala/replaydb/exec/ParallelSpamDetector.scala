@@ -110,7 +110,7 @@ object ParallelSpamDetector extends App {
               if (ct % gcInterval == 0) {
                 b.gcAllReplayState()
               }
-              if (ct % 1000000 == 0) {
+              if (ct % (1000 * numPartitions) == 1000 * partitionId) {
                 si.update(new PrintSpamCounter(lastTimestamp))
               }
             }
