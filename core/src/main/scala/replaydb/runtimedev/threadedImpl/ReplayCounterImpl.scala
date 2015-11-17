@@ -13,4 +13,8 @@ class ReplayCounterImpl extends ReplayValueImpl[Long](0L) with ReplayCounter {
       case None => 0
     }
   }
+
+  override def getDelta: ReplayCounterDelta = {
+    new ReplayCounterDelta
+  }
 }

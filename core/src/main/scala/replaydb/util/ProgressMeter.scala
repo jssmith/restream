@@ -28,7 +28,9 @@ class ProgressMeter(val printInterval: Long = 5000, val extraInfo: () => String 
     ct += delta
     if (ct >= nextPrintPoint) {
       val printTime = System.currentTimeMillis()
-      println(s"""${formatName}progress $ct, current rate ${(ct - lastPrintCt)*1000/(printTime - lastPrintTime)}""")
+      if (printTime != lastPrintTime) {
+        println( s"""${formatName}progress $ct, current rate ${(ct - lastPrintCt) * 1000 / (printTime - lastPrintTime)}""")
+      }
       lastPrintTime = printTime
       lastPrintCt = ct
       val extraStr = extraInfo()

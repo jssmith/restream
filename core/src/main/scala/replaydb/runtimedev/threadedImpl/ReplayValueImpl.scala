@@ -1,23 +1,17 @@
 package replaydb.runtimedev.threadedImpl
 
-import java.util.PriorityQueue
-
 import replaydb.runtimedev.ReplayValue
+import replaydb.runtimedev.threadedImpl.ReplayValueImpl.MergeRecord
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
-
 class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
 
-  private case class ValueRecord[T](ts: Long, value: T) extends Ordered[ValueRecord[T]] {
-    override def compare(that: ValueRecord[T]): Int = {
-      ts.compareTo(that.ts)
-    }
-  }
-  private case class MergeRecord[T](ts: Long, merge: T => T) extends Ordered[MergeRecord[T]] {
-    override def compare(that: MergeRecord[T]): Int = {
-      ts.compareTo(that.ts)
+  private case class ValueRecord[S](ts: Long, value: S) extends Ordered[ValueRecord[S]] {
+    override def compare(that: ValueRecord[S]): Int = {
+      that.ts.compareTo(ts)
     }
   }
 
@@ -39,10 +33,32 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
   private var validDataEnd = 0
   def size = validDataEnd - validDataStart
 
-  private val updates = new PriorityQueue[MergeRecord[T]]()
+  private val updates = new mutable.PriorityQueue[MergeRecord[T]]()
   private var lastRead = Long.MinValue
   private var lastGC = Long.MinValue
   private var oldestNonGCWrite = Long.MinValue
+
+  def merge(delta: ReplayValueDelta[T]): Unit = {
+    this.synchronized {
+      val ts = delta.pq.head.ts
+      if (ts <= lastRead || ts <= lastGC) {
+        throw new IllegalArgumentException(s"add at $ts must follow get at $lastRead and GC at $lastGC")
+      }
+      oldestNonGCWrite = if (oldestNonGCWrite < lastGC) {
+        // If we're the first write since the last GC,  make ourselves the new oldest
+        ts
+      } else {
+        // if we're older than another write following the last GC, update ourselves as oldest
+        Math.min(oldestNonGCWrite, ts)
+      }
+
+      updates ++= delta.pq
+    }
+  }
+
+  def getDelta: ReplayValueDelta[T] = {
+    new ReplayValueDelta[T]
+  }
 
   // TODO we should be able to use ReadWrite locks here, right?
 
@@ -59,14 +75,14 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
         // if we're older than another write following the last GC, update ourselves as oldest
         Math.min(oldestNonGCWrite, ts)
       }
-      updates.add(new MergeRecord[T](ts = ts, merge = merge))
+      updates.enqueue(new MergeRecord[T](ts = ts, merge = merge))
     }
   }
 
   override def getOption(ts: Long): Option[T] = {
     this.synchronized {
       lastRead = math.max(lastRead, ts)
-      if (updates.size > 0) {
+      if (updates.nonEmpty) {
         val value = mergeUpdates(ts)
         if (value.nonEmpty) {
           return value
@@ -103,8 +119,8 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
   // values(validDataEnd - 1)
   private def mergeUpdates(ts: Long): Option[T] = {
     val toMerge = ArrayBuffer[MergeRecord[T]]()
-    while (updates.size() > 0 && updates.peek().ts <= ts) {
-      toMerge += updates.poll()
+    while (updates.nonEmpty && updates.head.ts <= ts) {
+      toMerge += updates.dequeue()
     }
     ReplayValueImpl.mergeAvg.add(toMerge.size)
     if (toMerge.nonEmpty) {
@@ -192,6 +208,12 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
 }
 
 object ReplayValueImpl {
+  case class MergeRecord[T](ts: Long, merge: T => T) extends Ordered[MergeRecord[T]] {
+    override def compare(that: MergeRecord[T]): Int = {
+      that.ts.compareTo(ts)
+    }
+  }
+
   val mergeAvg = new ThreadAvg("ValueMerge")
   val missAvg = new ThreadAvg("ValueMiss")
   val hitAvg = new ThreadAvg("ValueHit")

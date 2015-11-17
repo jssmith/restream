@@ -3,7 +3,7 @@ package replaydb.exec.spam
 import replaydb.event.{MessageEvent, NewFriendshipEvent}
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
-import replaydb.runtimedev.threadedImpl.{ReplayCounterImpl, ReplayMapImpl, ReplayTimestampLocalMapImpl}
+import replaydb.runtimedev.threadedImpl._
 import replaydb.util.time._
 import replaydb.event.Event
 
@@ -22,32 +22,31 @@ RULES:
 
  */
 
-class SpamDetectorStats(useParallel: Boolean) {
+class SpamDetectorStatsParallel() {
 
-  def getMapImpl[K, V: ClassTag](default: => V): ReplayMap[K, V] = {
-    if (useParallel) new ReplayMapImpl[K, V](default) else new monotonicImpl.ReplayMapImpl[K, V](default)
+  def getMapImpl[K, V: ClassTag](default: => V): ReplayMapImpl[K, V] = {
+    new ReplayMapImpl[K, V](default)
   }
 
-  def getCounterImpl: ReplayCounter = {
-    if (useParallel) new ReplayCounterImpl else new monotonicImpl.ReplayCounterImpl
+  def getCounterImpl: ReplayCounterImpl = {
+    new ReplayCounterImpl
   }
 
   def getTimestampLocalMapImpl[K, V](default: => V): ReplayTimestampLocalMap[K, V] = {
-    if (useParallel) new ReplayTimestampLocalMapImpl[K, V](default)
-    else new monotonicImpl.ReplayTimestampLocalMapImpl[K, V](default)
+    new ReplayTimestampLocalMapImpl[K, V](default)
   }
 
-  val friendships: ReplayMap[UserPair, Int] = getMapImpl(0)
-  val friendSendRatio: ReplayMap[Long, (Long, Long)] = getMapImpl((0L,0L))
-  val spamCounter: ReplayCounter = getCounterImpl
-  val nonfriendMessagesInLastInterval: ReplayMap[Long, Long] = getMapImpl(0)
+  val friendships: ReplayMapImpl[UserPair, Int] = getMapImpl(0)
+  val friendSendRatio: ReplayMapImpl[Long, (Long, Long)] = getMapImpl((0L,0L))
+  val spamCounter: ReplayCounterImpl = getCounterImpl
+  val nonfriendMessagesInLastInterval: ReplayMapImpl[Long, Long] = getMapImpl(0)
   // Mapping userIDa -> (userIDb -> # messages sent userIDa to userIDb in last NonfriendMessageCountInterval)
-  val uniqueNonfriendsSentToInLastInterval: ReplayMap[Long, immutable.Map[Long, Long]] = getMapImpl(new immutable.HashMap)
-  val messageContainingEmailFraction: ReplayMap[Long, (Long, Long)] = getMapImpl((0L, 0L))
-  val messagesFractionLast7DaysInLast24Hours: ReplayMap[Long, (Long, Long)] = getMapImpl((0L,0L))
-  val userFirstMessageTS: ReplayMap[Long, Long] = getMapImpl(Long.MaxValue)
-  val userMostRecentReceivedMessage: ReplayMap[Long, immutable.Map[Long, Long]] = getMapImpl(new immutable.HashMap)
-  val messageSentInResponseFraction: ReplayMap[Long, (Long, Long)] = getMapImpl((0L, 0L))
+  val uniqueNonfriendsSentToInLastInterval: ReplayMapImpl[Long, immutable.Map[Long, Long]] = getMapImpl(new immutable.HashMap)
+  val messageContainingEmailFraction: ReplayMapImpl[Long, (Long, Long)] = getMapImpl((0L, 0L))
+  val messagesFractionLast7DaysInLast24Hours: ReplayMapImpl[Long, (Long, Long)] = getMapImpl((0L,0L))
+  val userFirstMessageTS: ReplayMapImpl[Long, Long] = getMapImpl(Long.MaxValue)
+  val userMostRecentReceivedMessage: ReplayMapImpl[Long, immutable.Map[Long, Long]] = getMapImpl(new immutable.HashMap)
+  val messageSentInResponseFraction: ReplayMapImpl[Long, (Long, Long)] = getMapImpl((0L, 0L))
   val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = getTimestampLocalMapImpl(0)
 
   // TODO Ideally this becomes automated by the code generation portion
@@ -56,6 +55,16 @@ class SpamDetectorStats(useParallel: Boolean) {
       nonfriendMessagesInLastInterval, messageContainingEmailFraction, messagesFractionLast7DaysInLast24Hours,
       userFirstMessageTS, userMostRecentReceivedMessage, messageSentInResponseFraction)
   }
+
+//  var runProgressCoordinator: RunProgressCoordinator = _
+//
+//  def setRunProgressCoordinator(rpc: RunProgressCoordinator): Unit = {
+//    runProgressCoordinator = rpc
+//  }
+//
+//  def getDeltaFromMap(map: ReplayMapImpl, phaseId: Int) = {
+//    runProgressCoordinator.
+//  }
 
   def getRuntimeInterface: RuntimeInterface = emit {
     bind { e: NewFriendshipEvent =>
