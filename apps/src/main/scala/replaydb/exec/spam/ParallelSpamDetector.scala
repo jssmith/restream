@@ -1,65 +1,10 @@
-package replaydb.exec
+package replaydb.exec.spam
 
-import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
-import replaydb.runtimedev.ReplayRuntime._
-import replaydb.runtimedev.threadedImpl.{MultiReaderEventSource, ReplayCounterImpl, ReplayMapImpl, RunProgressCoordinator}
-import replaydb.runtimedev.{ReplayCounter, ReplayMap, _}
+import replaydb.runtimedev.MemoryStats
+import replaydb.runtimedev.threadedImpl.{MultiReaderEventSource, RunProgressCoordinator}
 import replaydb.util.ProgressMeter
 
 object ParallelSpamDetector extends App {
-
-  class UserPair(val a: Long, val b: Long) {
-    override def equals(o: Any) = o match {
-      case that: UserPair => (a == that.a && b == that.b) || (a == that.b && b == that.a)
-      case _ => false
-    }
-    override def hashCode(): Int = {
-      a.hashCode() + 25741 * b.hashCode()
-    }
-  }
-
-  case class PrintSpamCounter(ts: Long) extends Event
-
-  class Stats {
-    val friendships: ReplayMap[UserPair, Int] = new ReplayMapImpl[UserPair, Int](0)
-    val friendSendRatio: ReplayMap[Long, (Long, Long)] =
-      new ReplayMapImpl[Long, (Long, Long)]((0L,0L))
-    val spamCounter: ReplayCounter = new ReplayCounterImpl
-
-    // TODO Ideally this becomes automated by the code generation portion
-    def getAllReplayStates: Seq[ReplayState] = {
-      List(friendships, friendSendRatio, spamCounter)
-    }
-
-    def getRuntimeInterface: RuntimeInterface = emit {
-      bind { e: NewFriendshipEvent =>
-        friendships.update(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
-      }
-      bind { me: MessageEvent =>
-        val ts = me.ts
-        friendships.get(ts = ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
-          case Some(_) => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
-          case None => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
-        }
-      }
-      bind {
-        me: MessageEvent =>
-          val ts = me.ts
-          friendSendRatio.get(ts = ts, key = me.senderUserId) match {
-            case Some((toFriends, toNonFriends)) =>
-              if (toFriends + toNonFriends > 5) {
-                if (toNonFriends > toFriends) {
-                  spamCounter.add(1, ts)
-                }
-              }
-            case None =>
-          }
-      }
-      bind {
-        e: PrintSpamCounter => println(s"spam count is ${spamCounter.get(e.ts)}")
-      }
-    }
-  }
 
   if (args.length != 5) {
     println(
@@ -74,7 +19,7 @@ object ParallelSpamDetector extends App {
   val maxInProgressEvents = args(3).toInt
   val gcInterval = args(4).toInt
 
-  val stats = new Stats
+  val stats = new SpamDetectorStats(true)
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
   val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, maxInProgressEvents = maxInProgressEvents)

@@ -9,7 +9,8 @@ import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 
 import scala.collection.immutable.HashMap
 
-class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator, alpha: Double = 1.0, spammerFraction: Double = 0.1) extends EventSource {
+class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator,
+                          words: Array[String], alpha: Double = 1.0, spammerFraction: Double = 0.02) extends EventSource {
   private var t = startTime
   private var messageIdSeq = 0L
   private val (userZipfDistribution, userProbabilities) = {
@@ -45,11 +46,28 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator, 
     rnd.nextInt(numUsers) + 1
   }
 
+  // 50% of spammer messages contain emails,
+  // 10% of normal messages contain emails
+  private def getRandomMessage(spammer: Boolean): String = {
+    val messageLength = 5 + rnd.nextInt(15)
+    (for (_ <- 0 until messageLength) yield {
+      getRandomWord
+    }).mkString(" ") +
+      (if (spammer && rnd.nextBoolean() || (!spammer && rnd.nextInt(10) < 1))
+        s" $getRandomWord@email.com "
+      else "")
+  }
+
+  private def getRandomWord: String = {
+    words(rnd.nextInt(words.length))
+  }
+
   override def genEvents(n: Int, f: (Event) => Unit): Unit = {
     val spammerThreshold = (spammerFraction * numUsers).toInt
-    for (i <- 0 until n) {
+    var i = 0
+    while (i < n) {
       val userIdA = nextUserZipf()
-      val e = if (userIdA > spammerThreshold) {
+      if (userIdA > spammerThreshold) {
         // Normal users choose their targets according to Zipfian distribution
         val d = Math.max(2, (userProbabilities(userIdA) * 10 * numUsers).toInt)
         val userIdB = (userIdA + (if (rnd.nextBoolean()) {
@@ -58,21 +76,26 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator, 
           -(rnd.nextInt(d/2) + 1)
         }) + numUsers - 1) % numUsers + 1
         val userPair = (userIdA, userIdB)
-        if (!bf.mightContain(userPair) && rnd.nextBoolean()) {
+        val e = if (!bf.mightContain(userPair) && rnd.nextBoolean()) {
           bf.put(userPair)
           new NewFriendshipEvent(t, userIdA, userIdB)
         } else {
-          new MessageEvent(t, nextMessageId(), userIdA, userIdB, "")
+          new MessageEvent(t, nextMessageId(), userIdA, userIdB, getRandomMessage(false))
         }
+        f(e)
+        i += 1
       } else {
-        // Spammers choose their targets at random
-        var userIdB = userIdA
-        while (userIdA == userIdB) {
-          userIdB = nextUserUniform()
+        // Spammers choose their targets at random and fire in bursts
+        for (_ <- 0 until 20) {
+          var userIdB = userIdA
+          while (userIdA == userIdB) {
+            userIdB = nextUserUniform()
+          }
+          f(new MessageEvent(t, nextMessageId(), userIdA, userIdB, getRandomMessage(true)))
+          t += rnd.nextInt(10000)
+          i += 1
         }
-        new MessageEvent(t, nextMessageId(), userIdA, userIdB, "")
       }
-      f(e)
       t += rnd.nextInt(100000)
     }
   }

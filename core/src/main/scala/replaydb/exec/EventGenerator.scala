@@ -1,6 +1,6 @@
 package replaydb.exec
 
-import java.io.{BufferedOutputStream, FileOutputStream}
+import java.io.{InputStream, BufferedOutputStream, FileOutputStream}
 
 import org.apache.commons.math3.random.MersenneTwister
 import replaydb.io.SocialNetworkStorage
@@ -23,6 +23,8 @@ object EventGenerator extends App {
     System.exit(1)
   }
 
+  val words = scala.io.Source.fromInputStream( getClass.getResourceAsStream("/US.txt") ).getLines.toArray
+
   val generator = Generators.withName(args(0))
   val numUsers = Integer.parseInt(args(1))
   val numEvents = Integer.parseInt(args(2))
@@ -31,7 +33,7 @@ object EventGenerator extends App {
   val rnd = new MersenneTwister(903485435L)
   val eventSource = generator match {
     case Generators.Uniform => new UniformEventSource(startTime, numUsers, rnd)
-    case Generators.Tunable => new TunableEventSource(startTime, numUsers, rnd)
+    case Generators.Tunable => new TunableEventSource(startTime, numUsers, rnd, words)
   }
   val eventStorage = new SocialNetworkStorage
   val pm = new ProgressMeter(printInterval = generator match {
