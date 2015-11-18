@@ -21,7 +21,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSize: Int,
   val MaxInFlightBatches = 20
 
   abstract class CoordinatorInterface(partitionId: Int, phaseId: Int) {
-    def reportCheckpoint(ts: Long): Long
+    def reportCheckpoint(ts: Long, readerLock: AnyRef): Long
 
     def reportFinished(): Unit = checkpoints.synchronized { checkpoints(phaseId)(partitionId) = Long.MaxValue; checkpoints.notifyAll() }
 //    def reportFinished(): Unit = checkpoints.synchronized { finished(phaseId)(partitionId) = true; checkpoints.notifyAll() }
@@ -51,7 +51,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSize: Int,
 
   def getCoordinatorInterface(partitionId: Int, phaseId: Int): CoordinatorInterface = {
     new CoordinatorInterface(partitionId, phaseId) {
-      override def reportCheckpoint(ts: Long): Long = {
+      override def reportCheckpoint(ts: Long, readerLock: AnyRef): Long = {
         val checkpointNumber: Long = relative(ts) / batchSize // round down; reporting in middle of batch is same as at start
         checkpoints.synchronized {
           val oldCheckpointNumber = checkpoints(phaseId)(partitionId)

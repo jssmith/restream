@@ -46,18 +46,18 @@ object ParallelSpamDetector extends App {
           val pm = new ProgressMeter(printInterval = 1000000, () => s"${MemoryStats.getStats()}", name = Some(s"$partitionId-$phaseId"))
           var ct = 0L
           var nextCheckpointTs = 0L
-          readerThreads(partitionId).readEvents(e => {
+          readerThreads(partitionId).readEvents((e, readerLock) => {
             while (e.ts > nextCheckpointTs) {
-              nextCheckpointTs = b.reportCheckpoint(e.ts)
+              nextCheckpointTs = b.reportCheckpoint(e.ts, readerLock)
             }
             si.update(phaseId - 1, e) // SI uses 0-based phaseIds
             ct += 1
-            if (ct % batchSize == 0 && phaseId == numPhases - 1) {
+            if (ct % batchSize == 0 && phaseId == numPhases) { // } - 1) {
               overallProgressMeter.synchronized { overallProgressMeter.add(batchSize) }
             }
             lastTimestamp = e.ts
             pm.increment()
-            if (partitionId == numPartitions - 1 && phaseId == numPhases - 1) {
+            if (partitionId == numPartitions - 1 && phaseId == numPhases) { //  - 1) {
               if (ct % gcInterval == 0) {
                 b.gcAllReplayState()
               }
@@ -66,7 +66,7 @@ object ParallelSpamDetector extends App {
 //              }
             }
           })
-          if (phaseId == numPhases - 1) {
+          if (phaseId == numPhases) { //  - 1) {
             overallProgressMeter.synchronized { overallProgressMeter.add((ct % batchSize).toInt) }
           }
           b.reportFinished()

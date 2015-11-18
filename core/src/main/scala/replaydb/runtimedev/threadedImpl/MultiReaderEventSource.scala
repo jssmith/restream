@@ -56,7 +56,7 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
     }
   }
 
-  def readEvents(f: Event => Unit): Unit = {
+  def readEvents(f: (Event, AnyRef) => Unit): Unit = {
     val readerId = nextReaderNum()
     val readerUpdateDelta = 100
     var readerPos = 0L
@@ -65,7 +65,7 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
     var posLimit = this.synchronized { pos }
     do {
       while (readerPos < posLimit) {
-        f(buffer((readerPos % bufferSize).toInt))
+        f(buffer((readerPos % bufferSize).toInt), positions)
         readerPos += 1
         if (readerPos == readerPosUpdate) {
           positions.synchronized {
