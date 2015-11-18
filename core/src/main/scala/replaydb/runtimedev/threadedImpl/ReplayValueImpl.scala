@@ -1,6 +1,6 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.ReplayValue
+import replaydb.runtimedev.{ReplayDelta, ReplayValue}
 import replaydb.runtimedev.threadedImpl.ReplayValueImpl.MergeRecord
 
 import scala.collection.mutable
@@ -38,11 +38,12 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
   private var lastGC = Long.MinValue
   private var oldestNonGCWrite = Long.MinValue
 
-  def merge(delta: ReplayValueDelta[T]): Unit = {
+  def merge(rd: ReplayDelta): Unit = {
+    val delta = rd.asInstanceOf[ReplayValueDelta[T]]
     this.synchronized {
       val ts = delta.pq.head.ts
       if (ts <= lastRead || ts <= lastGC) {
-        throw new IllegalArgumentException(s"add at $ts must follow get at $lastRead and GC at $lastGC")
+        throw new IllegalArgumentException(s"add at $ts must precede get at $lastRead and GC at $lastGC")
       }
       oldestNonGCWrite = if (oldestNonGCWrite < lastGC) {
         // If we're the first write since the last GC,  make ourselves the new oldest
@@ -53,10 +54,11 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
       }
 
       updates ++= delta.pq
+      delta.clear()
     }
   }
 
-  def getDelta: ReplayValueDelta[T] = {
+  override def getDelta: ReplayValueDelta[T] = {
     new ReplayValueDelta[T]
   }
 
@@ -65,7 +67,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
   override def merge(ts: Long, merge: T => T): Unit = {
     this.synchronized {
       if (ts <= lastRead || ts <= lastGC) {
-        throw new IllegalArgumentException(s"add at $ts must follow get at $lastRead and GC at $lastGC")
+        throw new IllegalArgumentException(s"add at $ts must precede get at $lastRead and GC at $lastGC")
       }
 
       oldestNonGCWrite = if (oldestNonGCWrite < lastGC) {

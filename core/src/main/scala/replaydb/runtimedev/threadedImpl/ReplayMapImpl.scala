@@ -2,7 +2,7 @@ package replaydb.runtimedev.threadedImpl
 
 import java.util.function.BiConsumer
 
-import replaydb.runtimedev.{ReplayMap, ReplayValue}
+import replaydb.runtimedev.{ReplayDelta, ReplayMap, ReplayValue}
 
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions._
@@ -22,7 +22,8 @@ class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] {
     ???
   }
 
-  def update(delta: ReplayMapDelta[K, V]): Unit = {
+  override def merge(rd: ReplayDelta): Unit = {
+    val delta = rd.asInstanceOf[ReplayMapDelta[K, V]]
     delta.m.forEach(new BiConsumer[K, ReplayValueDelta[V]] {
       override def accept(key: K, value: ReplayValueDelta[V]): Unit = {
         m.computeIfAbsent(key, new java.util.function.Function[K,ReplayValueImpl[V]] {
@@ -32,9 +33,10 @@ class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] {
         }).merge(value)
       }
     })
+    delta.clear()
   }
 
-  def getDelta: ReplayMapDelta[K, V] = {
+  override def getDelta: ReplayMapDelta[K, V] = {
     new ReplayMapDelta[K, V]
   }
 

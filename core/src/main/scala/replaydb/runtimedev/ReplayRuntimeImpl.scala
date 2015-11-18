@@ -23,13 +23,16 @@ class ReplayRuntimeImpl(val c: Context) {
     }
   }
 
-  def dataflowAnalysis(bindings: Iterable[c.Expr[Any]]): Array[Array[c.Expr[Any]]] = {
+  def dataflowAnalysis(bindings: Iterable[c.Expr[Any]]): (Array[Array[c.Expr[Any]]], Set[SymTree]) = {
     trait Dataflow {
       val obj: Tree
     }
     case class ReadDataflow (obj: Tree) extends Dataflow
     case class WriteDataflow (obj: Tree) extends Dataflow
     case class BindingDesc (binding: c.Expr[Any], dataflow: List[Dataflow])
+
+    var writeSymTrees: Set[SymTree] = Set()
+
     class DependencyDetector {
       val df = ArrayBuffer[BindingDesc]()
       def add(x: c.Expr[Any]) = {
@@ -39,6 +42,10 @@ class ReplayRuntimeImpl(val c: Context) {
               case TermName("get") | TermName("getOption") | TermName("getRandom") =>
                 ReadDataflow(obj)
               case TermName("update") | TermName("merge") | TermName("add") =>
+                obj match {
+                  case st: SymTree => writeSymTrees += st
+                  case _ => println(s"Unexpected Tree found: $obj")
+                }
                 WriteDataflow(obj)
               case _ =>
                 throw new RuntimeException(s"unexpected method $meth")
@@ -76,7 +83,7 @@ class ReplayRuntimeImpl(val c: Context) {
     for (binding <- bindings) {
       dd.add(binding)
     }
-    dd.analyze().map(bl => bl.map(_.binding).toArray).toArray
+    (dd.analyze().map(bl => bl.map(_.binding).toArray).toArray, writeSymTrees)
   }
 
   def bindImpl(x: c.Expr[Any]): c.Expr[Unit] = {
@@ -87,12 +94,12 @@ class ReplayRuntimeImpl(val c: Context) {
   def emitImpl(bindings: Expr[Any]): c.Expr[RuntimeInterface] = {
     val bindings = ReplayRuntime.getBindings(c.internal.enclosingOwner.owner).
       asInstanceOf[ArrayBuffer[c.Expr[Any]]]
-    val bindingsAnalyzed = dataflowAnalysis(bindings)
+    val (bindingsAnalyzed, writeSymTrees) = dataflowAnalysis(bindings)
     val numPhases = bindingsAnalyzed.size
 
-    val phaseCases = (for (i <- 0 until bindingsAnalyzed.size) yield {
+    val phaseCases = (for (i <- 1 to bindingsAnalyzed.size) yield {
       val m = mutable.HashMap[Type, ArrayBuffer[(TermName,Tree)]]()
-      for (b <- bindingsAnalyzed(i)) {
+      for (b <- bindingsAnalyzed(i - 1)) {
         b.tree match {
           case Function(params, body) =>
             if (params.size == 1 && params(0).tpt.tpe <:< typeOf[Event]) {
@@ -107,7 +114,13 @@ class ReplayRuntimeImpl(val c: Context) {
       val cases = m.map{ case (tpt, trees) =>
         val statements = trees.map { case(termName, body) =>
           val rt = replaceTransform(termName, TermName("zz"))
-          rt.transform(body)
+          new Transformer {
+            override def transform(tree: Tree): Tree = tree match {
+              case st: SymTree if writeSymTrees.contains(st) =>
+                q"this.getDeltaFromState($st, phase).asInstanceOf[${st.tpe.dealias}]"
+              case _ => super.transform(tree)
+            }
+          }.transform(rt.transform(body))
         }
         cq"zz : $tpt => ..$statements".asInstanceOf[CaseDef]
       }.toList ++ List(cq"_ => ".asInstanceOf[CaseDef])

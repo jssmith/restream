@@ -10,7 +10,7 @@ object ParallelSpamDetector extends App {
   if (args.length != 4) {
     println(
       """Usage: ParallelSpamDetector baseFilename numPartitions batchSize gcInterval
-        |  Suggested values: numPartitions = 4, batchSize = 1000000 (millis), gcInterval = 500000
+        |  Suggested values: numPartitions = 4, batchSize = 1000000 (millis), gcInterval = 100000
       """.stripMargin)
     System.exit(1)
   }
@@ -31,11 +31,12 @@ object ParallelSpamDetector extends App {
   val numPhases = si.numPhases
 
   val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, batchSize = batchSize, startTime = startTime)
+  si.setRunProgressCoordinator(barrier)
 
   barrier.registerReplayStates(stats.getAllReplayStates)
   val overallProgressMeter = new ProgressMeter(1000000, name = Some("Overall Progress"))
   val readerThreads = (for (partitionId <- 0 until numPartitions) yield {
-    new MultiReaderEventSource(s"$partitionFnBase-$partitionId", numPhases, bufferSize = 1000000)
+    new MultiReaderEventSource(s"$partitionFnBase-$partitionId", numPhases, bufferSize = 100000)
   }).toArray
   val threads =
     for (partitionId <- 0 until numPartitions; phaseId <- 1 to si.numPhases) yield {
@@ -46,18 +47,18 @@ object ParallelSpamDetector extends App {
           val pm = new ProgressMeter(printInterval = 1000000, () => s"${MemoryStats.getStats()}", name = Some(s"$partitionId-$phaseId"))
           var ct = 0L
           var nextCheckpointTs = 0L
-          readerThreads(partitionId).readEvents((e, readerLock) => {
+          readerThreads(partitionId).readEvents(e => {
             while (e.ts > nextCheckpointTs) {
-              nextCheckpointTs = b.reportCheckpoint(e.ts, readerLock)
+              nextCheckpointTs = b.reportCheckpoint(e.ts)
             }
-            si.update(phaseId - 1, e) // SI uses 0-based phaseIds
+            si.update(phaseId, e)
             ct += 1
-            if (ct % batchSize == 0 && phaseId == numPhases) { // } - 1) {
+            if (ct % batchSize == 0 && phaseId == numPhases) {
               overallProgressMeter.synchronized { overallProgressMeter.add(batchSize) }
             }
             lastTimestamp = e.ts
             pm.increment()
-            if (partitionId == numPartitions - 1 && phaseId == numPhases) { //  - 1) {
+            if (partitionId == numPartitions - 1 && phaseId == numPhases) {
               if (ct % gcInterval == 0) {
                 b.gcAllReplayState()
               }
@@ -66,7 +67,7 @@ object ParallelSpamDetector extends App {
 //              }
             }
           })
-          if (phaseId == numPhases) { //  - 1) {
+          if (phaseId == numPhases) {
             overallProgressMeter.synchronized { overallProgressMeter.add((ct % batchSize).toInt) }
           }
           b.reportFinished()

@@ -14,12 +14,14 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
   private var numReadersRegistered = 0
 
   private def nextReaderNum(): Int = {
-    if (numReadersRegistered < numReaders) {
-      val ret = numReadersRegistered
-      numReadersRegistered += 1
-      ret
-    } else {
-      throw new RuntimeException("too many readers registered")
+    this.synchronized {
+      if (numReadersRegistered < numReaders) {
+        val ret = numReadersRegistered
+        numReadersRegistered += 1
+        ret
+      } else {
+        throw new RuntimeException("too many readers registered")
+      }
     }
   }
 
@@ -56,7 +58,7 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
     }
   }
 
-  def readEvents(f: (Event, AnyRef) => Unit): Unit = {
+  def readEvents(f: Event => Unit): Unit = {
     val readerId = nextReaderNum()
     val readerUpdateDelta = 100
     var readerPos = 0L
@@ -65,7 +67,7 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
     var posLimit = this.synchronized { pos }
     do {
       while (readerPos < posLimit) {
-        f(buffer((readerPos % bufferSize).toInt), positions)
+        f(buffer((readerPos % bufferSize).toInt))
         readerPos += 1
         if (readerPos == readerPosUpdate) {
           positions.synchronized {

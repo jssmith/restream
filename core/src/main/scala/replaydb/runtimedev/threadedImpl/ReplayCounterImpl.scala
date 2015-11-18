@@ -1,17 +1,30 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.ReplayCounter
+import replaydb.runtimedev.{ReplayDelta, ReplayCounter}
 
 
-class ReplayCounterImpl extends ReplayValueImpl[Long](0L) with ReplayCounter {
+class ReplayCounterImpl extends ReplayCounter {
+
+  val replayValue = new ReplayValueImpl[Long](0L)
+
   override def add(value: Long, ts: Long): Unit = {
-    merge(ts, _ + value)
+    replayValue.merge(ts, _ + value)
   }
   override def get(ts: Long): Long = {
-    getOption(ts) match {
+    replayValue.getOption(ts) match {
       case Some(x) => x
       case None => 0
     }
+  }
+
+  override def gcOlderThan(ts: Long): Int = {
+    replayValue.gcOlderThan(ts)
+  }
+
+  override def merge(rd: ReplayDelta): Unit = {
+    val delta = rd.asInstanceOf[ReplayCounterDelta]
+    replayValue.merge(delta.replayDelta)
+
   }
 
   override def getDelta: ReplayCounterDelta = {

@@ -2,9 +2,9 @@ package replaydb.runtimedev.threadedImpl
 
 import java.util.function.BiConsumer
 
-import replaydb.runtimedev.ReplayTimestampLocalMap
+import replaydb.runtimedev.{ReplayDelta, ReplayTimestampLocalMap}
 
-
+// NOTE: Should only be used with associative, commutative operators
 class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLocalMap[K, V] {
 
   class ValueWithTimestamp(initialValue: V, val ts: Long) {
@@ -40,6 +40,18 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
     } else {
       x.updateValue(fn)
     }
+  }
+
+  override def merge(rd: ReplayDelta): Unit = {
+    val delta = rd.asInstanceOf[ReplayTimestampLocalMapDelta[K, V]]
+    for(upd <- delta.updates) {
+      update(upd.ts, upd.key, upd.fn)
+    }
+    delta.clear()
+  }
+
+  override def getDelta: ReplayTimestampLocalMapDelta[K, V] = {
+    new ReplayTimestampLocalMapDelta[K, V]
   }
 
   override def gcOlderThan(ts: Long): Int = {
