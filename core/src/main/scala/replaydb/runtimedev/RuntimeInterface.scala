@@ -6,10 +6,10 @@ import replaydb.runtimedev.threadedImpl.RunProgressCoordinator
 
 trait RuntimeInterface {
   def numPhases: Int
-  def update(phase: Int, e: Event): Unit
-  def update(e: Event): Unit = {
+  def update(partitionId: Int, phase: Int, e: Event): Unit
+  def update(partitionId: Int, e: Event): Unit = {
     for (i <- 0 until numPhases) {
-      update(i, e)
+      update(partitionId, i, e)
     }
   }
 
@@ -17,7 +17,7 @@ trait RuntimeInterface {
   def setRunProgressCoordinator(rpc: RunProgressCoordinator): Unit = {
     runProgressCoordinator = rpc
   }
-  def getDeltaFromState(state: ReplayState, phaseId: Int): ReplayDelta = {
-    runProgressCoordinator.getDeltaForState(state, phaseId)
+  def getDeltaFromState(state: ReplayState, partitionId: Int, phaseId: Int): ReplayDelta = {
+    runProgressCoordinator.getDeltaForState(state, partitionId, phaseId)
   }
 }

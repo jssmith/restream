@@ -51,7 +51,7 @@ object ParallelSpamDetector extends App {
             while (e.ts > nextCheckpointTs) {
               nextCheckpointTs = b.reportCheckpoint(e.ts)
             }
-            si.update(phaseId, e)
+            si.update(partitionId, phaseId, e)
             ct += 1
             if (ct % batchSize == 0 && phaseId == numPhases) {
               overallProgressMeter.synchronized { overallProgressMeter.add(batchSize) }
@@ -80,5 +80,9 @@ object ParallelSpamDetector extends App {
   readerThreads.foreach(_.join())
   threads.foreach(_.join())
   overallProgressMeter.synchronized{ overallProgressMeter.finished() }
+
+  // TODO should support an aggregate / counter type that is write-only during
+  // execution ( + commutative/associative) and then you can access at the end
+  // -> the pause right now to roll-up all of the spamcounters is completely unnecessary
   println("Final spam count: " + stats.spamCounter.get(Long.MaxValue))
 }
