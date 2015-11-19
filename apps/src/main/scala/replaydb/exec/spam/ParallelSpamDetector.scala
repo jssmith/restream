@@ -10,7 +10,7 @@ object ParallelSpamDetector extends App {
   if (args.length != 4) {
     println(
       """Usage: ParallelSpamDetector baseFilename numPartitions batchSize gcInterval
-        |  Suggested values: numPartitions = 4, batchSize = 1000000 (millis), gcInterval = 100000
+        |  Suggested values: numPartitions = 4, batchSize = 500, gcInterval = 50000
       """.stripMargin)
     System.exit(1)
   }
@@ -30,7 +30,7 @@ object ParallelSpamDetector extends App {
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
 
-  val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, batchSize = batchSize, startTime = startTime)
+  val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, batchSizeGoal = batchSize, startTime = startTime)
   si.setRunProgressCoordinator(barrier)
 
   barrier.registerReplayStates(stats.getAllReplayStates)
@@ -47,9 +47,16 @@ object ParallelSpamDetector extends App {
           val pm = new ProgressMeter(printInterval = 1000000, () => s"${MemoryStats.getStats()}", name = Some(s"$partitionId-$phaseId"))
           var ct = 0L
           var nextCheckpointTs = 0L
+          var nextCheckpointCt = 0L
           readerThreads(partitionId).readEvents(e => {
-            while (e.ts > nextCheckpointTs) {
-              nextCheckpointTs = b.reportCheckpoint(e.ts)
+            while (e.ts > nextCheckpointTs || ct >= nextCheckpointCt) {
+              if (ct - nextCheckpointCt < 0) {
+                println(s"phaseId $phaseId, partId $partitionId, e.ts: ${e.ts}, nextChkptTs: $nextCheckpointTs, ct: $ct, " +
+                  s"nextChkptCt: $nextCheckpointCt, deltaTs: ${e.ts - nextCheckpointTs}, deltaCt: ${ct - nextCheckpointCt}")
+              }
+              val nextCheckpoint = b.reportCheckpoint(e.ts, ct)
+              nextCheckpointTs = nextCheckpoint._1
+              nextCheckpointCt = nextCheckpoint._2
             }
             si.update(partitionId, phaseId, e)
             ct += 1
@@ -62,9 +69,9 @@ object ParallelSpamDetector extends App {
               if (ct % gcInterval == 0) {
                 b.gcAllReplayState()
               }
-//              if (ct % (1000 * numPartitions) == 1000 * partitionId) {
-//                si.update(new PrintSpamCounter(lastTimestamp))
-//              }
+              if (ct % (1000 * numPartitions) == 1000 * partitionId) {
+                si.update(partitionId, phaseId, new PrintSpamCounter(lastTimestamp))
+              }
             }
           })
           if (phaseId == numPhases) {
