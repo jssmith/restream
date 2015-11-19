@@ -40,21 +40,23 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
 
   def merge(rd: ReplayDelta): Unit = {
     val delta = rd.asInstanceOf[ReplayValueDelta[T]]
-    this.synchronized {
-      val ts = delta.pq.head.ts
-      if (ts <= lastRead || ts <= lastGC) {
-        throw new IllegalArgumentException(s"add at $ts must precede get at $lastRead and GC at $lastGC")
-      }
-      oldestNonGCWrite = if (oldestNonGCWrite < lastGC) {
-        // If we're the first write since the last GC,  make ourselves the new oldest
-        ts
-      } else {
-        // if we're older than another write following the last GC, update ourselves as oldest
-        Math.min(oldestNonGCWrite, ts)
-      }
+    if (delta.pq.nonEmpty) {
+      this.synchronized {
+        val ts = delta.pq.head.ts
+        if (ts <= lastRead || ts <= lastGC) {
+          throw new IllegalArgumentException(s"add at $ts must precede get at $lastRead and GC at $lastGC")
+        }
+        oldestNonGCWrite = if (oldestNonGCWrite < lastGC) {
+          // If we're the first write since the last GC,  make ourselves the new oldest
+          ts
+        } else {
+          // if we're older than another write following the last GC, update ourselves as oldest
+          Math.min(oldestNonGCWrite, ts)
+        }
 
-      updates ++= delta.pq
-      delta.clear()
+        updates ++= delta.pq
+        delta.clear()
+      }
     }
   }
 

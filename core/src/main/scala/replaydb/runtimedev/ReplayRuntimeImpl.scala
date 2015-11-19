@@ -117,7 +117,7 @@ class ReplayRuntimeImpl(val c: Context) {
           new Transformer {
             override def transform(tree: Tree): Tree = tree match {
               case st: SymTree if writeSymTrees.contains(st) =>
-                q"this.getDeltaFromState($st, partitionId, phase).asInstanceOf[${st.tpe.dealias}]"
+                q"deltaMap($st).asInstanceOf[${st.tpe.dealias}]"
               case _ => super.transform(tree)
             }
           }.transform(rt.transform(body))
@@ -133,7 +133,7 @@ class ReplayRuntimeImpl(val c: Context) {
       q"""
          new RuntimeInterface {
            def numPhases: Int = $numPhases
-           def update(partitionId: Int, phase: Int, e: Event): Unit = {
+           def update(partitionId: Int, phase: Int, e: Event, deltaMap: Map[ReplayState, ReplayDelta]): Unit = {
              $me
            }
          }

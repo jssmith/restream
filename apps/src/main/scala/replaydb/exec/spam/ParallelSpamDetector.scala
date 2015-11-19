@@ -1,6 +1,6 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.MemoryStats
+import replaydb.runtimedev.{ReplayState, ReplayDelta, MemoryStats}
 import replaydb.runtimedev.threadedImpl.{MultiReaderEventSource, RunProgressCoordinator}
 import replaydb.util.ProgressMeter
 import replaydb.util
@@ -31,7 +31,6 @@ object ParallelSpamDetector extends App {
   val numPhases = si.numPhases
 
   val barrier = new RunProgressCoordinator(numPartitions = numPartitions, numPhases = numPhases, batchSizeGoal = batchSize, startTime = startTime)
-  si.setRunProgressCoordinator(barrier)
 
   barrier.registerReplayStates(stats.getAllReplayStates)
   val overallProgressMeter = new ProgressMeter(1000000, name = Some("Overall Progress"))
@@ -48,6 +47,7 @@ object ParallelSpamDetector extends App {
           var ct = 0L
           var nextCheckpointTs = 0L
           var nextCheckpointCt = 0L
+          var deltaMap = Map[ReplayState, ReplayDelta]()
           readerThreads(partitionId).readEvents(e => {
             while (e.ts > nextCheckpointTs || ct >= nextCheckpointCt) {
               if (ct - nextCheckpointCt < 0) {
@@ -57,8 +57,9 @@ object ParallelSpamDetector extends App {
               val nextCheckpoint = b.reportCheckpoint(e.ts, ct)
               nextCheckpointTs = nextCheckpoint._1
               nextCheckpointCt = nextCheckpoint._2
+              deltaMap = nextCheckpoint._3
             }
-            si.update(partitionId, phaseId, e)
+            si.update(partitionId, phaseId, e, deltaMap)
             ct += 1
             if (ct % batchSize == 0 && phaseId == numPhases) {
               overallProgressMeter.synchronized { overallProgressMeter.add(batchSize) }
@@ -70,7 +71,7 @@ object ParallelSpamDetector extends App {
                 b.gcAllReplayState()
               }
               if (ct % (1000 * numPartitions) == 1000 * partitionId) {
-                si.update(partitionId, phaseId, new PrintSpamCounter(lastTimestamp))
+                si.update(partitionId, phaseId, new PrintSpamCounter(lastTimestamp), deltaMap)
               }
             }
           })

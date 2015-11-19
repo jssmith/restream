@@ -2,7 +2,7 @@ package replaydb.runtimedev.threadedImpl
 
 import replaydb.runtimedev.{ReplayDelta, ReplayState}
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 
 // Assuming we know the startTime in advance
 class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: Int, startTime: Long) {
@@ -22,7 +22,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
   }
 
   abstract class CoordinatorInterface(partitionId: Int, phaseId: Int) {
-    def reportCheckpoint(ts: Long, ct: Long): (Long, Long)
+    def reportCheckpoint(ts: Long, ct: Long): (Long, Long, Map[ReplayState, ReplayDelta])
 
     def reportFinished(): Unit = {
       val checkpointNumber = checkpoints.synchronized {
@@ -46,29 +46,24 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
 
   def registerReplayState(rs: ReplayState): Unit = {
     replayStates += rs
-  }
-
-  var stateToDeltasMap = mutable.Map[ReplayState, Array[Array[Array[ReplayDelta]]]]()
-
-  def getDeltaForState(state: ReplayState, partitionId: Int, phaseId: Int): ReplayDelta = {
-    val batchId = checkpoints.synchronized {
-      checkpoints(phaseId)(partitionId) % MaxInFlightBatches // assuming single partition for now
-    }
-
-    stateToDeltasMap.synchronized {
-      val deltas = stateToDeltasMap.getOrElseUpdate(state, Array.ofDim(numPartitions, numPhases + 1, MaxInFlightBatches))
-      if (deltas(partitionId)(phaseId)(batchId) == null) {
-        deltas(partitionId)(phaseId)(batchId) = state.getDelta
+    val array = Array.ofDim[ReplayDelta](numPartitions, numPhases + 1, MaxInFlightBatches)
+    for (partId <- 0 until numPartitions) {
+      for (pid <- 1 to numPhases) {
+        for (bid <- 0 until MaxInFlightBatches) {
+          array(partId)(pid)(bid) = rs.getDelta
+        }
       }
-      deltas(partitionId)(phaseId)(batchId)
     }
+    stateToDeltasMap += ((rs, array))
   }
+
+  var stateToDeltasMap = immutable.Map[ReplayState, Array[Array[Array[ReplayDelta]]]]()
 
   def relative(ts: Long): Long = ts - startTime
 
   def getCoordinatorInterface(partitionId: Int, phaseId: Int): CoordinatorInterface = {
     new CoordinatorInterface(partitionId, phaseId) {
-      override def reportCheckpoint(ts: Long, ct: Long): (Long, Long) = {
+      override def reportCheckpoint(ts: Long, ct: Long): (Long, Long, Map[ReplayState, ReplayDelta]) = {
 //        val checkpointNumber: Int = (relative(ts) / batchSizeGoal).toInt
 
         //        var checkpointMergeStart = checkpointNumber
@@ -85,7 +80,6 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
           checkpoints.notifyAll()
 
           while (checkpointNumber - (MaxInFlightBatches-1) > checkpoints(phaseId + 1).min
-//            || (!finished(phaseId - 1).forall(_ == true) && checkpointNumber >= checkpoints(phaseId - 1).min)) {
             || (checkpointNumber >= checkpoints(phaseId - 1).min)) {
 //            println(s"phase $phaseId WAITing because chkpts(${phaseId + 1}).min is ${checkpoints(phaseId + 1).min}" +
 //              s" and chkpts(${phaseId - 1}).min is ${checkpoints(phaseId - 1).min} but this is at chkptNum $checkpointNumber")
@@ -99,27 +93,22 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
         }
         val batchId = checkpointNumber % MaxInFlightBatches
         // Ready to move forward; state is ready
-        if (phaseId != 1) {
-          stateToDeltasMap.synchronized {
+
+        val deltaMap = stateToDeltasMap.synchronized {
+          if (phaseId != 1) {
             for (entry <- stateToDeltasMap) entry match {
               case (rs, deltas) =>
-                  for (part <- 0 until numPartitions) {
-                    val delta = deltas(part)(phaseId - 1)(batchId)
-                    if (delta == null) {
-                      // do nothing
-                    } else {
-                      rs.merge(delta)
-                    }
-                    deltas(part)(phaseId - 1)(batchId) = null
-                  }
+                for (part <- 0 until numPartitions) {
+                  rs.merge(deltas(part)(phaseId - 1)(batchId))
+                }
             }
           }
+          stateToDeltasMap.mapValues(_(partitionId)(phaseId)(batchId))
         }
         val nextCheckpointTs = readUntil.synchronized {
           readUntil(phaseId - 1)(batchId).min
         } - 1
-//        startTime + batchSizeGoal.asInstanceOf[Long] * (checkpointNumber + 1)
-        (nextCheckpointTs, ct + batchSizeGoal) // maxTS, maxCount
+        (nextCheckpointTs, ct + batchSizeGoal, deltaMap)
       }
 
       override def gcAllReplayState(): Unit = {
