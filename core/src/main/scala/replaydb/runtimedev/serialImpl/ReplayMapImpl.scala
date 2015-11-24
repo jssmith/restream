@@ -1,6 +1,6 @@
 package replaydb.runtimedev.serialImpl
 
-import replaydb.runtimedev.{ReplayValue, ReplayDelta, ReplayMap}
+import replaydb.runtimedev.{ReplayValue, ReplayMap}
 
 import scala.collection.mutable
 import scala.util.Random
@@ -30,8 +30,4 @@ class ReplayMapImpl[K, V](default: => V) extends ReplayMap[K,V] with Serial {
     }
   }
 
-  val delta = new ReplayMapDelta[K, V](this)
-  override def getDelta: ReplayMapDelta[K, V] = {
-    delta
-  }
 }

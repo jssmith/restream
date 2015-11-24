@@ -2,10 +2,10 @@ package replaydb.runtimedev.threadedImpl
 
 import java.util.function.BiConsumer
 
-import replaydb.runtimedev.{ReplayDelta, ReplayTimestampLocalMap}
+import replaydb.runtimedev.ReplayTimestampLocalMap
 
 // NOTE: Should only be used with associative, commutative operators
-class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLocalMap[K, V] {
+class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLocalMap[K, V] with Threaded {
 
   class ValueWithTimestamp(initialValue: V, val ts: Long) {
     var read = false

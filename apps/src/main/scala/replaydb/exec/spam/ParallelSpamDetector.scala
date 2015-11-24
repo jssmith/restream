@@ -1,6 +1,6 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.{ReplayState, ReplayDelta, MemoryStats}
+import replaydb.runtimedev.{ReplayState, MemoryStats}
 import replaydb.runtimedev.threadedImpl.{MultiReaderEventSource, RunProgressCoordinator}
 import replaydb.util.ProgressMeter
 import replaydb.util
@@ -47,7 +47,7 @@ object ParallelSpamDetector extends App {
           var ct = 0L
           var nextCheckpointTs = 0L
           var nextCheckpointCt = 0L
-          var deltaMap = Map[ReplayState, ReplayDelta]()
+          var deltaMap = Map[ReplayState, ReplayState]()
           readerThreads(partitionId).readEvents(e => {
             while (e.ts > nextCheckpointTs || ct >= nextCheckpointCt) {
               val nextCheckpoint = b.reportCheckpoint(e.ts, ct)

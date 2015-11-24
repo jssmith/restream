@@ -2,12 +2,12 @@ package replaydb.runtimedev.threadedImpl
 
 import java.util.function.BiConsumer
 
-import replaydb.runtimedev.{ReplayDelta, ReplayMap, ReplayValue}
+import replaydb.runtimedev.{ReplayMap, ReplayValue}
 
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions._
 
-class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] {
+class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] with Threaded {
   val m = new java.util.concurrent.ConcurrentHashMap[K, ReplayValueImpl[V]]()
   override def get(ts: Long, key: K): Option[V] = {
     val x = m.get(key)

@@ -1,6 +1,6 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.{ReplayDelta, ReplayCounter}
+import replaydb.runtimedev.ReplayCounter
 
 class ReplayCounterDelta extends ReplayCounter with ReplayDelta {
 

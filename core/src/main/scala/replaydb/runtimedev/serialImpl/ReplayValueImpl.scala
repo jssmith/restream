@@ -26,9 +26,4 @@ class ReplayValueImpl[T](default: => T) extends ReplayValue[T] with Serial {
     Some(value)
   }
 
-  val delta = new ReplayValueDelta[T](this)
-  override def getDelta: ReplayValueDelta[T] = {
-    delta
-  }
-
 }

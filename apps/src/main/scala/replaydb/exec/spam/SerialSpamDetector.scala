@@ -3,7 +3,7 @@ package replaydb.exec.spam
 import java.io.FileInputStream
 
 import replaydb.io.SocialNetworkStorage
-import replaydb.runtimedev.{ReplayState, ReplayDelta}
+import replaydb.runtimedev.ReplayState
 import replaydb.util.ProgressMeter
 
 /**
@@ -21,7 +21,7 @@ object SerialSpamDetector extends App {
   val stats = new SpamDetectorStatsParallel(false)
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
-  val deltaMap: Map[ReplayState, ReplayDelta] = Map().withDefault(_.getDelta)
+  val deltaMap: Map[ReplayState, ReplayState] = Map().withDefault(rs => rs)
   val pm = new ProgressMeter(printInterval = 1000000, () => { si.update(0, new PrintSpamCounter(lastTimestamp), deltaMap); ""})
   val r = eventStorage.readEvents(new FileInputStream(inputFilename), e => {
     si.update(0, e, deltaMap)

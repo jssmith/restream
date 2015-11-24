@@ -1,9 +1,9 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.{ReplayDelta, ReplayCounter}
+import replaydb.runtimedev.ReplayCounter
 
 
-class ReplayCounterImpl extends ReplayCounter {
+class ReplayCounterImpl extends ReplayCounter with Threaded {
 
   val replayValue = new ReplayValueImpl[Long](0L)
 

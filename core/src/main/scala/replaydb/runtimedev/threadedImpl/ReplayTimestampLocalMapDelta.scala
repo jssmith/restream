@@ -1,6 +1,6 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.{ReplayTimestampLocalMap, ReplayDelta}
+import replaydb.runtimedev.ReplayTimestampLocalMap
 
 import scala.collection.mutable
 

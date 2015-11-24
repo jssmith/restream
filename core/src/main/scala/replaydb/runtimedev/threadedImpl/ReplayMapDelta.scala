@@ -3,7 +3,7 @@ package replaydb.runtimedev.threadedImpl
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Function
 
-import replaydb.runtimedev.{ReplayMap, ReplayDelta}
+import replaydb.runtimedev.ReplayMap
 
 import scala.reflect.ClassTag
 

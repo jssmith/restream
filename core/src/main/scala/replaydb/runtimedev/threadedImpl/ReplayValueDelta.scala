@@ -1,6 +1,6 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.{ReplayValue, ReplayDelta}
+import replaydb.runtimedev.ReplayValue
 import replaydb.runtimedev.threadedImpl.ReplayValueImpl.MergeRecord
 
 import scala.collection.mutable

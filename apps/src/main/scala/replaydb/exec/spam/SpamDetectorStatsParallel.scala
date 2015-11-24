@@ -53,10 +53,15 @@ class SpamDetectorStatsParallel(useParallel: Boolean) {
   val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = getReplayTimestampLocalMap(0)
 
   // TODO Ideally this becomes automated by the code generation portion
-  def getAllReplayStates: Seq[ReplayState] = {
-    List(friendships, friendSendRatio, spamCounter, messageSpamRatings, uniqueNonfriendsSentToInLastInterval,
-      nonfriendMessagesInLastInterval, messageContainingEmailFraction, messagesFractionLast7DaysInLast24Hours,
-      userFirstMessageTS, userMostRecentReceivedMessage, messageSentInResponseFraction)
+  def getAllReplayStates: Seq[ReplayState with Threaded] = {
+    if (!useParallel) {
+      throw new UnsupportedOperationException
+    } else {
+      List(friendships, friendSendRatio, spamCounter, messageSpamRatings, uniqueNonfriendsSentToInLastInterval,
+        nonfriendMessagesInLastInterval, messageContainingEmailFraction, messagesFractionLast7DaysInLast24Hours,
+        userFirstMessageTS, userMostRecentReceivedMessage, messageSentInResponseFraction)
+        .asInstanceOf[Seq[ReplayState with Threaded]]
+    }
   }
 
   def getRuntimeInterface: RuntimeInterface = emit {

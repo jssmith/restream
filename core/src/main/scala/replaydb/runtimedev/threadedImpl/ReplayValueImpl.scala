@@ -1,13 +1,13 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.{ReplayDelta, ReplayValue}
+import replaydb.runtimedev.ReplayValue
 import replaydb.runtimedev.threadedImpl.ReplayValueImpl.MergeRecord
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
-class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] {
+class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with Threaded {
 
   private case class ValueRecord[S](ts: Long, value: S) extends Ordered[ValueRecord[S]] {
     override def compare(that: ValueRecord[S]): Int = {

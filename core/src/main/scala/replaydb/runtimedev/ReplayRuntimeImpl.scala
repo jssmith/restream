@@ -133,7 +133,7 @@ class ReplayRuntimeImpl(val c: Context) {
       q"""
          new RuntimeInterface {
            def numPhases: Int = $numPhases
-           def update(partitionId: Int, phase: Int, e: Event, deltaMap: Map[ReplayState, ReplayDelta]): Unit = {
+           def update(partitionId: Int, phase: Int, e: Event, deltaMap: Map[ReplayState, ReplayState]): Unit = {
              $me
            }
          }

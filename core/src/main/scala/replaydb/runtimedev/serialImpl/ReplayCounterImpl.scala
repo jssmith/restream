@@ -14,9 +14,4 @@ class ReplayCounterImpl extends ReplayCounter with Serial {
     replayVal.getOption(ts).get
   }
 
-  val delta = new ReplayCounterDelta(this)
-  override def getDelta: ReplayCounterDelta = {
-    delta
-  }
-
 }
