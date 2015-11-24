@@ -26,7 +26,7 @@ object ParallelSpamDetector extends App {
 
   val startTime = util.Date.df.parse("2015-01-01 00:00:00.000").getTime
 
-  val stats = new SpamDetectorStatsParallel()
+  val stats = new SpamDetectorStatsParallel(true)
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
 
@@ -50,10 +50,6 @@ object ParallelSpamDetector extends App {
           var deltaMap = Map[ReplayState, ReplayDelta]()
           readerThreads(partitionId).readEvents(e => {
             while (e.ts > nextCheckpointTs || ct >= nextCheckpointCt) {
-              if (ct - nextCheckpointCt < 0) {
-                println(s"phaseId $phaseId, partId $partitionId, e.ts: ${e.ts}, nextChkptTs: $nextCheckpointTs, ct: $ct, " +
-                  s"nextChkptCt: $nextCheckpointCt, deltaTs: ${e.ts - nextCheckpointTs}, deltaCt: ${ct - nextCheckpointCt}")
-              }
               val nextCheckpoint = b.reportCheckpoint(e.ts, ct)
               nextCheckpointTs = nextCheckpoint._1
               nextCheckpointCt = nextCheckpoint._2
@@ -70,7 +66,7 @@ object ParallelSpamDetector extends App {
               if (ct % gcInterval == 0) {
                 b.gcAllReplayState()
               }
-              if (ct % (1000 * numPartitions) == 1000 * partitionId) {
+              if (ct % 500000 == 0) {
                 si.update(partitionId, phaseId, new PrintSpamCounter(lastTimestamp), deltaMap)
               }
             }

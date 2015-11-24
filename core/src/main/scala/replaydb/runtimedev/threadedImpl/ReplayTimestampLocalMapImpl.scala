@@ -26,7 +26,7 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
       if (x.ts == ts) {
         Option(x.value)
       } else {
-        throw new IllegalArgumentException(s"Requested key $key at time $ts but $key is only valid at $x.ts")
+        throw new IllegalArgumentException(s"Requested key $key at time $ts but $key is only valid at ${x.ts}")
       }
     }
   }

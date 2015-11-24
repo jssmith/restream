@@ -22,22 +22,35 @@ RULES:
 
  */
 
-class SpamDetectorStatsParallel() {
+class SpamDetectorStatsParallel(useParallel: Boolean) {
 
-  val friendships: ReplayMap[UserPair, Int] = new ReplayMapImpl(0)
-  val friendSendRatio: ReplayMap[Long, (Long, Long)] = new ReplayMapImpl((0L,0L))
-  val spamCounter: ReplayCounter = new ReplayCounterImpl
-  val nonfriendMessagesInLastInterval: ReplayMap[Long, Long] = new ReplayMapImpl(0)
+  def getReplayMap[K, V : ClassTag](default: => V): ReplayMap[K, V] = {
+    if (useParallel) new ReplayMapImpl[K, V](default) else new serialImpl.ReplayMapImpl[K, V](default)
+  }
+
+  def getReplayCounter: ReplayCounter = {
+    if (useParallel) new ReplayCounterImpl else new serialImpl.ReplayCounterImpl
+  }
+
+  def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = {
+    if (useParallel) new ReplayTimestampLocalMapImpl[K, V](default)
+    else new serialImpl.ReplayTimestampLocalMapImpl[K, V](default)
+  }
+
+  val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
+  val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
+  val spamCounter: ReplayCounter = getReplayCounter
+  val nonfriendMessagesInLastInterval: ReplayMap[Long, Long] = getReplayMap(0)
   // Mapping userIDa -> (userIDb -> # messages sent userIDa to userIDb in last NonfriendMessageCountInterval)
   val uniqueNonfriendsSentToInLastInterval: ReplayMap[Long, immutable.Map[Long, Long]] =
-    new ReplayMapImpl(new immutable.HashMap)
-  val messageContainingEmailFraction: ReplayMap[Long, (Long, Long)] = new ReplayMapImpl((0L, 0L))
-  val messagesFractionLast7DaysInLast24Hours: ReplayMap[Long, (Long, Long)] = new ReplayMapImpl((0L,0L))
-  val userFirstMessageTS: ReplayMap[Long, Long] = new ReplayMapImpl(Long.MaxValue)
+    getReplayMap(new immutable.HashMap)
+  val messageContainingEmailFraction: ReplayMap[Long, (Long, Long)] = getReplayMap((0L, 0L))
+  val messagesFractionLast7DaysInLast24Hours: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
+  val userFirstMessageTS: ReplayMap[Long, Long] = getReplayMap(Long.MaxValue)
   val userMostRecentReceivedMessage: ReplayMap[Long, immutable.Map[Long, Long]] =
-    new ReplayMapImpl(new immutable.HashMap)
-  val messageSentInResponseFraction: ReplayMap[Long, (Long, Long)] = new ReplayMapImpl((0L, 0L))
-  val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = new ReplayTimestampLocalMapImpl(0)
+    getReplayMap(new immutable.HashMap)
+  val messageSentInResponseFraction: ReplayMap[Long, (Long, Long)] = getReplayMap((0L, 0L))
+  val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = getReplayTimestampLocalMap(0)
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState] = {

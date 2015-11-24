@@ -3,7 +3,7 @@ package replaydb.runtimedev
 import org.scalatest.FlatSpec
 import replaydb.event.{ProductView, ProductUpdate, MessageEvent, Event}
 import replaydb.runtimedev.ReplayRuntime._
-import replaydb.runtimedev.monotonicImpl._
+import replaydb.runtimedev.serialImpl._
 
 class ReplayRuntimeSpec extends FlatSpec {
   "A ReplayRuntime" should "implement overall popularity" in {
