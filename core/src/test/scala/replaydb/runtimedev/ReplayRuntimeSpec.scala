@@ -41,11 +41,15 @@ class ReplayRuntimeSpec extends FlatSpec {
 
     val a = new Analysis
     val ai = a.getRuntimeInterface
-    ai.update(new ProductUpdate(ts = 1L, sku = 100L))
-    ai.update(new ProductView(ts = 2L, sku = 100L))
-    ai.update(new ProductView(ts = 3L, sku = 100L))
-    ai.update(new StopEvent(ts = 4L))
+    updateWithEvent(ai, new ProductUpdate(ts = 1L, sku = 100L))
+    updateWithEvent(ai, new ProductView(ts = 2L, sku = 100L))
+    updateWithEvent(ai, new ProductView(ts = 3L, sku = 100L))
+    updateWithEvent(ai, new StopEvent(ts = 4L))
     assert(endCt === 2)
+  }
+
+  def updateWithEvent(ri: RuntimeInterface, e: Event): Unit = {
+    ri.update(0, e, Map().withDefault(rs => rs))
   }
 
   case class PrintUserEvent(ts: Long, userId: Long) extends Event
@@ -91,14 +95,14 @@ class ReplayRuntimeSpec extends FlatSpec {
 
     val a = new Analysis
     val ai = a.getRuntimeInterface()
-    ai.update(new MessageEvent(ts = 10L, messageId = 1L, senderUserId =  100L, recipientUserId = 200L, content = ""))
-    ai.update(new MessageEvent(ts = 20L, messageId = 2L, senderUserId =  100L, recipientUserId = 300L, content = ""))
-    ai.update(new MessageEvent(ts = 30L, messageId = 3L, senderUserId =  200L, recipientUserId = 300L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 10L, messageId = 1L, senderUserId =  100L, recipientUserId = 200L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 20L, messageId = 2L, senderUserId =  100L, recipientUserId = 300L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 30L, messageId = 3L, senderUserId =  200L, recipientUserId = 300L, content = ""))
     assert(a.lastPrinted === None)
-    ai.update(new PrintUserEvent(ts = 35L, userId = 200L))
+    updateWithEvent(ai, new PrintUserEvent(ts = 35L, userId = 200L))
     assert(a.lastPrinted === None)
-    ai.update(new MessageEvent(ts = 40L, messageId = 4L, senderUserId =  200L, recipientUserId = 100L, content = ""))
-    ai.update(new PrintUserEvent(ts = 50, userId = 200L))
+    updateWithEvent(ai, new MessageEvent(ts = 40L, messageId = 4L, senderUserId =  200L, recipientUserId = 100L, content = ""))
+    updateWithEvent(ai, new PrintUserEvent(ts = 50, userId = 200L))
     assert(a.lastPrinted === Some(30))
   }
 
@@ -136,18 +140,18 @@ class ReplayRuntimeSpec extends FlatSpec {
 
     val a = new Analysis
     val ai = a.getRuntimeInterface()
-    ai.update(new MessageEvent(ts = 10L, messageId = 1L, senderUserId =  100L, recipientUserId = 200L, content = ""))
-    ai.update(new MessageEvent(ts = 20L, messageId = 2L, senderUserId =  100L, recipientUserId = 300L, content = ""))
-    ai.update(new MessageEvent(ts = 30L, messageId = 3L, senderUserId =  200L, recipientUserId = 300L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 10L, messageId = 1L, senderUserId =  100L, recipientUserId = 200L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 20L, messageId = 2L, senderUserId =  100L, recipientUserId = 300L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 30L, messageId = 3L, senderUserId =  200L, recipientUserId = 300L, content = ""))
     assert(a.lastPrinted === None)
-    ai.update(new PrintUserEvent(ts = 35L, userId = 200L))
+    updateWithEvent(ai, new PrintUserEvent(ts = 35L, userId = 200L))
     assert(a.lastPrinted === Some(0D))
-    ai.update(new MessageEvent(ts = 40L, messageId = 4L, senderUserId =  200L, recipientUserId = 100L, content = ""))
-    ai.update(new PrintUserEvent(ts = 50, userId = 200L))
+    updateWithEvent(ai, new MessageEvent(ts = 40L, messageId = 4L, senderUserId =  200L, recipientUserId = 100L, content = ""))
+    updateWithEvent(ai, new PrintUserEvent(ts = 50, userId = 200L))
     assert(a.lastPrinted === Some(0.5D))
-    ai.update(new PrintUserEvent(ts = 51, userId = 100L))
+    updateWithEvent(ai, new PrintUserEvent(ts = 51, userId = 100L))
     assert(a.lastPrinted === Some(0D))
-    ai.update(new PrintUserEvent(ts = 51, userId = 300L))
+    updateWithEvent(ai, new PrintUserEvent(ts = 51, userId = 300L))
     assert(a.lastPrinted === None)
   }
 
@@ -186,10 +190,10 @@ class ReplayRuntimeSpec extends FlatSpec {
 
     val a = new Analysis
     val ai = a.getRuntimeInterface
-    ai.update(new ProductUpdate(ts = 1L, sku = 100L))
-    ai.update(new ProductView(ts = 2L, sku = 100L))
-    ai.update(new ProductView(ts = 3L, sku = 100L))
-    ai.update(new StopEvent(ts = 4L))
+    updateWithEvent(ai, new ProductUpdate(ts = 1L, sku = 100L))
+    updateWithEvent(ai, new ProductView(ts = 2L, sku = 100L))
+    updateWithEvent(ai, new ProductView(ts = 3L, sku = 100L))
+    updateWithEvent(ai, new StopEvent(ts = 4L))
     assert(endCt === 2)
   }
 }
