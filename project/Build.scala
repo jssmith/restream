@@ -32,7 +32,9 @@ object ReplayDBBuild extends Build {
     settings = buildSettings ++ Seq(
       name := "replaydb-core",
       libraryDependencies ++= Seq(
-        "com.twitter" %% "chill" % "0.7.1",
+        "com.twitter" %% "chill" % "0.7.2",
+        "io.netty" % "netty-all" % "4.0.33.Final",
+        "org.slf4j" % "slf4j-simple" % "1.7.13",
         "org.apache.commons" % "commons-math3" % "3.5",
         "com.google.guava" % "guava" % "18.0",
         "org.scalatest" %% "scalatest" % "2.2.5"
@@ -42,7 +44,11 @@ object ReplayDBBuild extends Build {
 
   lazy val apps = Project("apps", file("apps"),
     settings = buildSettings ++ Seq(
-      name := "replaydb-apps"
+      name := "replaydb-apps",
+      libraryDependencies ++= Seq(
+      // TODO why do I need to include this again? Why isn't it picked up from core?
+        "io.netty" % "netty-all" % "4.0.33.Final"
+      )
     )
   ) dependsOn (core)
 

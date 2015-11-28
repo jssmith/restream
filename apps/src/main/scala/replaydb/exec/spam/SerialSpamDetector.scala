@@ -4,6 +4,7 @@ import java.io.FileInputStream
 
 import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.ReplayState
+import replaydb.runtimedev.serialImpl.ReplayStateFactory
 import replaydb.util.ProgressMeter
 
 /**
@@ -18,7 +19,7 @@ object SerialSpamDetector extends App {
 
   val inputFilename = args(0)
   val eventStorage = new SocialNetworkStorage
-  val stats = new SpamDetectorStatsParallel(false)
+  val stats = new SpamDetectorStatsParallel(new ReplayStateFactory())
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
   val deltaMap: Map[ReplayState, ReplayState] = Map().withDefault(rs => rs)

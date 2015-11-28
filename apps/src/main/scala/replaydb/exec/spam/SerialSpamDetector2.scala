@@ -1,6 +1,7 @@
 package replaydb.exec.spam
 
 import replaydb.runtimedev.ReplayState
+import replaydb.runtimedev.serialImpl.ReplayStateFactory
 import replaydb.runtimedev.threadedImpl.MultiReaderEventSource
 import replaydb.util.ProgressMeter
 
@@ -15,7 +16,7 @@ object SerialSpamDetector2 extends App {
   }
 
   val inputFilename = args(0)
-  val stats = new SpamDetectorStatsParallel(false)
+  val stats = new SpamDetectorStatsParallel(new ReplayStateFactory())
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
   val deltaMap: Map[ReplayState, ReplayState] = Map().withDefault(rs => rs)

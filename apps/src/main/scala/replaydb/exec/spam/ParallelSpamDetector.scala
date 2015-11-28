@@ -1,7 +1,7 @@
 package replaydb.exec.spam
 
 import replaydb.runtimedev.{ReplayState, MemoryStats}
-import replaydb.runtimedev.threadedImpl.{MultiReaderEventSource, RunProgressCoordinator}
+import replaydb.runtimedev.threadedImpl.{ReplayStateFactory, MultiReaderEventSource, RunProgressCoordinator}
 import replaydb.util.ProgressMeter
 import replaydb.util
 
@@ -26,7 +26,7 @@ object ParallelSpamDetector extends App {
 
   val startTime = util.Date.df.parse("2015-01-01 00:00:00.000").getTime
 
-  val stats = new SpamDetectorStatsParallel(true)
+  val stats = new SpamDetectorStatsParallel(new ReplayStateFactory())
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
 

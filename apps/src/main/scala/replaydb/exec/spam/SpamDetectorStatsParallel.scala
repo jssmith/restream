@@ -8,7 +8,7 @@ import replaydb.util.time._
 import replaydb.event.Event
 
 import scala.collection.immutable
-import scala.reflect.ClassTag
+
 
 /*
 RULES:
@@ -22,20 +22,8 @@ RULES:
 
  */
 
-class SpamDetectorStatsParallel(useParallel: Boolean) {
-
-  def getReplayMap[K, V : ClassTag](default: => V): ReplayMap[K, V] = {
-    if (useParallel) new ReplayMapImpl[K, V](default) else new serialImpl.ReplayMapImpl[K, V](default)
-  }
-
-  def getReplayCounter: ReplayCounter = {
-    if (useParallel) new ReplayCounterImpl else new serialImpl.ReplayCounterImpl
-  }
-
-  def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = {
-    if (useParallel) new ReplayTimestampLocalMapImpl[K, V](default)
-    else new serialImpl.ReplayTimestampLocalMapImpl[K, V](default)
-  }
+class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface {
+  import replayStateFactory._
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
   val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
