@@ -38,6 +38,8 @@ class ClientGroup(runConfiguration: RunConfiguration) {
 
   def connect(hostConfigurations: Iterable[Hosts.HostConfiguration]): Unit = {
     logger.info("connecting with host configuration {}", hostConfigurations.mkString(","))
+    // TODO shouldn't the count be the number of partitions / things you connect to
+    // since each one decrements the latch when it sends a `completed` message?
     workLatch = new CountDownLatch(1)
     for (hostConfiguration <- hostConfigurations) {
       cf += b.connect(hostConfiguration.host, hostConfiguration.port).sync()

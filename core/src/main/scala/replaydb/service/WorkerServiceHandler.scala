@@ -34,7 +34,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                 //  - separate reader thread
                 //  - barrier to prevent from running until previous batch has finished
                 try {
-                  logger.info("starting replay on partition {}, will update at interval {}", partitionId.toInt, c.progressUpdateInterval)
+                  logger.info(s"starting replay on partition $partitionId (phase $phaseId), will update at interval ${c.progressUpdateInterval}")
                   var batchEndTimestamp = c.startTimestamp
                   val eventStorage = new SocialNetworkStorage
                   var lastTimestamp = Long.MinValue

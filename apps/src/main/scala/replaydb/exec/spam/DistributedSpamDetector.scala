@@ -38,7 +38,7 @@ object DistributedSpamDetector extends App {
   // estimate the event rate so that we can set a batch time range
   val r = EventRateEstimator.estimateRate(partitionFnBase, numPartitions)
   val startTime = r.startTime
-  val batchTimeInterval = (100000 * r.eventIntervalMs).toLong
+  val batchTimeInterval = (batchSize * r.eventIntervalMs).toLong
   println(s"rate estimate $r")
   val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = 5,
     startTimestamp = startTime, batchTimeInterval = batchTimeInterval)
