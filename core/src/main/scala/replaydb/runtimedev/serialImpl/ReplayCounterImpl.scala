@@ -11,7 +11,7 @@ class ReplayCounterImpl extends ReplayCounter with Serial {
   }
 
   override def get(ts: Long): Long = {
-    replayVal.getOption(ts).get
+    replayVal.get(ts).get
   }
 
 }

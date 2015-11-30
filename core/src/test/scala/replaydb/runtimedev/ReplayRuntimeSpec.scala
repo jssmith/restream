@@ -16,11 +16,11 @@ class ReplayRuntimeSpec extends FlatSpec {
 
       def getRuntimeInterface = emit {
         bind { pu: ProductUpdate =>
-          allSkus.update(ts = pu.ts, key = pu.sku, fn = _ => 1)
+          allSkus.merge(ts = pu.ts, key = pu.sku, fn = _ => 1)
         }
         bind { pv: ProductView =>
           c.add(1, pv.ts)
-          cSku.update(ts = pv.ts, key = pv.sku, fn = _ + 1)
+          cSku.merge(ts = pv.ts, key = pv.sku, fn = _ + 1)
         }
         bind { pv: ProductView =>
           val ts = pv.ts
@@ -71,13 +71,13 @@ class ReplayRuntimeSpec extends FlatSpec {
       def getRuntimeInterface() = emit {
         bind {
           me: MessageEvent =>
-            initiations.update(ts = me.ts, key = (me.senderUserId, me.recipientUserId), prevMinTs => Math.min(prevMinTs, me.ts))
+            initiations.merge(ts = me.ts, key = (me.senderUserId, me.recipientUserId), prevMinTs => Math.min(prevMinTs, me.ts))
         }
         bind {
           me: MessageEvent =>
             initiations.get(ts = me.ts, key = (me.recipientUserId, me.senderUserId)) match {
               case Some(startTime) =>
-                userAverages.update(ts = me.ts, key = me.senderUserId, fn = ReplayAvg.add(me.ts - startTime))
+                userAverages.merge(ts = me.ts, key = me.senderUserId, fn = ReplayAvg.add(me.ts - startTime))
               case None =>
             }
         }
@@ -114,12 +114,12 @@ class ReplayRuntimeSpec extends FlatSpec {
       def getRuntimeInterface() = emit {
         bind {
           me: MessageEvent =>
-            initiations.update(ts = me.ts, key = (me.senderUserId, me.recipientUserId), fn = _ => 1)
+            initiations.merge(ts = me.ts, key = (me.senderUserId, me.recipientUserId), fn = _ => 1)
         }
 
         bind {
           me: MessageEvent =>
-            userAverages.update(ts = me.ts, key = me.senderUserId,
+            userAverages.merge(ts = me.ts, key = me.senderUserId,
               fn = ReplayAvg.add(initiations.get(ts = me.ts, key = (me.recipientUserId, me.senderUserId)) match {
                 case Some(_) => 1
                 case None => 0
@@ -180,10 +180,10 @@ class ReplayRuntimeSpec extends FlatSpec {
         bind { se: StopEvent => endCt = c.get(se.ts)}
         bind { pv: ProductView =>
           c.add(1, pv.ts)
-          cSku.update(ts = pv.ts, key = pv.sku, fn = _ + 1)
+          cSku.merge(ts = pv.ts, key = pv.sku, fn = _ + 1)
         }
         bind { pu: ProductUpdate =>
-          allSkus.update(ts = pu.ts, key = pu.sku, fn = _ => 1)
+          allSkus.merge(ts = pu.ts, key = pu.sku, fn = _ => 1)
         }
       }
     }

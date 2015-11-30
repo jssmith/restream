@@ -66,14 +66,14 @@ class SpamDetectorStatsParallel(useParallel: Boolean) {
 
   def getRuntimeInterface: RuntimeInterface = emit {
     bind { e: NewFriendshipEvent =>
-      friendships.update(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
+      friendships.merge(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
     }
     // RULE 1 STATE
     bind { me: MessageEvent =>
       val ts = me.ts
       friendships.get(ts = ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
-        case Some(_) => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
-        case None => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
+        case Some(_) => friendSendRatio.merge(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
+        case None => friendSendRatio.merge(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
       }
     }
     // RULE 1 EVALUATION
@@ -98,11 +98,11 @@ class SpamDetectorStatsParallel(useParallel: Boolean) {
         friendships.get(ts = ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
           case Some(_) =>
           case None =>
-            nonfriendMessagesInLastInterval.update(ts, me.senderUserId, _ + 1)
-            nonfriendMessagesInLastInterval.update(ts + NonfriendMessageCountInterval, me.senderUserId, _ - 1)
-            uniqueNonfriendsSentToInLastInterval.update(ts, me.senderUserId,
+            nonfriendMessagesInLastInterval.merge(ts, me.senderUserId, _ + 1)
+            nonfriendMessagesInLastInterval.merge(ts + NonfriendMessageCountInterval, me.senderUserId, _ - 1)
+            uniqueNonfriendsSentToInLastInterval.merge(ts, me.senderUserId,
               map => map.updated(me.recipientUserId, map.getOrElse(me.recipientUserId, 0L) + 1))
-            uniqueNonfriendsSentToInLastInterval.update(ts + NonfriendMessageCountInterval, me.senderUserId,
+            uniqueNonfriendsSentToInLastInterval.merge(ts + NonfriendMessageCountInterval, me.senderUserId,
               map => { val x = map.getOrElse(me.recipientUserId, 0L); if (x > 0) map.updated(me.recipientUserId, x - 1) else null })
               // null case should never happen - leave null to throw NPE
         }
@@ -133,12 +133,12 @@ class SpamDetectorStatsParallel(useParallel: Boolean) {
       me: MessageEvent =>
         val ts = me.ts
         if (containsEmail(me.content)) {
-          messageContainingEmailFraction.update(ts, me.senderUserId, (ratio) => (ratio._1 + 1, ratio._2 + 1))
-          messageContainingEmailFraction.update(ts + MessageContainingEmailInterval,
+          messageContainingEmailFraction.merge(ts, me.senderUserId, (ratio) => (ratio._1 + 1, ratio._2 + 1))
+          messageContainingEmailFraction.merge(ts + MessageContainingEmailInterval,
             me.senderUserId, (ratio) => (ratio._1 - 1, ratio._2 - 1))
         } else {
-          messageContainingEmailFraction.update(ts, me.senderUserId, (ratio) => (ratio._1, ratio._2 + 1))
-          messageContainingEmailFraction.update(ts + MessageContainingEmailInterval,
+          messageContainingEmailFraction.merge(ts, me.senderUserId, (ratio) => (ratio._1, ratio._2 + 1))
+          messageContainingEmailFraction.merge(ts + MessageContainingEmailInterval,
             me.senderUserId, (ratio) => (ratio._1, ratio._2 - 1))
         }
     }
@@ -158,10 +158,10 @@ class SpamDetectorStatsParallel(useParallel: Boolean) {
     bind {
       me: MessageEvent =>
         val ts = me.ts
-        userFirstMessageTS.update(ts, me.senderUserId, Math.min(_, ts)) // kind of wasteful...
-        messagesFractionLast7DaysInLast24Hours.update(ts, me.senderUserId, old => (old._1 + 1, old._2 + 1))
-        messagesFractionLast7DaysInLast24Hours.update(ts + 1.days, me.senderUserId, old => (old._1 - 1, old._2))
-        messagesFractionLast7DaysInLast24Hours.update(ts + 7.days, me.senderUserId, old => (old._1, old._2 - 1))
+        userFirstMessageTS.merge(ts, me.senderUserId, Math.min(_, ts)) // kind of wasteful...
+        messagesFractionLast7DaysInLast24Hours.merge(ts, me.senderUserId, old => (old._1 + 1, old._2 + 1))
+        messagesFractionLast7DaysInLast24Hours.merge(ts + 1.days, me.senderUserId, old => (old._1 - 1, old._2))
+        messagesFractionLast7DaysInLast24Hours.merge(ts + 7.days, me.senderUserId, old => (old._1, old._2 - 1))
     }
     // RULE 4 EVALUATE
     bind {
@@ -184,7 +184,7 @@ class SpamDetectorStatsParallel(useParallel: Boolean) {
     // RULE 5 STATE 1
     bind {
       me: MessageEvent =>
-        userMostRecentReceivedMessage.update(me.ts, me.recipientUserId, map => {
+        userMostRecentReceivedMessage.merge(me.ts, me.recipientUserId, map => {
           map.updated(me.senderUserId, me.ts)
         })
     }
@@ -197,9 +197,9 @@ class SpamDetectorStatsParallel(useParallel: Boolean) {
           case None => false
         }
         if (isResponse) {
-          messageSentInResponseFraction.update(ts, me.senderUserId, frac => (frac._1 + 1, frac._2 + 1))
+          messageSentInResponseFraction.merge(ts, me.senderUserId, frac => (frac._1 + 1, frac._2 + 1))
         } else {
-          messageSentInResponseFraction.update(ts, me.senderUserId, frac => (frac._1, frac._2 + 1))
+          messageSentInResponseFraction.merge(ts, me.senderUserId, frac => (frac._1, frac._2 + 1))
         }
     }
     // RULE 5 EVALUATION

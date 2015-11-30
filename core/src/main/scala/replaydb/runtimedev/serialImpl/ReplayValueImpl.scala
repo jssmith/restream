@@ -19,7 +19,7 @@ class ReplayValueImpl[T](default: => T) extends ReplayValue[T] with Serial {
     outstanding.enqueue(new MergeRecord(ts, value))
   }
 
-  override def getOption(ts: Long): Option[T] = {
+  override def get(ts: Long): Option[T] = {
     while (outstanding.nonEmpty && outstanding.head.ts <= ts) {
       value = outstanding.dequeue().merge(value)
     }

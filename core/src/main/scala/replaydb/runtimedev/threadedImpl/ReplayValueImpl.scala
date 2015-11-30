@@ -83,7 +83,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
     }
   }
 
-  override def getOption(ts: Long): Option[T] = {
+  override def get(ts: Long): Option[T] = {
     this.synchronized {
       lastRead = math.max(lastRead, ts)
       if (updates.nonEmpty) {
