@@ -34,14 +34,14 @@ class SimpleSpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.Re
 
   def getRuntimeInterface: RuntimeInterface = emit {
     bind { e: NewFriendshipEvent =>
-      friendships.update(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
+      friendships.merge(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
     }
     // RULE 1 STATE
     bind { me: MessageEvent =>
       val ts = me.ts
       friendships.get(ts = ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
-        case Some(_) => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
-        case None => friendSendRatio.update(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
+        case Some(_) => friendSendRatio.merge(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
+        case None => friendSendRatio.merge(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
       }
     }
     // RULE 1 EVALUATION
