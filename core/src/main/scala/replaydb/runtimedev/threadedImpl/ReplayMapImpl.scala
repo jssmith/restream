@@ -14,7 +14,7 @@ class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] with
     if (x == null) {
       None
     } else {
-      x.getOption(ts)
+      x.get(ts)
     }
   }
 
@@ -40,7 +40,7 @@ class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] with
     new ReplayMapDelta[K, V]
   }
 
-  override def update(ts: Long, key: K, fn: (V) => V): Unit = {
+  override def merge(ts: Long, key: K, fn: (V) => V): Unit = {
     m.computeIfAbsent(key, new java.util.function.Function[K,ReplayValueImpl[V]] {
       override def apply(t: K): ReplayValueImpl[V] = {
         new ReplayValueImpl[V](default)

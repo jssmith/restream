@@ -11,7 +11,7 @@ class ReplayCounterImpl extends ReplayCounter with Threaded {
     replayValue.merge(ts, _ + value)
   }
   override def get(ts: Long): Long = {
-    replayValue.getOption(ts) match {
+    replayValue.get(ts) match {
       case Some(x) => x
       case None => 0
     }

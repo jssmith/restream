@@ -20,7 +20,7 @@ class ReplayValueDelta[T : ClassTag]
     pq.clear()
   }
 
-  override def getOption(ts: Long): Option[T] = {
+  override def get(ts: Long): Option[T] = {
     throw new UnsupportedOperationException
   }
 
