@@ -6,7 +6,7 @@ import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.ReferenceCountUtil
 import org.slf4j.LoggerFactory
 import replaydb.io.SocialNetworkStorage
-import replaydb.runtimedev.{HasRuntimeInterface, ReplayState}
+import replaydb.runtimedev.HasRuntimeInterface
 import replaydb.runtimedev.distributedImpl.{StateCommunicationService, ReplayStateFactory}
 import replaydb.service.driver._
 import com.typesafe.scalalogging.Logger
@@ -20,17 +20,17 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
     logger.info(s"received message $msg")
     msg.asInstanceOf[Command] match {
       case c : InitReplayCommand[_] => {
-        // TODO need to know my own partitionId and total number of partitions \/ here
-        val stateFactory = new ReplayStateFactory(new StateCommunicationService(???, ???))
         val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
+        val runConfig = c.runConfiguration
+        val stateFactory = new ReplayStateFactory(new StateCommunicationService(c.partitionId, runConfig.numPartitions))
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
-        batchProgressCoordinator = new BatchProgressCoordinator(c.startTimestamp, c.batchTimeInterval)
+        batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval)
 
-        logger.info(s"launching threads... number of partitions: ${c.files.size}, number of phases ${runtime.numPhases}")
+        val partitionId = c.partitionId
+        logger.info(s"launching threads... number of phases ${runConfig.numPhases}")
         val threads =
-          // TODO aren't we only having one partition per worker?
-          for ((partitionId, partitionFn) <- c.files; phaseId <- 1 to runtime.numPhases) yield {
+          for (phaseId <- 1 to runtime.numPhases) yield {
             new Thread(s"replay-$partitionId-$phaseId") {
               val progressCoordinator = batchProgressCoordinator.getCoordinator(phaseId)
               override def run(): Unit = {
@@ -38,7 +38,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                 //  - separate reader thread
                 try {
                   logger.info(s"starting replay on partition $partitionId (phase $phaseId), will update at interval ${c.printProgressInterval}")
-                  var batchEndTimestamp = c.startTimestamp
+                  var batchEndTimestamp = runConfig.startTimestamp
                   val eventStorage = new SocialNetworkStorage
                   var lastTimestamp = Long.MinValue
                   var ct = 0
@@ -53,13 +53,13 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                       }
                     })
                   }
-                  eventStorage.readEvents(new FileInputStream(partitionFn), e => {
+                  eventStorage.readEvents(new FileInputStream(c.filename), e => {
                     if (e.ts >= batchEndTimestamp) {
                       logger.info(s"reached batch end on partition $partitionId phase $phaseId")
                       if (ct > 0) {
                         sendProgress()
                       }
-                      batchEndTimestamp += c.batchTimeInterval
+                      batchEndTimestamp += runConfig.batchTimeInterval
                       logger.info(s"advancing endtime $batchEndTimestamp on partition $partitionId phase $phaseId")
                       progressCoordinator.awaitAdvance(batchEndTimestamp)
                     }
