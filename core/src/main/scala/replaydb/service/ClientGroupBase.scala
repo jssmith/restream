@@ -15,12 +15,14 @@ import replaydb.service.driver._
 
 import scala.collection.mutable.ArrayBuffer
 
-class ClientGroupBase(runConfiguration: RunConfiguration, serviceHandlerFactory: ServiceHandlerFactory) {
+abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
   val logger = Logger(LoggerFactory.getLogger(classOf[ClientGroupBase]))
   val group = new NioEventLoopGroup()
   val cf = new ArrayBuffer[ChannelFuture]()
   val progressTracker = new ProgressTracker(runConfiguration)
   var workLatch: CountDownLatch = _
+
+  def getHandler(): ChannelInboundHandler
 
   val b = new Bootstrap()
   b.group(group)
@@ -36,7 +38,7 @@ class ClientGroupBase(runConfiguration: RunConfiguration, serviceHandlerFactory:
         // Decode commands received from clients
         p.addLast(new LengthFieldBasedFrameDecoder(KryoCommands.MAX_KRYO_MESSAGE_SIZE, 0, 4, 0, 4))
         p.addLast(new KryoCommandDecoder())
-        p.addLast(serviceHandlerFactory.getHandler())
+        p.addLast(getHandler())
       }
     })
 

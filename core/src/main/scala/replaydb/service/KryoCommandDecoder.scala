@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory
 import replaydb.service.driver.KryoCommands
 
 class KryoCommandDecoder extends ByteToMessageDecoder with KryoCommands {
-  val logger = Logger(LoggerFactory.getLogger(classOf[KryoCommandEncoder]))
+  val logger = Logger(LoggerFactory.getLogger(classOf[KryoCommandDecoder]))
    val buf = new Array[Byte](KryoCommands.MAX_KRYO_MESSAGE_SIZE)
    val input = new Input(buf)
 
