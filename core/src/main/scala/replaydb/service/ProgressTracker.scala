@@ -13,8 +13,8 @@ class ProgressTracker(runConfiguration: RunConfiguration) {
     positions.map(_.min).zipWithIndex.map{ case (ts, phase) => (phase + 1, ts) }.toMap
   }
   def update(partitionId: Int, phaseId: Int, latestTimestamp: Long): Option[Map[Int,Long]] = {
-    val prev = positions(phaseId)(partitionId)
-    positions(phaseId)(partitionId) = latestTimestamp
+    val prev = positions(phaseId - 1)(partitionId)
+    positions(phaseId - 1)(partitionId) = latestTimestamp
     if (batchId(prev) != batchId(latestTimestamp)) {
       Some(summarize())
     } else {

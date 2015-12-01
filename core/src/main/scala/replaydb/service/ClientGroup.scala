@@ -2,27 +2,31 @@ package replaydb.service
 
 import java.util.concurrent.CountDownLatch
 
+import com.typesafe.scalalogging.Logger
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel._
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder
+import io.netty.handler.logging.{LogLevel, LoggingHandler}
 import replaydb.service.driver._
 
 import scala.collection.mutable.ArrayBuffer
 import org.slf4j.LoggerFactory
 
 class ClientGroup(runConfiguration: RunConfiguration) {
-  val logger = LoggerFactory.getLogger(classOf[ClientGroup])
+  val logger = Logger(LoggerFactory.getLogger(classOf[ClientGroup]))
   val group = new NioEventLoopGroup()
   val cf = new ArrayBuffer[ChannelFuture]()
+  val progressTracker = new ProgressTracker(runConfiguration)
   var workLatch: CountDownLatch = _
 
   val b = new Bootstrap()
   b.group(group)
     .channel(classOf[NioSocketChannel])
     .option(ChannelOption.TCP_NODELAY.asInstanceOf[ChannelOption[Any]], true)
+    .handler(new LoggingHandler(LogLevel.DEBUG))
     .handler(new ChannelInitializer[SocketChannel] {
       override def initChannel(ch: SocketChannel): Unit = {
         val p = ch.pipeline()
@@ -37,17 +41,19 @@ class ClientGroup(runConfiguration: RunConfiguration) {
     })
 
   def connect(hostConfigurations: Iterable[Hosts.HostConfiguration]): Unit = {
-    logger.info("connecting with host configuration {}", hostConfigurations.mkString(","))
-    // TODO shouldn't the count be the number of partitions / things you connect to
-    // since each one decrements the latch when it sends a `completed` message?
-    workLatch = new CountDownLatch(1)
+    logger.info(s"connecting with host configuration ${hostConfigurations.mkString(",")}")
+    workLatch = new CountDownLatch(runConfiguration.numPartitions)
     for (hostConfiguration <- hostConfigurations) {
       cf += b.connect(hostConfiguration.host, hostConfiguration.port).sync()
     }
   }
 
+  def broadcastCommand(c: Command): Unit = {
+    cf.foreach { _.channel().writeAndFlush(c).sync() }
+  }
+
   def issueCommand(i: Int, c: Command): Unit = {
-    logger.info("issuing command on partition {}: {}", i, c.toString)
+    logger.info(s"issuing command on partition $i: ${c.toString}")
     // TODO - do we need to sync here?
     cf(i).channel().writeAndFlush(c).sync()
   }

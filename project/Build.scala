@@ -34,6 +34,7 @@ object ReplayDBBuild extends Build {
       libraryDependencies ++= Seq(
         "com.twitter" %% "chill" % "0.7.2",
         "io.netty" % "netty-all" % "4.0.33.Final",
+        "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
         "org.slf4j" % "slf4j-simple" % "1.7.13",
         "org.apache.commons" % "commons-math3" % "3.5",
         "com.google.guava" % "guava" % "18.0",

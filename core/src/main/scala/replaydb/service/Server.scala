@@ -1,5 +1,6 @@
 package replaydb.service
 
+import com.typesafe.scalalogging.Logger
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
@@ -11,11 +12,11 @@ import org.slf4j.LoggerFactory
 import replaydb.service.driver.{Command, KryoCommands}
 
 class Server(port: Int) {
-  val logger = LoggerFactory.getLogger(classOf[Server])
+  val logger = Logger(LoggerFactory.getLogger(classOf[Server]))
   var f: ChannelFuture = _
 
   def run(): Unit = {
-    logger.info("starting server on port {}", port)
+    logger.info(s"starting server on port $port")
     val bossGroup = new NioEventLoopGroup(1)
     val workerGroup = new NioEventLoopGroup()
     try {
@@ -24,7 +25,8 @@ class Server(port: Int) {
       b.group(bossGroup, workerGroup)
         .channel(classOf[NioServerSocketChannel])
         .option(ChannelOption.SO_BACKLOG.asInstanceOf[ChannelOption[Any]], 100)
-        .handler(new LoggingHandler(LogLevel.INFO))
+        .option(ChannelOption.TCP_NODELAY.asInstanceOf[ChannelOption[Any]], true)
+        .handler(new LoggingHandler(LogLevel.DEBUG))
         .childHandler(new ChannelInitializer[SocketChannel] {
           override def initChannel(ch: SocketChannel): Unit = {
             val p = ch.pipeline()

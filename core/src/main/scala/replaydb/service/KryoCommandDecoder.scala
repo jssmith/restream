@@ -3,13 +3,15 @@ package replaydb.service
 import java.util
 
 import com.esotericsoftware.kryo.io.Input
+import com.typesafe.scalalogging.Logger
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageDecoder
+import org.slf4j.LoggerFactory
 import replaydb.service.driver.KryoCommands
 
 class KryoCommandDecoder extends ByteToMessageDecoder with KryoCommands {
-
+  val logger = Logger(LoggerFactory.getLogger(classOf[KryoCommandEncoder]))
    val buf = new Array[Byte](KryoCommands.MAX_KRYO_MESSAGE_SIZE)
    val input = new Input(buf)
 
@@ -22,7 +24,9 @@ class KryoCommandDecoder extends ByteToMessageDecoder with KryoCommands {
        input.rewind()
        in.readBytes(buf, 0, len)
        input.setLimit(len)
-       out.add(kryo.readClassAndObject(input))
+       val obj = kryo.readClassAndObject(input)
+       out.add(obj)
+       logger.debug(s"kryo decoded class of type ${obj.getClass}")
      }
    }
  }
