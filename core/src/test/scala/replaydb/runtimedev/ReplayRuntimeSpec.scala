@@ -1,7 +1,7 @@
 package replaydb.runtimedev
 
 import org.scalatest.FlatSpec
-import replaydb.event.{ProductView, ProductUpdate, MessageEvent, Event}
+import replaydb.event.{Event, MessageEvent, ProductUpdate, ProductView}
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev.serialImpl._
 
@@ -23,17 +23,20 @@ class ReplayRuntimeSpec extends FlatSpec {
           cSku.merge(ts = pv.ts, key = pv.sku, fn = _ + 1)
         }
         bind { pv: ProductView =>
-          val ts = pv.ts
-          val ct = c.get(ts)
-          def printTraining(sku: Long, outcome: Boolean) = {
-            val featureValue = if (ct > 0) {
+          val ct = c.get(pv.ts)
+          printf("%f %b\n",
+            if (ct > 0) {
               0D
             } else {
-              cSku.get(sku, ts).getOrElse(0L).toDouble / ct.toDouble
-            }
-          }
-          printTraining(pv.sku, outcome = true)
-          printTraining(allSkus.getRandom(ts).orNull._1, outcome = false)
+              cSku.get(pv.sku, pv.ts).getOrElse(0L).toDouble / ct.toDouble
+            }, true)
+            // TODO restore this test
+//            printf("%f %b\n",
+//              if (ct > 0) {
+//                0D
+//              } else {
+//                cSku.get(allSkus.getRandom(pv.ts).orNull._1, pv.ts).getOrElse(0L).toDouble / ct.toDouble
+//              }, false)
         }
         bind { se: StopEvent => endCt = c.get(se.ts)}
       }
@@ -165,17 +168,20 @@ class ReplayRuntimeSpec extends FlatSpec {
 
       def getRuntimeInterface = emit {
         bind { pv: ProductView =>
-          val ts = pv.ts
-          val ct = c.get(ts)
-          def printTraining(sku: Long, outcome: Boolean) = {
-            val featureValue = if (ct > 0) {
+          val ct = c.get(pv.ts)
+          printf("%f %b\n",
+            if (ct > 0) {
               0D
             } else {
-              cSku.get(sku, ts).getOrElse(0L).toDouble / ct.toDouble
-            }
-          }
-          printTraining(pv.sku, outcome = true)
-          printTraining(allSkus.getRandom(ts).orNull._1, outcome = false)
+              cSku.get(pv.sku, pv.ts).getOrElse(0L).toDouble / ct.toDouble
+            }, true)
+            // TODO restore this test
+//            printf("%f %b\n",
+//              if (ct > 0) {
+//                0D
+//              } else {
+//                cSku.get(allSkus.getRandom(pv.ts).orNull._1, pv.ts).getOrElse(0L).toDouble / ct.toDouble
+//              }, false)
         }
         bind { se: StopEvent => endCt = c.get(se.ts)}
         bind { pv: ProductView =>

@@ -1,7 +1,6 @@
 package replaydb.runtimedev
 
 import replaydb.event.Event
-import replaydb.runtimedev.CoordinatorInterface
 
 trait RuntimeInterface {
   def numPhases: Int
