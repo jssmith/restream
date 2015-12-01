@@ -1,6 +1,6 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.ReplayValue
+import replaydb.runtimedev.{CoordinatorInterface, ReplayValue}
 import replaydb.runtimedev.threadedImpl.ReplayValueImpl.MergeRecord
 
 import scala.collection.mutable
@@ -38,35 +38,9 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
   private var lastGC = Long.MinValue
   private var oldestNonGCWrite = Long.MinValue
 
-  def merge(rd: ReplayDelta): Unit = {
-    val delta = rd.asInstanceOf[ReplayValueDelta[T]]
-    if (delta.pq.nonEmpty) {
-      this.synchronized {
-        val ts = delta.pq.head.ts
-        if (ts <= lastRead || ts <= lastGC) {
-          throw new IllegalArgumentException(s"add at $ts must precede get at $lastRead and GC at $lastGC")
-        }
-        oldestNonGCWrite = if (oldestNonGCWrite < lastGC) {
-          // If we're the first write since the last GC,  make ourselves the new oldest
-          ts
-        } else {
-          // if we're older than another write following the last GC, update ourselves as oldest
-          Math.min(oldestNonGCWrite, ts)
-        }
-
-        updates ++= delta.pq
-        delta.clear()
-      }
-    }
-  }
-
-  override def getDelta: ReplayValueDelta[T] = {
-    new ReplayValueDelta[T]
-  }
-
   // TODO we should be able to use ReadWrite locks here, right?
 
-  override def merge(ts: Long, merge: T => T): Unit = {
+  override def merge(ts: Long, merge: T => T)(implicit coordinator: CoordinatorInterface): Unit = {
     this.synchronized {
       if (ts <= lastRead || ts <= lastGC) {
         throw new IllegalArgumentException(s"add at $ts must precede get at $lastRead and GC at $lastGC")
@@ -83,7 +57,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
     }
   }
 
-  override def get(ts: Long): Option[T] = {
+  override def get(ts: Long)(implicit coordinator: CoordinatorInterface): Option[T] = {
     this.synchronized {
       lastRead = math.max(lastRead, ts)
       if (updates.nonEmpty) {
@@ -96,6 +70,10 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
       }
       return findValue(ts)._2
     }
+  }
+
+  override def getPrepare(ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
   }
 
   // Search for the most recent value less than or equal to ts

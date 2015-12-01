@@ -24,12 +24,13 @@ class SimpleSpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.Re
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState with Threaded] = {
-    if (!useParallel) {
-      throw new UnsupportedOperationException
-    } else {
-      List(friendships, friendSendRatio)
-        .asInstanceOf[Seq[ReplayState with Threaded]]
+    val states = List(friendships, friendSendRatio, messageSpamRatings, spamCounter)
+    for (s <- states) {
+      if (!s.isInstanceOf[ReplayState with Threaded]) {
+        throw new UnsupportedOperationException
+      }
     }
+    states.asInstanceOf[Seq[ReplayState with Threaded]]
   }
 
   def getRuntimeInterface: RuntimeInterface = emit {
@@ -38,22 +39,20 @@ class SimpleSpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.Re
     }
     // RULE 1 STATE
     bind { me: MessageEvent =>
-      val ts = me.ts
-      friendships.get(ts = ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
-        case Some(_) => friendSendRatio.merge(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
-        case None => friendSendRatio.merge(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
+      friendships.get(ts = me.ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
+        case Some(_) => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
+        case None => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
       }
     }
     // RULE 1 EVALUATION
     bind {
       me: MessageEvent =>
-        val ts = me.ts
-        friendSendRatio.get(ts = ts, key = me.senderUserId) match {
+        friendSendRatio.get(ts = me.ts, key = me.senderUserId) match {
           case Some((toFriends, toNonFriends)) =>
             if (toFriends + toNonFriends > 5) {
               if (toNonFriends > 2 * toFriends) {
                 //                  spamCounter.add(1, ts)
-                messageSpamRatings.update(ts, me.messageId, _ + 10)
+                messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
               }
             }
           case None =>

@@ -1,51 +1,37 @@
 package replaydb.runtimedev.threadedImpl
 
-import java.util.function.BiConsumer
-
-import replaydb.runtimedev.{ReplayMap, ReplayValue}
+import replaydb.runtimedev.{CoordinatorInterface, ReplayMap}
 
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions._
 
 class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] with Threaded {
   val m = new java.util.concurrent.ConcurrentHashMap[K, ReplayValueImpl[V]]()
-  override def get(ts: Long, key: K): Option[V] = {
+  override def get(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Option[V] = {
+//    println(s"Requesting get on key $key within phase ${coordinator.phaseId}, partition ${coordinator.partitionId}, batch ${coordinator.batchId}")
     val x = m.get(key)
     if (x == null) {
       None
     } else {
-      x.get(ts)
+      x.get(ts)(coordinator)
     }
+  }
+
+  def getPrepare(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
+//    println(s"Requesting getPrepare on key $key within phase ${coordinator.phaseId}, partition ${coordinator.partitionId}, batch ${coordinator.batchId}")
   }
 
   override def getRandom(ts: Long): Option[(K, V)] = {
     ???
   }
 
-  override def merge(rd: ReplayDelta): Unit = {
-    val delta = rd.asInstanceOf[ReplayMapDelta[K, V]]
-    delta.m.forEach(new BiConsumer[K, ReplayValueDelta[V]] {
-      override def accept(key: K, value: ReplayValueDelta[V]): Unit = {
-        m.computeIfAbsent(key, new java.util.function.Function[K,ReplayValueImpl[V]] {
-          override def apply(t: K): ReplayValueImpl[V] = {
-            new ReplayValueImpl[V](default)
-          }
-        }).merge(value)
-      }
-    })
-    delta.clear()
-  }
-
-  override def getDelta: ReplayMapDelta[K, V] = {
-    new ReplayMapDelta[K, V]
-  }
-
-  override def merge(ts: Long, key: K, fn: (V) => V): Unit = {
+  override def merge(ts: Long, key: K, fn: (V) => V)(implicit coordinator: CoordinatorInterface): Unit = {
     m.computeIfAbsent(key, new java.util.function.Function[K,ReplayValueImpl[V]] {
       override def apply(t: K): ReplayValueImpl[V] = {
         new ReplayValueImpl[V](default)
       }
-    }).merge(ts, fn)
+    }).merge(ts, fn)(coordinator)
   }
 
   override def gcOlderThan(ts: Long): Int = {

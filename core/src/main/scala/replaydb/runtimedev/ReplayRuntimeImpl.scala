@@ -1,6 +1,7 @@
 package replaydb.runtimedev
 
 import replaydb.event.Event
+import replaydb.runtimedev.threadedImpl.RunProgressCoordinator
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -23,7 +24,7 @@ class ReplayRuntimeImpl(val c: Context) {
     }
   }
 
-  def dataflowAnalysis(bindings: Iterable[c.Expr[Any]]): (Array[Array[c.Expr[Any]]], Set[SymTree]) = {
+  def dataflowAnalysis(bindings: Iterable[c.Expr[Any]]): Array[Array[c.Expr[Any]]] = {
     trait Dataflow {
       val obj: Tree
     }
@@ -31,21 +32,15 @@ class ReplayRuntimeImpl(val c: Context) {
     case class WriteDataflow (obj: Tree) extends Dataflow
     case class BindingDesc (binding: c.Expr[Any], dataflow: List[Dataflow])
 
-    var writeSymTrees: Set[SymTree] = Set()
-
     class DependencyDetector {
       val df = ArrayBuffer[BindingDesc]()
       def add(x: c.Expr[Any]) = {
         val dataflow: List[Dataflow] = x.tree.collect {
           case Apply(Select(obj,meth: Name), _) if obj.tpe <:< typeOf[ReplayState] =>
             meth match {
-              case TermName("get") | TermName("getOption") | TermName("getRandom") =>
+              case TermName("get") | TermName("getRandom") =>
                 ReadDataflow(obj)
-              case TermName("update") | TermName("merge") | TermName("add") =>
-                obj match {
-                  case st: SymTree => writeSymTrees += st
-                  case _ => println(s"Unexpected Tree found: $obj")
-                }
+              case TermName("merge") | TermName("add") =>
                 WriteDataflow(obj)
               case _ =>
                 throw new RuntimeException(s"unexpected method $meth")
@@ -83,7 +78,7 @@ class ReplayRuntimeImpl(val c: Context) {
     for (binding <- bindings) {
       dd.add(binding)
     }
-    (dd.analyze().map(bl => bl.map(_.binding).toArray).toArray, writeSymTrees)
+    dd.analyze().map(bl => bl.map(_.binding).toArray).toArray
   }
 
   def bindImpl(x: c.Expr[Any]): c.Expr[Unit] = {
@@ -94,16 +89,39 @@ class ReplayRuntimeImpl(val c: Context) {
   def emitImpl(bindings: Expr[Any]): c.Expr[RuntimeInterface] = {
     val bindings = ReplayRuntime.getBindings(c.internal.enclosingOwner.owner).
       asInstanceOf[ArrayBuffer[c.Expr[Any]]]
-    val (bindingsAnalyzed, writeSymTrees) = dataflowAnalysis(bindings)
+    val bindingsAnalyzed = dataflowAnalysis(bindings)
     val numPhases = bindingsAnalyzed.size
 
-    val phaseCases = (for (i <- 1 to bindingsAnalyzed.size) yield {
+    var outstandingPrepares: mutable.Map[Type, ArrayBuffer[(TermName, Tree)]] = mutable.Map()
+
+    val phaseCases = (for (i <- bindingsAnalyzed.size to 1 by -1) yield {
       val m = mutable.HashMap[Type, ArrayBuffer[(TermName,Tree)]]()
+
+      for (preps <- outstandingPrepares) preps match {
+        case (tpe, body) => m.getOrElseUpdate(tpe, ArrayBuffer()) ++= body
+      }
+      outstandingPrepares = mutable.Map()
+
       for (b <- bindingsAnalyzed(i - 1)) {
         b.tree match {
           case Function(params, body) =>
             if (params.size == 1 && params(0).tpt.tpe <:< typeOf[Event]) {
-              m.getOrElseUpdate(params(0).tpt.tpe, ArrayBuffer[(TermName,Tree)]()) += ((params(0).name, body))
+
+              body.foreach {
+                case Apply(Select(obj,meth: Name), args: List[Tree]) if obj.tpe <:< typeOf[ReplayState] =>
+                  meth match {
+                    case TermName("get") | TermName("getRandom") =>
+                      outstandingPrepares.getOrElseUpdate(params.head.tpt.tpe, ArrayBuffer()) += ((params.head.name,
+                        Apply(Apply(Select(obj, TermName("getPrepare")), args), List(q"coordinator"))))
+                    case TermName("merge") | TermName("add") =>
+                      // Nothing to be done
+                    case _ =>
+                      throw new RuntimeException(s"unexpected method $meth")
+                  }
+                case _ =>
+              }
+
+              m.getOrElseUpdate(params(0).tpt.tpe, ArrayBuffer()) += ((params(0).name, body))
             } else {
               throw new RuntimeException("unrecognized function with parameters " + params)
             }
@@ -116,8 +134,9 @@ class ReplayRuntimeImpl(val c: Context) {
           val rt = replaceTransform(termName, TermName("zz"))
           new Transformer {
             override def transform(tree: Tree): Tree = tree match {
-              case st: SymTree if writeSymTrees.contains(st) =>
-                q"deltaMap($st).asInstanceOf[${st.tpe.dealias}]"
+              case st: SymTree if st.tpe != null && st.tpe <:< typeOf[CoordinatorInterface]
+                && st.symbol.name == TermName("defaultCoordinatorInterface") =>
+                q"coordinator"
               case _ => super.transform(tree)
             }
           }.transform(rt.transform(body))
@@ -127,13 +146,16 @@ class ReplayRuntimeImpl(val c: Context) {
       val me = Match(q"e", cases)
       cq"$i => $me".asInstanceOf[CaseDef]
     }).toList
+    if (outstandingPrepares.nonEmpty) {
+      throw new RuntimeException("Outstanding prepares remaining!")
+    }
     val me = Match(q"phase", phaseCases)
 
     val ri =
       q"""
          new RuntimeInterface {
            def numPhases: Int = $numPhases
-           def update(partitionId: Int, phase: Int, e: Event, deltaMap: Map[ReplayState, ReplayState]): Unit = {
+           def update(phase: Int, e: Event)(implicit coordinator: CoordinatorInterface): Unit = {
              $me
            }
          }

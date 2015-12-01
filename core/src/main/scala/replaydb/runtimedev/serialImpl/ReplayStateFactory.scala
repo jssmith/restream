@@ -5,7 +5,6 @@ import replaydb.runtimedev.{ReplayCounter, ReplayMap, ReplayTimestampLocalMap, s
 import scala.reflect.ClassTag
 
 class ReplayStateFactory extends replaydb.runtimedev.ReplayStateFactory {
-  val useParallel = false
 
   def getReplayMap[K, V : ClassTag](default: => V): ReplayMap[K, V] = {
     new serialImpl.ReplayMapImpl[K, V](default)

@@ -49,7 +49,7 @@ class ReplayRuntimeSpec extends FlatSpec {
   }
 
   def updateWithEvent(ri: RuntimeInterface, e: Event): Unit = {
-    ri.update(0, e, Map().withDefault(rs => rs))
+    ri.updateAllPhases(e)
   }
 
   case class PrintUserEvent(ts: Long, userId: Long) extends Event

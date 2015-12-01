@@ -22,7 +22,7 @@ RULES:
 
  */
 
-class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface {
+class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface {
   import replayStateFactory._
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
@@ -42,14 +42,15 @@ class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplaySt
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState with Threaded] = {
-    if (!useParallel) {
-      throw new UnsupportedOperationException
-    } else {
-      List(friendships, friendSendRatio, spamCounter, messageSpamRatings, uniqueNonfriendsSentToInLastInterval,
-        nonfriendMessagesInLastInterval, messageContainingEmailFraction, messagesFractionLast7DaysInLast24Hours,
-        userFirstMessageTS, userMostRecentReceivedMessage, messageSentInResponseFraction)
-        .asInstanceOf[Seq[ReplayState with Threaded]]
+    val states = List(friendships, friendSendRatio, spamCounter, messageSpamRatings, uniqueNonfriendsSentToInLastInterval,
+      nonfriendMessagesInLastInterval, messageContainingEmailFraction, messagesFractionLast7DaysInLast24Hours,
+      userFirstMessageTS, userMostRecentReceivedMessage, messageSentInResponseFraction)
+    for (s <- states) {
+      if (!s.isInstanceOf[ReplayState with Threaded]) {
+        throw new UnsupportedOperationException
+      }
     }
+    states.asInstanceOf[Seq[ReplayState with Threaded]]
   }
 
   def getRuntimeInterface: RuntimeInterface = emit {
@@ -58,22 +59,20 @@ class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplaySt
     }
     // RULE 1 STATE
     bind { me: MessageEvent =>
-      val ts = me.ts
-      friendships.get(ts = ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
-        case Some(_) => friendSendRatio.merge(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
-        case None => friendSendRatio.merge(ts = ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
+      friendships.get(ts = me.ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
+        case Some(_) => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
+        case None => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
       }
     }
     // RULE 1 EVALUATION
     bind {
       me: MessageEvent =>
-        val ts = me.ts
-        friendSendRatio.get(ts = ts, key = me.senderUserId) match {
+        friendSendRatio.get(ts = me.ts, key = me.senderUserId) match {
           case Some((toFriends, toNonFriends)) =>
             if (toFriends + toNonFriends > 5) {
               if (toNonFriends > 2 * toFriends) {
                 //                  spamCounter.add(1, ts)
-                messageSpamRatings.update(ts, me.messageId, _ + 10)
+                messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
               }
             }
           case None =>
@@ -82,15 +81,14 @@ class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplaySt
     // RULE 2 STATE
     bind {
       me: MessageEvent =>
-        val ts = me.ts
-        friendships.get(ts = ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
+        friendships.get(ts = me.ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
           case Some(_) =>
           case None =>
-            nonfriendMessagesInLastInterval.merge(ts, me.senderUserId, _ + 1)
-            nonfriendMessagesInLastInterval.merge(ts + NonfriendMessageCountInterval, me.senderUserId, _ - 1)
-            uniqueNonfriendsSentToInLastInterval.merge(ts, me.senderUserId,
+            nonfriendMessagesInLastInterval.merge(me.ts, me.senderUserId, _ + 1)
+            nonfriendMessagesInLastInterval.merge(me.ts + NonfriendMessageCountInterval, me.senderUserId, _ - 1)
+            uniqueNonfriendsSentToInLastInterval.merge(me.ts, me.senderUserId,
               map => map.updated(me.recipientUserId, map.getOrElse(me.recipientUserId, 0L) + 1))
-            uniqueNonfriendsSentToInLastInterval.merge(ts + NonfriendMessageCountInterval, me.senderUserId,
+            uniqueNonfriendsSentToInLastInterval.merge(me.ts + NonfriendMessageCountInterval, me.senderUserId,
               map => { val x = map.getOrElse(me.recipientUserId, 0L); if (x > 0) map.updated(me.recipientUserId, x - 1) else null })
               // null case should never happen - leave null to throw NPE
         }
@@ -112,7 +110,7 @@ class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplaySt
             case None => 0
           }
           if (nonfriendCnt > UniqueNonfriendCountSpamThreshold) {
-            messageSpamRatings.update(me.ts, me.messageId, _ + 10)
+            messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
           }
         }
     }
@@ -133,11 +131,10 @@ class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplaySt
     // RULE 3 EVALUATION
     bind {
       me: MessageEvent =>
-        val ts = me.ts
-        messageContainingEmailFraction.get(ts, me.senderUserId) match {
+        messageContainingEmailFraction.get(me.ts, me.senderUserId) match {
           case Some((email: Long, all: Long)) =>
             if ((email + 0.0) / all > MessageContainingEmailFractionThreshold) {
-              messageSpamRatings.update(ts, me.messageId, _ + 10)
+              messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
             }
           case None =>
         }
@@ -145,25 +142,23 @@ class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplaySt
     // RULE 4 STATE
     bind {
       me: MessageEvent =>
-        val ts = me.ts
-        userFirstMessageTS.merge(ts, me.senderUserId, Math.min(_, ts)) // kind of wasteful...
-        messagesFractionLast7DaysInLast24Hours.merge(ts, me.senderUserId, old => (old._1 + 1, old._2 + 1))
-        messagesFractionLast7DaysInLast24Hours.merge(ts + 1.days, me.senderUserId, old => (old._1 - 1, old._2))
-        messagesFractionLast7DaysInLast24Hours.merge(ts + 7.days, me.senderUserId, old => (old._1, old._2 - 1))
+        userFirstMessageTS.merge(me.ts, me.senderUserId, Math.min(_, me.ts)) // kind of wasteful...
+        messagesFractionLast7DaysInLast24Hours.merge(me.ts, me.senderUserId, old => (old._1 + 1, old._2 + 1))
+        messagesFractionLast7DaysInLast24Hours.merge(me.ts + 1.days, me.senderUserId, old => (old._1 - 1, old._2))
+        messagesFractionLast7DaysInLast24Hours.merge(me.ts + 7.days, me.senderUserId, old => (old._1, old._2 - 1))
     }
     // RULE 4 EVALUATE
     bind {
       me: MessageEvent =>
-        val ts = me.ts
-        val userExistedMoreThan7Days = userFirstMessageTS.get(ts, me.senderUserId) match {
-          case Some(firstTS) => firstTS > ts - 7.days
+        val userExistedMoreThan7Days = userFirstMessageTS.get(me.ts, me.senderUserId) match {
+          case Some(firstTS) => firstTS > me.ts - 7.days
           case None => false
         }
         if (userExistedMoreThan7Days) {
-          messagesFractionLast7DaysInLast24Hours.get(ts, me.senderUserId) match {
+          messagesFractionLast7DaysInLast24Hours.get(me.ts, me.senderUserId) match {
             case Some((last24Hours, last7Days)) =>
               if ((last24Hours + 0.0) / last7Days > MessagesLast7DaysSentLast24HoursFraction) {
-                messageSpamRatings.update(ts, me.messageId, _ + 10)
+                messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
               }
             case None =>
           }
@@ -179,15 +174,14 @@ class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplaySt
     // RULE 5 STATE 2
     bind {
       me: MessageEvent =>
-        val ts = me.ts
-        val isResponse = userMostRecentReceivedMessage.get(ts, me.senderUserId) match {
-          case Some(map) => map.getOrElse(me.recipientUserId, Long.MinValue) > (ts - 7.days)
+        val isResponse = userMostRecentReceivedMessage.get(me.ts, me.senderUserId) match {
+          case Some(map) => map.getOrElse(me.recipientUserId, Long.MinValue) > (me.ts - 7.days)
           case None => false
         }
         if (isResponse) {
-          messageSentInResponseFraction.merge(ts, me.senderUserId, frac => (frac._1 + 1, frac._2 + 1))
+          messageSentInResponseFraction.merge(me.ts, me.senderUserId, frac => (frac._1 + 1, frac._2 + 1))
         } else {
-          messageSentInResponseFraction.merge(ts, me.senderUserId, frac => (frac._1, frac._2 + 1))
+          messageSentInResponseFraction.merge(me.ts, me.senderUserId, frac => (frac._1, frac._2 + 1))
         }
     }
     // RULE 5 EVALUATION
@@ -196,7 +190,7 @@ class SpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplaySt
         messageSentInResponseFraction.get(me.ts, me.senderUserId) match {
           case Some((resp, all)) =>
             if ((resp + 0.0) / all < MessageSentInResponseFractionThreshold) {
-              messageSpamRatings.update(me.ts, me.messageId, _ + 10)
+              messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
             }
           case None =>
         }

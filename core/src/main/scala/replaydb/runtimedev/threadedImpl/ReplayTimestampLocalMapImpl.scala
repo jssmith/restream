@@ -2,7 +2,7 @@ package replaydb.runtimedev.threadedImpl
 
 import java.util.function.BiConsumer
 
-import replaydb.runtimedev.ReplayTimestampLocalMap
+import replaydb.runtimedev.{CoordinatorInterface, ReplayTimestampLocalMap}
 
 // NOTE: Should only be used with associative, commutative operators
 class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLocalMap[K, V] with Threaded {
@@ -18,7 +18,7 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
   }
 
   val m = new java.util.concurrent.ConcurrentHashMap[K, ValueWithTimestamp]()
-  override def get(ts: Long, key: K): Option[V] = {
+  override def get(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Option[V] = {
     val x = m.get(key)
     if (x == null) {
       None
@@ -31,7 +31,11 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
     }
   }
 
-  override def update(ts: Long, key: K, fn: (V) => V): Unit = {
+  override def getPrepare(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
+  }
+
+  override def merge(ts: Long, key: K, fn: (V) => V)(implicit coordinator: CoordinatorInterface): Unit = {
     val x = m.get(key)
     if (x == null) {
       m.put(key, new ValueWithTimestamp(fn(default), ts))
@@ -40,18 +44,6 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
     } else {
       x.updateValue(fn)
     }
-  }
-
-  override def merge(rd: ReplayDelta): Unit = {
-    val delta = rd.asInstanceOf[ReplayTimestampLocalMapDelta[K, V]]
-    for(upd <- delta.updates) {
-      update(upd.ts, upd.key, upd.fn)
-    }
-    delta.clear()
-  }
-
-  override def getDelta: ReplayTimestampLocalMapDelta[K, V] = {
-    new ReplayTimestampLocalMapDelta[K, V]
   }
 
   override def gcOlderThan(ts: Long): Int = {
