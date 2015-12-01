@@ -30,8 +30,46 @@ class DriverServiceHandler(clientGroup: ClientGroup, runConfiguration: RunConfig
    ReferenceCountUtil.release(msg)
   }
 
-   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
-     cause.printStackTrace()
-     ctx.close()
-   }
- }
+  override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
+    logger.error("driver error", cause)
+    ctx.close()
+  }
+
+  // Additional logging code can be useful
+  /*
+  override def channelReadComplete(ctx: ChannelHandlerContext): Unit = {
+    logger.debug("channel read complete")
+    ctx.fireChannelReadComplete()
+  }
+
+  override def channelActive(ctx: ChannelHandlerContext): Unit = {
+    logger.debug("channel active")
+    ctx.fireChannelActive()
+  }
+
+  override def channelUnregistered(ctx: ChannelHandlerContext): Unit = {
+    logger.debug("channel unregistered")
+    ctx.fireChannelUnregistered()
+  }
+
+  override def channelInactive(ctx: ChannelHandlerContext): Unit = {
+    logger.debug("channel inactive")
+    ctx.fireChannelInactive()
+  }
+
+  override def channelWritabilityChanged(ctx: ChannelHandlerContext): Unit = {
+    logger.debug("channel writability changed")
+    ctx.fireChannelWritabilityChanged()
+  }
+
+  override def userEventTriggered(ctx: ChannelHandlerContext, evt: scala.Any): Unit = {
+    logger.debug("user event triggered")
+    ctx.fireUserEventTriggered()
+  }
+
+  override def channelRegistered(ctx: ChannelHandlerContext): Unit = {
+    logger.debug("channel registered")
+    ctx.fireChannelRegistered()
+  }
+  */
+}

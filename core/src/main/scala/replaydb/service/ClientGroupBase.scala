@@ -51,7 +51,34 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
   }
 
   def broadcastCommand(c: Command): Unit = {
-    cf.foreach { _.channel().writeAndFlush(c).sync() }
+    // TODO this is a hack, launching a new thread for
+    // the broadcast so that we don't run out. Probably
+    // would be better to put in some sort of executor
+    val t = new Thread() {
+      override def run(): Unit = {
+        ClientGroupBase.this.synchronized {
+          try {
+            logger.info(s"started broadcast of $c")
+            for (i <- cf.indices) {
+              logger.info(s"broadcast: start sending to $i")
+              val a = cf(i).channel()
+              logger.info(s"broadcast: got channel for $i")
+              val b = a.writeAndFlush(c)
+              logger.info(s"broadcast: wrote to $i")
+              b.sync()
+              logger.info(s"broadcast: done sending to $i")
+            }
+            cf.foreach {
+              _.channel().writeAndFlush(c).sync()
+            }
+            logger.info("finished broadcast")
+          } catch {
+            case e: Throwable => e.printStackTrace()
+          }
+        }
+      }
+    }
+    t.start()
   }
 
   def issueCommand(i: Int, c: Command): Unit = {

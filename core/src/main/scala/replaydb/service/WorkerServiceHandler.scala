@@ -48,6 +48,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                       override def run(): Unit = {
                         logger.info(s"sending progress update $progressUpdateCommand)")
                         ctx.writeAndFlush(progressUpdateCommand).sync()
+                        logger.debug(s"finished sending progress update")
                       }
                     })
                   }
