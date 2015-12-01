@@ -7,28 +7,29 @@ import io.netty.util.ReferenceCountUtil
 import org.slf4j.LoggerFactory
 import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.{HasRuntimeInterface, ReplayState}
-import replaydb.runtimedev.distributedImpl.ReplayStateFactory
+import replaydb.runtimedev.distributedImpl.{StateCommunicationService, ReplayStateFactory}
 import replaydb.service.driver._
 import com.typesafe.scalalogging.Logger
 
 
 class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter {
   val logger = Logger(LoggerFactory.getLogger(classOf[WorkerServiceHandler]))
-  val stateFactory = new ReplayStateFactory
   var batchProgressCoordinator: BatchProgressCoordinator = null
 
   override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
     logger.info(s"received message $msg")
     msg.asInstanceOf[Command] match {
       case c : InitReplayCommand[_] => {
+        // TODO need to know my own partitionId and total number of partitions \/ here
+        val stateFactory = new ReplayStateFactory(new StateCommunicationService(???, ???))
         val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
-        var deltaMap = Map[ReplayState, ReplayState]()
         batchProgressCoordinator = new BatchProgressCoordinator(c.startTimestamp, c.batchTimeInterval)
 
         logger.info(s"launching threads... number of partitions: ${c.files.size}, number of phases ${runtime.numPhases}")
         val threads =
+          // TODO aren't we only having one partition per worker?
           for ((partitionId, partitionFn) <- c.files; phaseId <- 1 to runtime.numPhases) yield {
             new Thread(s"replay-$partitionId-$phaseId") {
               val progressCoordinator = batchProgressCoordinator.getCoordinator(phaseId)
