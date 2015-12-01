@@ -72,6 +72,10 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
     }
   }
 
+  override def getPrepare(ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
+  }
+
   // Search for the most recent value less than or equal to ts
   // return (index, Some(value)) where index is the location of
   // value in the values() array if found, else return (0, None)

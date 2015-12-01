@@ -17,6 +17,10 @@ class ReplayCounterImpl extends ReplayCounter with Threaded {
     }
   }
 
+  override def getPrepare(ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
+  }
+
   override def gcOlderThan(ts: Long): Int = {
     replayValue.gcOlderThan(ts)
   }

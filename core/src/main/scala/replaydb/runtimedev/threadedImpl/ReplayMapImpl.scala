@@ -8,12 +8,18 @@ import scala.collection.JavaConversions._
 class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] with Threaded {
   val m = new java.util.concurrent.ConcurrentHashMap[K, ReplayValueImpl[V]]()
   override def get(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Option[V] = {
+//    println(s"Requesting get on key $key within phase ${coordinator.phaseId}, partition ${coordinator.partitionId}, batch ${coordinator.batchId}")
     val x = m.get(key)
     if (x == null) {
       None
     } else {
       x.get(ts)(coordinator)
     }
+  }
+
+  def getPrepare(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
+//    println(s"Requesting getPrepare on key $key within phase ${coordinator.phaseId}, partition ${coordinator.partitionId}, batch ${coordinator.batchId}")
   }
 
   override def getRandom(ts: Long): Option[(K, V)] = {

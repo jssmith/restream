@@ -31,7 +31,11 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
     }
   }
 
-  override def update(ts: Long, key: K, fn: (V) => V)(implicit coordinator: CoordinatorInterface): Unit = {
+  override def getPrepare(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
+  }
+
+  override def merge(ts: Long, key: K, fn: (V) => V)(implicit coordinator: CoordinatorInterface): Unit = {
     val x = m.get(key)
     if (x == null) {
       m.put(key, new ValueWithTimestamp(fn(default), ts))

@@ -26,4 +26,8 @@ class ReplayValueImpl[T](default: => T) extends ReplayValue[T] with Serial {
     Some(value)
   }
 
+  override def getPrepare(ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
+  }
+
 }

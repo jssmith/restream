@@ -14,4 +14,8 @@ class ReplayCounterImpl extends ReplayCounter with Serial {
     replayVal.get(ts)(coordinator).get
   }
 
+  override def getPrepare(ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
+  }
+
 }

@@ -30,4 +30,8 @@ class ReplayMapImpl[K, V](default: => V) extends ReplayMap[K,V] with Serial {
     }
   }
 
+  override def getPrepare(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Unit = {
+    // Nothing to be done
+  }
+
 }
