@@ -1,8 +1,6 @@
 package replaydb.runtimedev.serialImpl
 
-import replaydb.runtimedev.ReplayTimestampLocalMap
-
-import scala.collection.mutable
+import replaydb.runtimedev.{CoordinatorInterface, ReplayTimestampLocalMap}
 
 
 class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLocalMap[K, V] with Serial {
@@ -10,7 +8,7 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
   var currentTs: Long = _
   var currentMap: Map[K, V] = Map()
 
-  override def get(ts: Long, key: K): Option[V] = {
+  override def get(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Option[V] = {
     if (ts == currentTs) {
       currentMap.get(key)
     } else {
@@ -18,7 +16,7 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
     }
   }
 
-  override def update(ts: Long, key: K, fn: (V) => V): Unit = {
+  override def update(ts: Long, key: K, fn: (V) => V)(implicit coordinator: CoordinatorInterface): Unit = {
     if (ts != currentTs) {
       currentTs = ts
       currentMap = Map((key, fn(default)))

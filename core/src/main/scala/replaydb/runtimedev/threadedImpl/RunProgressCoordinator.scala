@@ -1,8 +1,8 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.ReplayState
+import replaydb.runtimedev.{CoordinatorInterface, ReplayState}
 
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 
 // Assuming we know the startTime in advance
 class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: Int, startTime: Long) {
@@ -21,56 +21,40 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
     }
   }
 
-  abstract class CoordinatorInterface(partitionId: Int, phaseId: Int) {
-    def reportCheckpoint(ts: Long, ct: Long): (Long, Long, Map[ReplayState, ReplayState])
-
-    def reportFinished(): Unit = {
-      val checkpointNumber = checkpoints.synchronized {
-        checkpoints(phaseId)(partitionId)
-      }
-      readUntil.synchronized {
-        readUntil(phaseId)(checkpointNumber % MaxInFlightBatches)(partitionId) = Long.MaxValue
-      }
-      checkpoints.synchronized {
-        checkpoints(phaseId)(partitionId) = Int.MaxValue
-        checkpoints.notifyAll()
-      }
-    }
-
-    def gcAllReplayState(): Unit
-  }
-
   def registerReplayStates(states: Iterable[ReplayState with Threaded]): Unit = {
     states.foreach(this.registerReplayState)
   }
 
   def registerReplayState(rs: ReplayState with Threaded): Unit = {
     replayStates += rs
-    val array = Array.ofDim[ReplayDelta](numPartitions, numPhases + 1, MaxInFlightBatches)
-    for (partId <- 0 until numPartitions) {
-      for (pid <- 1 to numPhases) {
-        for (bid <- 0 until MaxInFlightBatches) {
-          array(partId)(pid)(bid) = rs.getDelta
-        }
-      }
-    }
-    stateToDeltasMap += ((rs, array))
+//    val array = Array.ofDim[ReplayDelta](numPartitions, numPhases + 1, MaxInFlightBatches)
+//    for (partId <- 0 until numPartitions) {
+//      for (pid <- 1 to numPhases) {
+//        for (bid <- 0 until MaxInFlightBatches) {
+//          array(partId)(pid)(bid) = rs.getDelta
+//        }
+//      }
+//    }
+//    stateToDeltasMap += ((rs, array))
   }
 
-  var stateToDeltasMap = immutable.Map[ReplayState with Threaded, Array[Array[Array[ReplayDelta]]]]()
+//  var stateToDeltasMap = immutable.Map[ReplayState with Threaded, Array[Array[Array[ReplayDelta]]]]()
 
   def relative(ts: Long): Long = ts - startTime
 
   def getCoordinatorInterface(partitionId: Int, phaseId: Int): CoordinatorInterface = {
     new CoordinatorInterface(partitionId, phaseId) {
-      override def reportCheckpoint(ts: Long, ct: Long): (Long, Long, Map[ReplayState, ReplayState]) = {
+
+      var currentBatchId: Int = 0
+
+      override def reportCheckpoint(ts: Long, ct: Long): (Long, Long) = {
 //        val checkpointNumber: Int = (relative(ts) / batchSizeGoal).toInt
 
         //        var checkpointMergeStart = checkpointNumber
         val checkpointNumber = checkpoints.synchronized {
           checkpoints(phaseId)(partitionId) + 1
         }
-        
+
         readUntil.synchronized {
           readUntil(phaseId)((checkpointNumber - 1) % MaxInFlightBatches)(partitionId) = ts
         }
@@ -91,25 +75,41 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
           }
           checkpointNumber
         }
-        val batchId = checkpointNumber % MaxInFlightBatches
+
+        currentBatchId = checkpointNumber % MaxInFlightBatches
         // Ready to move forward; state is ready
 
-        val deltaMap = stateToDeltasMap.synchronized {
-          if (phaseId != 1) {
-            for (entry <- stateToDeltasMap) entry match {
-              case (rs, deltas) =>
-                for (part <- 0 until numPartitions) {
-                  rs.merge(deltas(part)(phaseId - 1)(batchId))
-                }
-            }
-          }
-          stateToDeltasMap.mapValues(_(partitionId)(phaseId)(batchId).asInstanceOf[ReplayState])
-//          stateToDeltasMap.map(entry => (entry._1.asInstanceOf[ReplayState], entry._2(partitionId)(phaseId)(batchId)))
-        }
+//        val deltaMap = stateToDeltasMap.synchronized {
+//          if (phaseId != 1) {
+//            for (entry <- stateToDeltasMap) entry match {
+//              case (rs, deltas) =>
+//                for (part <- 0 until numPartitions) {
+//                  rs.merge(deltas(part)(phaseId - 1)(batchId))
+//                }
+//            }
+//          }
+//          stateToDeltasMap.mapValues(_(partitionId)(phaseId)(batchId).asInstanceOf[ReplayState])
+////          stateToDeltasMap.map(entry => (entry._1.asInstanceOf[ReplayState], entry._2(partitionId)(phaseId)(batchId)))
+//        }
         val nextCheckpointTs = readUntil.synchronized {
-          readUntil(phaseId - 1)(batchId).min
+          readUntil(phaseId - 1)(currentBatchId).min
         } - 1
-        (nextCheckpointTs, ct + batchSizeGoal, deltaMap.asInstanceOf[Map[ReplayState, ReplayState]])
+        (nextCheckpointTs, ct + batchSizeGoal)
+      }
+
+      def batchId: Int = currentBatchId
+
+      override def reportFinished(): Unit = {
+        val checkpointNumber = checkpoints.synchronized {
+          checkpoints(phaseId)(partitionId)
+        }
+        readUntil.synchronized {
+          readUntil(phaseId)(checkpointNumber % MaxInFlightBatches)(partitionId) = Long.MaxValue
+        }
+        checkpoints.synchronized {
+          checkpoints(phaseId)(partitionId) = Int.MaxValue
+          checkpoints.notifyAll()
+        }
       }
 
       override def gcAllReplayState(): Unit = {
@@ -125,6 +125,27 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
         readUntil.synchronized {
           readUntil(numPhases).map(_.min).min
         }
+      }
+    }
+  }
+}
+
+object RunProgressCoordinator {
+  // TODO probably a cleaner way to achieve this?
+  def getDriverCoordinator: CoordinatorInterface = {
+    new CoordinatorInterface(0, 1) {
+      override def gcAllReplayState(): Unit = {
+        throw new UnsupportedOperationException
+      }
+
+      override def batchId: Int = 0
+
+      override def reportCheckpoint(ts: Long, ct: Long): (Long, Long) = {
+        throw new UnsupportedOperationException
+      }
+
+      override def reportFinished(): Unit = {
+        throw new UnsupportedOperationException
       }
     }
   }

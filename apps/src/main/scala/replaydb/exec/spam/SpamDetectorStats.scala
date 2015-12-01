@@ -22,20 +22,8 @@ RULES:
 
  */
 
-class SpamDetectorStatsParallel(useParallel: Boolean) {
-
-  def getReplayMap[K, V : ClassTag](default: => V): ReplayMap[K, V] = {
-    if (useParallel) new ReplayMapImpl[K, V](default) else new serialImpl.ReplayMapImpl[K, V](default)
-  }
-
-  def getReplayCounter: ReplayCounter = {
-    if (useParallel) new ReplayCounterImpl else new serialImpl.ReplayCounterImpl
-  }
-
-  def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = {
-    if (useParallel) new ReplayTimestampLocalMapImpl[K, V](default)
-    else new serialImpl.ReplayTimestampLocalMapImpl[K, V](default)
-  }
+class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) {
+  import replayStateFactory._
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
   val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
@@ -54,14 +42,15 @@ class SpamDetectorStatsParallel(useParallel: Boolean) {
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState with Threaded] = {
-    if (!useParallel) {
-      throw new UnsupportedOperationException
-    } else {
-      List(friendships, friendSendRatio, spamCounter, messageSpamRatings, uniqueNonfriendsSentToInLastInterval,
-        nonfriendMessagesInLastInterval, messageContainingEmailFraction, messagesFractionLast7DaysInLast24Hours,
-        userFirstMessageTS, userMostRecentReceivedMessage, messageSentInResponseFraction)
-        .asInstanceOf[Seq[ReplayState with Threaded]]
+    val states = List(friendships, friendSendRatio, spamCounter, messageSpamRatings, uniqueNonfriendsSentToInLastInterval,
+      nonfriendMessagesInLastInterval, messageContainingEmailFraction, messagesFractionLast7DaysInLast24Hours,
+      userFirstMessageTS, userMostRecentReceivedMessage, messageSentInResponseFraction)
+    for (s <- states) {
+      if (!s.isInstanceOf[ReplayState with Threaded]) {
+        throw new UnsupportedOperationException
+      }
     }
+    states.asInstanceOf[Seq[ReplayState with Threaded]]
   }
 
   def getRuntimeInterface: RuntimeInterface = emit {

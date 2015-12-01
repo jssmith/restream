@@ -1,6 +1,7 @@
 package replaydb.runtimedev
 
 import replaydb.event.Event
+import replaydb.runtimedev.threadedImpl.RunProgressCoordinator
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -39,9 +40,9 @@ class ReplayRuntimeImpl(val c: Context) {
         val dataflow: List[Dataflow] = x.tree.collect {
           case Apply(Select(obj,meth: Name), _) if obj.tpe <:< typeOf[ReplayState] =>
             meth match {
-              case TermName("get") | TermName("getOption") | TermName("getRandom") =>
+              case TermName("get") | TermName("getRandom") =>
                 ReadDataflow(obj)
-              case TermName("update") | TermName("merge") | TermName("add") =>
+              case TermName("merge") | TermName("add") =>
                 obj match {
                   case st: SymTree => writeSymTrees += st
                   case _ => println(s"Unexpected Tree found: $obj")
@@ -114,10 +115,18 @@ class ReplayRuntimeImpl(val c: Context) {
       val cases = m.map{ case (tpt, trees) =>
         val statements = trees.map { case(termName, body) =>
           val rt = replaceTransform(termName, TermName("zz"))
+//          new Transformer {
+//            override def transform(tree: Tree): Tree = tree match {
+//              case st: SymTree if writeSymTrees.contains(st) =>
+//                q"deltaMap($st).asInstanceOf[${st.tpe.dealias}]"
+//              case _ => super.transform(tree)
+//            }
+//          }.transform(rt.transform(body))
           new Transformer {
             override def transform(tree: Tree): Tree = tree match {
-              case st: SymTree if writeSymTrees.contains(st) =>
-                q"deltaMap($st).asInstanceOf[${st.tpe.dealias}]"
+              case st: SymTree if st.tpe != null && st.tpe <:< typeOf[CoordinatorInterface]
+                && st.symbol.name == TermName("defaultCoordinatorInterface") =>
+                q"coordinator"
               case _ => super.transform(tree)
             }
           }.transform(rt.transform(body))
@@ -133,7 +142,7 @@ class ReplayRuntimeImpl(val c: Context) {
       q"""
          new RuntimeInterface {
            def numPhases: Int = $numPhases
-           def update(partitionId: Int, phase: Int, e: Event, deltaMap: Map[ReplayState, ReplayState]): Unit = {
+           def update(phase: Int, e: Event)(implicit coordinator: CoordinatorInterface): Unit = {
              $me
            }
          }
