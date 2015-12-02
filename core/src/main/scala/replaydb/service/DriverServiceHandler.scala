@@ -13,15 +13,16 @@ class DriverServiceHandler(clientGroup: ClientGroup, runConfiguration: RunConfig
     msg.asInstanceOf[Command] match {
       case p: ProgressUpdateCommand => {
         logger.info(s"received progress update $p")
-        clientGroup.progressTracker.update(p.partitionId, p.phaseId, p.finishedTimestamp) match {
-          case Some(newProgressMarks) =>
-            logger.info(s"have new progress marks $newProgressMarks")
-            clientGroup.broadcastCommand(new UpdateAllProgressCommand(newProgressMarks))
-          case None =>
-            logger.info(s"no new progress to send")
-        }
         if (p.done) {
           clientGroup.workLatch.countDown()
+        } else {
+          clientGroup.progressTracker.update(p.partitionId, p.phaseId, p.finishedTimestamp) match {
+            case Some(newProgressMarks) =>
+              logger.info(s"have new progress marks $newProgressMarks")
+              clientGroup.broadcastCommand(new UpdateAllProgressCommand(newProgressMarks))
+            case None =>
+              logger.info(s"no new progress to send")
+          }
         }
       }
     }
