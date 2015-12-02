@@ -1,6 +1,6 @@
 package replaydb.service
 
-import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicLong}
 
 import com.typesafe.scalalogging.Logger
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandler, ChannelInboundHandlerAdapter}
@@ -18,8 +18,8 @@ class ClientServerSpec extends FlatSpec {
     val port = 15567
     val hosts = Array(new HostConfiguration(localhost, port))
     val m = Map[Int,Long](1->1L)
-    @volatile var progressReceived = false
-    @volatile var closeReceived = false
+    val progressReceived = new AtomicBoolean(false)
+    val closeReceived = new AtomicBoolean(false)
     val s = new ServerBase(port) {
       override def getHandler(): ChannelInboundHandler = {
         new ChannelInboundHandlerAdapter() {
@@ -32,8 +32,8 @@ class ClientServerSpec extends FlatSpec {
                 // shut down the server
                 ctx.channel().close().sync()
                 ctx.channel().parent().close().sync()
-                closeReceived = true
-                progressReceived = true
+                closeReceived.set(true)
+                progressReceived.set(true)
             }
           }
         }
@@ -55,8 +55,8 @@ class ClientServerSpec extends FlatSpec {
     c.issueCommand(0, new CloseCommand())
     logger.debug("close issued")
     s.close()
-    assert(progressReceived)
-    assert(closeReceived)
+    assert(progressReceived.get())
+    assert(closeReceived.get())
   }
 
   they should "exchange multiple messages" in {
@@ -66,8 +66,8 @@ class ClientServerSpec extends FlatSpec {
     val hosts = Array(new HostConfiguration(localhost, port))
     val m = Map[Int,Long](0 -> 15L)
     val n = 1000
-    @volatile var progressReceivedCt = 0
-    @volatile var closeReceived = false
+    val progressReceivedCt = new AtomicInteger()
+    val closeReceived = new AtomicBoolean(false)
     val s = new ServerBase(port) {
       override def getHandler(): ChannelInboundHandler = {
         new ChannelInboundHandlerAdapter() {
@@ -75,14 +75,14 @@ class ClientServerSpec extends FlatSpec {
             val c = msg.asInstanceOf[Command]
             c match {
               case p: UpdateAllProgressCommand =>
-                progressReceivedCt += 1
-                assert(p.progressMarks.keys.max === progressReceivedCt)
+                progressReceivedCt.incrementAndGet()
+                assert(p.progressMarks.keys.max === progressReceivedCt.get())
                 assert(p.progressMarks.values.sum === 25)
               case c: CloseCommand =>
                 // shut down the server
                 ctx.channel().close().sync()
                 ctx.channel().parent().close().sync()
-                closeReceived = true
+                closeReceived.set(true)
             }
           }
         }
@@ -106,8 +106,8 @@ class ClientServerSpec extends FlatSpec {
     c.issueCommand(0, new CloseCommand())
     logger.debug("close issued")
     s.close()
-    assert(progressReceivedCt === n)
-    assert(closeReceived)
+    assert(progressReceivedCt.get() === n)
+    assert(closeReceived.get())
   }
 
   they should "ping back and forth" in {
@@ -117,10 +117,10 @@ class ClientServerSpec extends FlatSpec {
     val hosts = Array(new HostConfiguration(localhost, port))
     val m = Map[Int,Long](0 -> 15L)
     val n = 10
-    @volatile var progressReceivedCt = 0
-    @volatile var sumResponseCt = 0
-    @volatile var responseCt = 0
-    @volatile var closeReceived = false
+    val progressReceivedCt = new AtomicInteger()
+    val sumResponseCt = new AtomicLong()
+    val responseCt = new AtomicInteger()
+    val closeReceived = new AtomicBoolean(false)
     val s = new ServerBase(port) {
       override def getHandler(): ChannelInboundHandler = {
         new ChannelInboundHandlerAdapter() {
@@ -128,15 +128,15 @@ class ClientServerSpec extends FlatSpec {
             val c = msg.asInstanceOf[Command]
             c match {
               case p: UpdateAllProgressCommand =>
-                progressReceivedCt += 1
-                assert(p.progressMarks.keys.max === progressReceivedCt)
+                val x = progressReceivedCt.incrementAndGet()
+                assert(p.progressMarks.keys.max === x)
                 assert(p.progressMarks.values.sum === 25)
-                ctx.writeAndFlush(new ProgressUpdateCommand(0, 0, progressReceivedCt, 0, false))
+                ctx.writeAndFlush(new ProgressUpdateCommand(0, 0, x, 0, false))
               case c: CloseCommand =>
                 // shut down the server
                 ctx.channel().close().sync()
                 ctx.channel().parent().close().sync()
-                closeReceived = true
+                closeReceived.set(true)
             }
           }
         }
@@ -152,8 +152,8 @@ class ClientServerSpec extends FlatSpec {
             val c = msg.asInstanceOf[Command]
             c match {
               case p: ProgressUpdateCommand =>
-                sumResponseCt += p.numProcessed
-                responseCt += 1
+                sumResponseCt.addAndGet(p.numProcessed)
+                responseCt.incrementAndGet()
             }
           }
         }
@@ -167,10 +167,10 @@ class ClientServerSpec extends FlatSpec {
     c.issueCommand(0, new CloseCommand())
     logger.debug("close issued")
     s.close()
-    assert(progressReceivedCt === n)
-    assert(responseCt === n)
-    assert(sumResponseCt === n * (n + 1) / 2)
-    assert(closeReceived)
+    assert(progressReceivedCt.get() === n)
+    assert(responseCt.get() === n)
+    assert(sumResponseCt.get() === n * (n + 1) / 2)
+    assert(closeReceived.get())
   }
 
   "A client and two servers should" should "ping back and forth" in {
