@@ -8,7 +8,7 @@ trait KryoCommands {
   private val instantiator = new ScalaKryoInstantiator
   protected val kryo = instantiator.newKryo()
 
-  kryo.setRegistrationRequired(true)
+//  kryo.setRegistrationRequired(true)
   kryo.register(classOf[Array[String]])
   kryo.register(classOf[CloseCommand])
   kryo.register(classOf[CloseWorkerCommand])

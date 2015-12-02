@@ -1,6 +1,7 @@
 package replaydb.service
 
 import java.io.FileInputStream
+import java.util.concurrent.{TimeUnit, CountDownLatch}
 
 import com.typesafe.scalalogging.Logger
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
@@ -16,6 +17,8 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
   val logger = Logger(LoggerFactory.getLogger(classOf[WorkerServiceHandler]))
   var batchProgressCoordinator: BatchProgressCoordinator = null
   var stateCommunicationService: StateCommunicationService = null
+
+  val startLatch = new CountDownLatch(5) // TODO this should be numPhases
 
   override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
     logger.info(s"received message $msg")
@@ -62,6 +65,11 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                 // TODO
                 //  - separate reader thread
                 try {
+                  Thread.sleep(5000) // TODO
+                  println(s"WORKER THREAD PHASE $phaseId STARTLATCH COUNT IS: " + startLatch.getCount)
+//                  startLatch.countDown()
+                  println(s"WORKER THREAD PHASE $phaseId AFTER COUNTDOWN STARTLATCH COUNT IS: " + startLatch.getCount)
+
                   logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
                   var batchEndTimestamp = c.runConfiguration.startTimestamp
                   val eventStorage = new SocialNetworkStorage
@@ -95,6 +103,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                     runtime.update(e)
                     ct += 1
                   })
+                  // TODO need a better way to extract info than this
                   runtime.update(PrintSpamCounter(batchEndTimestamp - 1))
                   stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                   logger.info(s"finished phase $phaseId on partition $partitionId")
@@ -125,7 +134,13 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
       }
 
       case suc: StateUpdateCommand => {
+//        while (startLatch.getCount != 0) {
+//          println("STARTLATCH COUNT IS: " + startLatch.getCount)
+//          startLatch.await(5, TimeUnit.SECONDS)
+//        }
+        logger.info(s"STARTING TO HANDLE StateUpdateCommand: $suc")
         stateCommunicationService.handleStateUpdateCommand(suc)
+        logger.info(s"FINISHED HANDLING StateUpdateCommand: $suc")
       }
 
       case _ : CloseWorkerCommand => {

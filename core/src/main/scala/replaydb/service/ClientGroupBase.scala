@@ -85,6 +85,7 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
     logger.info(s"issuing command on partition $i: ${c.toString}")
     // TODO - do we need to sync here?
     cf(i).channel().writeAndFlush(c).sync()
+    logger.info(s"finished issuing command on partition $i: ${c.toString}")
   }
 
   def closeWhenDone(isWorker: Boolean = false): Unit = {

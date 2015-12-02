@@ -1,14 +1,19 @@
 package replaydb.runtimedev.distributedImpl
 
+import com.typesafe.scalalogging.Logger
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter, ChannelInboundHandler}
+import org.slf4j.LoggerFactory
 import replaydb.service.driver.{RunConfiguration, Command}
-import replaydb.service.{ClientGroupBase}
+import replaydb.service.ClientGroupBase
 import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateResponse, StateRead, StateWrite}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+// TODO check for places where this needs gc - also need to call gc on the ReplayStates
+
 class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguration) {
+  val logger = Logger(LoggerFactory.getLogger(classOf[StateCommunicationService]))
   val workerCount = runConfiguration.hosts.length
   val client = new ClientGroupBase(runConfiguration) {
     override def getHandler(): ChannelInboundHandler = {
@@ -18,6 +23,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
             case s: StateRequestResponse => {
               handleStateRequestResponse(s)
             }
+            case _ => throw new RuntimeException("!!!!") //TODO
           }
         }
       }
@@ -27,6 +33,10 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
 
   def close(): Unit = {
     client.closeWhenDone(true)
+  }
+
+  def issueCommandToWorker(wId: Int, cmd: Command): Unit = {
+    client.issueCommand(if (wId > workerId) wId - 1 else wId, cmd)
   }
 
   // State is owned by worker #: partitionFn(key) % workerCount
@@ -78,6 +88,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   }
 
   def handleStateUpdateCommand(cmd: StateUpdateCommand): Unit = {
+    logger.info(s"Phase $workerId-${cmd.phaseId} received writes from ${cmd.originatingPartitionId} for batch ${cmd.batchEndTs}")
     val readRequestsToProcess = outstandingInboundReads.synchronized {
       val buf = outstandingInboundReads(cmd.phaseId).getOrElseUpdate(cmd.batchEndTs, ArrayBuffer())
       buf += cmd
@@ -92,6 +103,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
       states(w.collectionId).asInstanceOf[ReplayMapImpl[Any, Any]].insertRemoteWrite(w.ts, w.key, w.asInstanceOf[StateWrite[Any]].merge)
     }
     if (readRequestsToProcess.isDefined) {
+      logger.info(s"Phase $workerId-${cmd.phaseId} processing read requests for ${readRequestsToProcess.get.size} partitions")
       processStateReadRequests(readRequestsToProcess.get)
     }
   }
@@ -109,20 +121,23 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
       if (cmd.originatingPartitionId == workerId) {
         handleStateRequestResponse(respCmd)
       } else {
-        client.issueCommand(cmd.originatingPartitionId, respCmd)
+        issueCommandToWorker(cmd.originatingPartitionId, respCmd)
       }
     }
   }
 
   // Closes out a batch: sends out all of the outstanding writes and getPrepares
   def finalizeBatch(phaseId: Int, batchEndTs: Long): Unit = {
+    logger.info(s"Phase $workerId-$phaseId finalizing batch $batchEndTs")
     for (i <- 0 until workerCount) {
       val writes = queuedWrites(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
       val readPrepares = queuedReadPrepares(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
       val cmd = StateUpdateCommand(workerId, phaseId, batchEndTs, writes.toArray, readPrepares.toArray)
       // TODO does this require a new thread? executor?
       if (i != workerId) {
-        client.issueCommand(i, cmd)
+        logger.info(s"Phase $workerId-$phaseId sending updates to partition $i for batch $batchEndTs " +
+          s"(${cmd.writes.size} writes and ${cmd.readPrepares.size} readPrepares)")
+        issueCommandToWorker(i, cmd)
       } else {
         handleStateUpdateCommand(cmd)
       }

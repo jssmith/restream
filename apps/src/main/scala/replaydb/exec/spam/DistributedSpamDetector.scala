@@ -1,7 +1,7 @@
 package replaydb.exec.spam
 
 
-import replaydb.service.ClientGroup
+import replaydb.service.{KryoCommandEncoder, ClientGroup}
 import replaydb.service.driver.{RunConfiguration, Hosts, InitReplayCommand}
 import replaydb.util.EventRateEstimator
 
