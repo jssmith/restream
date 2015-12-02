@@ -27,7 +27,8 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
   val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
-  val spamCounter: ReplayCounter = getReplayCounter
+//  val spamCounter: ReplayCounter = getReplayCounter
+  val spamCounter: ReplayMap[Int, Long] = getReplayMap(0)
   val nonfriendMessagesInLastInterval: ReplayMap[Long, Long] = getReplayMap(0)
   // Mapping userIDa -> (userIDb -> # messages sent userIDa to userIDb in last NonfriendMessageCountInterval)
   val uniqueNonfriendsSentToInLastInterval: ReplayMap[Long, immutable.Map[Long, Long]] =
@@ -199,12 +200,13 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
     bind {
       me: MessageEvent =>
         messageSpamRatings.get(me.ts, me.messageId) match {
-          case Some(score) => if (score >= SpamScoreThreshold) spamCounter.add(1, me.ts)
+          //case Some(score) => if (score >= SpamScoreThreshold) spamCounter.add(1, me.ts)
+          case Some(score) => if (score >= SpamScoreThreshold) spamCounter.merge(me.ts, 0, _ + 1)
           case None =>
         }
     }
     bind {
-      e: PrintSpamCounter => println(s"spam count is ${spamCounter.get(e.ts)}")
+      e: PrintSpamCounter => println(s"spam count is ${spamCounter.get(e.ts, 0)}")
     }
   }
 }

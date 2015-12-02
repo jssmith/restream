@@ -7,7 +7,7 @@ import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.ReferenceCountUtil
 import org.slf4j.LoggerFactory
 import replaydb.io.SocialNetworkStorage
-import replaydb.runtimedev.HasRuntimeInterface
+import replaydb.runtimedev.{PrintSpamCounter, CoordinatorInterface, HasRuntimeInterface}
 import replaydb.runtimedev.distributedImpl._
 import replaydb.service.driver._
 
@@ -38,6 +38,26 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
           for (phaseId <- 1 to runtime.numPhases) yield {
             new Thread(s"replay-$partitionId-$phaseId") {
               val progressCoordinator = batchProgressCoordinator.getCoordinator(phaseId)
+              // TODO
+              implicit val coordinator = new CoordinatorInterface(partitionId, phaseId) {
+
+                var bets: Long = 0
+
+                def setBatchEndTs(ts: Long): Unit = {
+                  bets = ts
+                }
+
+                override def batchEndTs: Long = bets
+
+                override def gcAllReplayState(): Unit = ???
+
+                // TODO should only have one of these two
+                override def batchId: Int = ???
+
+                override def reportCheckpoint(ts: Long, ct: Long): (Long, Long) = ???
+
+                override def reportFinished(): Unit = ???
+              }
               override def run(): Unit = {
                 // TODO
                 //  - separate reader thread
@@ -67,13 +87,16 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                         sendProgress()
                       }
                       batchEndTimestamp += runConfig.batchTimeInterval
+                      coordinator.setBatchEndTs(batchEndTimestamp)
                       logger.info(s"advancing endtime $batchEndTimestamp on partition $partitionId phase $phaseId")
                       progressCoordinator.awaitAdvance(batchEndTimestamp)
                     }
                     lastTimestamp = e.ts
-//                    runtime.update(partitionId, phaseId, e, null)
+                    runtime.update(e)
                     ct += 1
                   })
+                  runtime.update(PrintSpamCounter(batchEndTimestamp - 1))
+                  stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                   logger.info(s"finished phase $phaseId on partition $partitionId")
                   // Send progress for all phases, but only set done flag when the last phase is done
                   sendProgress(phaseId == runtime.numPhases)

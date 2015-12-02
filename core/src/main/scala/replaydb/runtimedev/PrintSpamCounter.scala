@@ -1,4 +1,4 @@
-package replaydb.exec.spam
+package replaydb.runtimedev
 
 import replaydb.event.Event
 

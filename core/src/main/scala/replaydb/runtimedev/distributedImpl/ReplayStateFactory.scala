@@ -1,8 +1,8 @@
 package replaydb.runtimedev.distributedImpl
 
-import replaydb.runtimedev.{ReplayState, ReplayCounter, ReplayMap, ReplayTimestampLocalMap}
+import replaydb.runtimedev.threadedImpl.ReplayTimestampLocalMapImpl
+import replaydb.runtimedev.{ReplayCounter, ReplayMap, ReplayTimestampLocalMap}
 
-import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
 class ReplayStateFactory(commService: StateCommunicationService) extends replaydb.runtimedev.ReplayStateFactory {
@@ -17,10 +17,11 @@ class ReplayStateFactory(commService: StateCommunicationService) extends replayd
   }
 
   def getReplayCounter: ReplayCounter = {
-    null
+    // TODO there is no distributedImpl of ReplayCounter yet
+    throw new UnsupportedOperationException
   }
 
   def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = {
-    null
+    new ReplayTimestampLocalMapImpl[K, V](default)
   }
 }

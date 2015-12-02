@@ -1,6 +1,6 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.{ReplayState, MemoryStats}
+import replaydb.runtimedev.{PrintSpamCounter, ReplayState, MemoryStats}
 import replaydb.runtimedev.threadedImpl.{ReplayStateFactory, MultiReaderEventSource, RunProgressCoordinator}
 import replaydb.util.ProgressMeter
 import replaydb.util
@@ -86,5 +86,5 @@ object ParallelSpamDetector extends App {
   // TODO should support an aggregate / counter type that is write-only during
   // execution ( + commutative/associative) and then you can access at the end
   // -> the pause right now to roll-up all of the spamcounters is completely unnecessary
-  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue)(RunProgressCoordinator.getDriverCoordinator))
+  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue, 0)(RunProgressCoordinator.getDriverCoordinator))
 }

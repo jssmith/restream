@@ -3,6 +3,7 @@ package replaydb.exec.spam
 import java.io.FileInputStream
 
 import replaydb.io.SocialNetworkStorage
+import replaydb.runtimedev.PrintSpamCounter
 import replaydb.runtimedev.serialImpl.ReplayStateFactory
 import replaydb.util.ProgressMeter
 
@@ -28,5 +29,5 @@ object SerialSpamDetector extends App {
     pm.increment()
   })
   pm.finished()
-  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue))
+  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue, 0))
 }

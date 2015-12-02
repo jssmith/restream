@@ -27,12 +27,14 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
   // get(ts, key) only happens once, which may not be the case. the compiler will create
   // multiple getPrepares if there are multiple gets so we should figure all of that out
   override def get(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Option[V] = {
+//    Some(default)
     preparedValues.synchronized {
       while (!preparedValues.contains((ts, key))) {
         preparedValues.wait()
       }
       val ret = preparedValues((ts, key))
-      preparedValues.remove((ts, key))
+      // TODO want to put this back in but can't because of comment above
+//      preparedValues.remove((ts, key))
       ret
     }
   }
