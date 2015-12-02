@@ -87,10 +87,15 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
     cf(i).channel().writeAndFlush(c).sync()
   }
 
-  def closeWhenDone(): Unit = {
+  def closeWhenDone(isWorker: Boolean = false): Unit = {
     try {
-      workLatch.await()
-      cf.foreach { _.channel().writeAndFlush(new CloseCommand) }
+      val closeCmd = if (isWorker) {
+        new CloseWorkerCommand()
+      } else {
+        workLatch.await()
+        new CloseCommand()
+      }
+      cf.foreach { _.channel().writeAndFlush(closeCmd) }
       cf.foreach { _.channel().closeFuture().sync() }
     } finally {
       group.shutdownGracefully()

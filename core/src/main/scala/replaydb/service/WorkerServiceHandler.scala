@@ -2,15 +2,14 @@ package replaydb.service
 
 import java.io.FileInputStream
 
+import com.typesafe.scalalogging.Logger
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.ReferenceCountUtil
 import org.slf4j.LoggerFactory
 import replaydb.io.SocialNetworkStorage
-
-import replaydb.runtimedev.{HasRuntimeInterface, ReplayState}
+import replaydb.runtimedev.HasRuntimeInterface
 import replaydb.runtimedev.distributedImpl._
 import replaydb.service.driver._
-import com.typesafe.scalalogging.Logger
 
 
 class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter {
@@ -22,13 +21,15 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
     logger.info(s"received message $msg")
     msg.asInstanceOf[Command] match {
       case c : InitReplayCommand[_] => {
+        if (stateCommunicationService != null) {
+          stateCommunicationService.close()
+        }
         stateCommunicationService = new StateCommunicationService(c.hostId, c.runConfiguration)
         val stateFactory = new ReplayStateFactory(stateCommunicationService)
         val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
         val runConfig = c.runConfiguration
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
-        batchProgressCoordinator = new BatchProgressCoordinator(c.runConfiguration.startTimestamp, c.runConfiguration.batchTimeInterval)
         batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval)
 
         val partitionId = c.partitionId
@@ -105,7 +106,16 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
         stateCommunicationService.handleStateWriteCommand(swc)
       }
 
-      case _ : CloseCommand => ctx.close()
+      case _ : CloseWorkerCommand => {
+        ctx.close()
+      }
+
+      case _ : CloseCommand => {
+        stateCommunicationService.close()
+        stateCommunicationService = null
+        batchProgressCoordinator = null
+        ctx.close()
+      }
     }
     // TODO is this needed?
     ReferenceCountUtil.release(msg)

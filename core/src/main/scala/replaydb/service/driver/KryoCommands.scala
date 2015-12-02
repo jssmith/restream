@@ -10,6 +10,7 @@ trait KryoCommands {
   kryo.setRegistrationRequired(true)
   kryo.register(classOf[Array[String]])
   kryo.register(classOf[CloseCommand])
+  kryo.register(classOf[CloseWorkerCommand])
   kryo.register(classOf[InitReplayCommand[_]])
   kryo.register(classOf[ProgressUpdateCommand])
   kryo.register(classOf[UpdateAllProgressCommand])

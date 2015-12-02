@@ -25,6 +25,10 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   }
   client.connect(runConfiguration.hosts.zipWithIndex.filter(_._2 != workerId).map(_._1))
 
+  def close(): Unit = {
+    client.closeWhenDone(true)
+  }
+
   // State is owned by worker #: partitionFn(key) % workerCount
 
   // Send a request to the machine which owns this key
