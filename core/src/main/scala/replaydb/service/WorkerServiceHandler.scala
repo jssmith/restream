@@ -89,7 +89,9 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
       case uap: UpdateAllProgressCommand => {
         logger.info(s"have new progress marks ${uap.progressMarks}")
         for ((phaseId, maxTimestamp) <- uap.progressMarks) {
-          batchProgressCoordinator.update(phaseId, maxTimestamp)
+          if (batchProgressCoordinator != null) {
+            batchProgressCoordinator.update(phaseId, maxTimestamp)
+          }
         }
       }
 
