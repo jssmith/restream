@@ -1,3 +1,9 @@
 package replaydb.service.driver
 
-case class RunConfiguration(numPartitions: Int, numPhases: Int, startTimestamp: Long, batchTimeInterval: Long)
+import replaydb.service.driver.Hosts.HostConfiguration
+
+case class RunConfiguration(numPartitions: Int,
+                            numPhases: Int,
+                            val hosts: Array[HostConfiguration],
+                            startTimestamp: Long,
+                            batchTimeInterval: Long)

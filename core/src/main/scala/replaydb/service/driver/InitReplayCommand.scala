@@ -4,8 +4,7 @@ import replaydb.runtimedev.HasRuntimeInterface
 
 class InitReplayCommand[T <: HasRuntimeInterface](val files: Map[Int, String],
                              program: Class[T],
-                             val startTimestamp: Long,
-                             val batchTimeInterval: Long,
-                             val printProgressInterval: Int) extends Command {
+                             val hostId: Int,
+                             val runConfiguration: RunConfiguration) extends Command {
   val programClass = program.getCanonicalName
 }

@@ -1,8 +1,29 @@
 package replaydb.runtimedev.distributedImpl
 
+import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter, ChannelInboundHandler}
+import replaydb.service.driver.{RunConfiguration, Command}
+import replaydb.service.{ClientGroupBase}
+
 import scala.collection.mutable
 
-class StateCommunicationService(workerId: Int, workerCount: Int) {
+class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguration) {
+  val workerCount = runConfiguration.hosts.length
+  val client = new ClientGroupBase(runConfiguration) {
+    override def getHandler(): ChannelInboundHandler = {
+      new ChannelInboundHandlerAdapter() {
+        override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
+          msg.asInstanceOf[Command] match {
+            case s: StateRequestResponse => {
+              // TODO - have to get the types right here
+//              val rs: ReplayMapImpl[_,_] = states(s.collectionId)
+//              rs.insertPreparedValue(s.ts, s.key, Some(s.value))
+            }
+          }
+        }
+      }
+    }
+  }
+  client.connect(runConfiguration.hosts.zipWithIndex.filter(_._2 != workerId).map(_._1))
 
   // State is owned by worker #: partitionFn(key) % workerCount
 
@@ -14,7 +35,7 @@ class StateCommunicationService(workerId: Int, workerCount: Int) {
       rs.insertPreparedValue(ts, key, rs.get(ts, key))
     } else {
       val cmd = new StateRequestCommand(collectionId, ts, key)
-      // send cmd across network to partition srcWorker
+      client.issueCommand(srcWorker, cmd)
     }
   }
 
@@ -25,8 +46,20 @@ class StateCommunicationService(workerId: Int, workerCount: Int) {
       states(collectionId).asInstanceOf[ReplayMapImpl[K, V]].insertRemoteWrite(ts, key, merge)
     } else {
       val cmd = StateWriteCommand(collectionId, ts, key, merge)
-      // send cmd across network to partition destWorker
+      client.issueCommand(destWorker, cmd)
     }
+  }
+
+  def handleStateWriteCommand[T](cmd: StateWriteCommand[T]) = {
+    // TODO - have to get the types right here
+//    states(cmd.collectionId).insertRemoteWrite(cmd.ts, cmd.key, cmd.merge)
+  }
+
+  def handleStateRequestCommand(cmd: StateRequestCommand): StateRequestResponse = {
+    // TODO - have to get the types right here
+//    val rv = states(cmd.collectionId).get(cmd.ts, cmd.key)
+//    new StateRequestResponse(cmd.collectionId, cmd.ts, cmd.key, rv)
+    ???
   }
 
   val states: mutable.Map[Int, ReplayMapImpl[_, _]] = mutable.HashMap()

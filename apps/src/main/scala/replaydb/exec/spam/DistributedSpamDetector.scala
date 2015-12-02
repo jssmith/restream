@@ -40,7 +40,7 @@ object DistributedSpamDetector extends App {
   val startTime = r.startTime
   val batchTimeInterval = (batchSize * r.eventIntervalMs).toLong
   println(s"rate estimate $r")
-  val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = 5,
+  val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = 5, hosts,
     startTimestamp = startTime, batchTimeInterval = batchTimeInterval)
 
   println("connecting...")
@@ -49,7 +49,7 @@ object DistributedSpamDetector extends App {
 
   println("starting replay...")
   for (i <- hostFiles.indices) {
-    clients.issueCommand(i, new InitReplayCommand(hostFiles(i).toMap, classOf[SpamDetectorStats],r.startTime, batchTimeInterval, printProgressInterval = 100000))
+    clients.issueCommand(i, new InitReplayCommand(hostFiles(i).toMap, classOf[SpamDetectorStats], i, runConfiguration))
   }
   clients.closeWhenDone()
 }
