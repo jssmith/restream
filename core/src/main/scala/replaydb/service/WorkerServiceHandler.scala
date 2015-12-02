@@ -6,6 +6,7 @@ import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.ReferenceCountUtil
 import org.slf4j.LoggerFactory
 import replaydb.io.SocialNetworkStorage
+
 import replaydb.runtimedev.{HasRuntimeInterface, ReplayState}
 import replaydb.runtimedev.distributedImpl._
 import replaydb.service.driver._
@@ -24,14 +25,16 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
         stateCommunicationService = new StateCommunicationService(c.hostId, c.runConfiguration)
         val stateFactory = new ReplayStateFactory(stateCommunicationService)
         val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
+        val runConfig = c.runConfiguration
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
         batchProgressCoordinator = new BatchProgressCoordinator(c.runConfiguration.startTimestamp, c.runConfiguration.batchTimeInterval)
+        batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval)
 
-        logger.info(s"launching threads... number of partitions: ${c.files.size}, number of phases ${runtime.numPhases}")
+        val partitionId = c.partitionId
+        logger.info(s"launching threads... number of phases ${runConfig.numPhases}")
         val threads =
-          // TODO aren't we only having one partition per worker?
-          for ((partitionId, partitionFn) <- c.files; phaseId <- 1 to runtime.numPhases) yield {
+          for (phaseId <- 1 to runtime.numPhases) yield {
             new Thread(s"replay-$partitionId-$phaseId") {
               val progressCoordinator = batchProgressCoordinator.getCoordinator(phaseId)
               override def run(): Unit = {
@@ -54,13 +57,13 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                       }
                     })
                   }
-                  eventStorage.readEvents(new FileInputStream(partitionFn), e => {
+                  eventStorage.readEvents(new FileInputStream(c.filename), e => {
                     if (e.ts >= batchEndTimestamp) {
                       logger.info(s"reached batch end on partition $partitionId phase $phaseId")
                       if (ct > 0) {
                         sendProgress()
                       }
-                      batchEndTimestamp += c.runConfiguration.batchTimeInterval
+                      batchEndTimestamp += runConfig.batchTimeInterval
                       logger.info(s"advancing endtime $batchEndTimestamp on partition $partitionId phase $phaseId")
                       progressCoordinator.awaitAdvance(batchEndTimestamp)
                     }
