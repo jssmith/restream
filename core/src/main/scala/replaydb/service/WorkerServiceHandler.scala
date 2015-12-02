@@ -1,7 +1,8 @@
 package replaydb.service
 
 import java.io.FileInputStream
-import java.util.concurrent.{TimeUnit, CountDownLatch}
+
+import scala.language.reflectiveCalls // TODO
 
 import com.typesafe.scalalogging.Logger
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
@@ -15,32 +16,28 @@ import replaydb.service.driver._
 
 class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter {
   val logger = Logger(LoggerFactory.getLogger(classOf[WorkerServiceHandler]))
-  var batchProgressCoordinator: BatchProgressCoordinator = null
-  var stateCommunicationService: StateCommunicationService = null
-
-  val startLatch = new CountDownLatch(5) // TODO this should be numPhases
 
   override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
     logger.info(s"received message $msg")
     msg.asInstanceOf[Command] match {
       case c : InitReplayCommand[_] => {
-        if (stateCommunicationService != null) {
-          stateCommunicationService.close()
+        if (server.stateCommunicationService != null) {
+          server.stateCommunicationService.close()
         }
-        stateCommunicationService = new StateCommunicationService(c.hostId, c.runConfiguration)
-        val stateFactory = new ReplayStateFactory(stateCommunicationService)
+        server.stateCommunicationService = new StateCommunicationService(c.hostId, c.runConfiguration)
+        val stateFactory = new ReplayStateFactory(server.stateCommunicationService)
         val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
         val runConfig = c.runConfiguration
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
-        batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval)
+        server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval)
 
         val partitionId = c.partitionId
         logger.info(s"launching threads... number of phases ${runConfig.numPhases}")
         val threads =
           for (phaseId <- 1 to runtime.numPhases) yield {
             new Thread(s"replay-$partitionId-$phaseId") {
-              val progressCoordinator = batchProgressCoordinator.getCoordinator(phaseId)
+              val progressCoordinator = server.batchProgressCoordinator.getCoordinator(phaseId)
               // TODO
               implicit val coordinator = new CoordinatorInterface(partitionId, phaseId) {
 
@@ -65,10 +62,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                 // TODO
                 //  - separate reader thread
                 try {
-                  Thread.sleep(5000) // TODO
-                  println(s"WORKER THREAD PHASE $phaseId STARTLATCH COUNT IS: " + startLatch.getCount)
-//                  startLatch.countDown()
-                  println(s"WORKER THREAD PHASE $phaseId AFTER COUNTDOWN STARTLATCH COUNT IS: " + startLatch.getCount)
+                  server.startLatch.countDown()
 
                   logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
                   var batchEndTimestamp = c.runConfiguration.startTimestamp
@@ -90,7 +84,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                     if (e.ts >= batchEndTimestamp) {
                       logger.info(s"reached batch end on partition $partitionId phase $phaseId")
                       // Send out StateUpdateCommands
-                      stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
+                      server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                       if (ct > 0) {
                         sendProgress()
                       }
@@ -105,7 +99,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                   })
                   // TODO need a better way to extract info than this
                   runtime.update(PrintSpamCounter(batchEndTimestamp - 1))
-                  stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
+                  server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                   logger.info(s"finished phase $phaseId on partition $partitionId")
                   // Send progress for all phases, but only set done flag when the last phase is done
                   sendProgress(phaseId == runtime.numPhases)
@@ -122,24 +116,21 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
 
       case uap: UpdateAllProgressCommand => {
         logger.info(s"have new progress marks ${uap.progressMarks}")
+        server.startLatch.await()
         for ((phaseId, maxTimestamp) <- uap.progressMarks) {
-          if (batchProgressCoordinator != null) {
-            batchProgressCoordinator.update(phaseId, maxTimestamp)
-          }
+          server.batchProgressCoordinator.update(phaseId, maxTimestamp)
         }
       }
 
       case srp: StateRequestResponse => {
-        stateCommunicationService.handleStateRequestResponse(srp)
+        server.stateCommunicationService.handleStateRequestResponse(srp)
       }
 
       case suc: StateUpdateCommand => {
-//        while (startLatch.getCount != 0) {
-//          println("STARTLATCH COUNT IS: " + startLatch.getCount)
-//          startLatch.await(5, TimeUnit.SECONDS)
-//        }
+        server.startLatch.await()
+
         logger.info(s"STARTING TO HANDLE StateUpdateCommand: $suc")
-        stateCommunicationService.handleStateUpdateCommand(suc)
+        server.stateCommunicationService.handleStateUpdateCommand(suc)
         logger.info(s"FINISHED HANDLING StateUpdateCommand: $suc")
       }
 
@@ -148,9 +139,9 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
       }
 
       case _ : CloseCommand => {
-        stateCommunicationService.close()
-        stateCommunicationService = null
-        batchProgressCoordinator = null
+        server.stateCommunicationService.close()
+        server.stateCommunicationService = null
+        server.batchProgressCoordinator = null
         ctx.close()
       }
     }

@@ -22,6 +22,7 @@ class KryoCommandDecoder extends ByteToMessageDecoder with KryoCommands {
          throw new RuntimeException("Buffer size exceeded")
        }
        input.rewind()
+       // TODO any way to do this without copying the buffer?
        in.readBytes(buf, 0, len)
        input.setLimit(len)
        val obj = kryo.readClassAndObject(input)

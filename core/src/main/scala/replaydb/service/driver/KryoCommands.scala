@@ -30,5 +30,5 @@ trait KryoCommands {
 
 
 object KryoCommands {
-  val MAX_KRYO_MESSAGE_SIZE = 10000
+  val MAX_KRYO_MESSAGE_SIZE = 10000000
 }

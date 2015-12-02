@@ -14,6 +14,7 @@ class KryoCommandEncoder extends MessageToByteEncoder[Command] with KryoCommands
   override def encode(ctx: ChannelHandlerContext, msg: Command, out: ByteBuf): Unit = {
     logger.debug(s"kryo encoding class of type ${msg.getClass}")
     output.clear()
+    // TODO is there any way to do this without having to copy the buffer, instead writing directly?
     kryo.writeClassAndObject(output, msg)
     val len = output.position()
     out.writeInt(len)
