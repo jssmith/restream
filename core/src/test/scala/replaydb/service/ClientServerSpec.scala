@@ -16,6 +16,7 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("single message tests")
     val localhost = "127.0.0.1"
     val port = 15567
+    val hosts = Array(new HostConfiguration(localhost, port))
     val m = Map[Int,Long](1->1L)
     @volatile var progressReceived = false
     @volatile var closeReceived = false
@@ -40,7 +41,7 @@ class ClientServerSpec extends FlatSpec {
     }
     s.run()
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelInboundHandler = {
         new ChannelInboundHandlerAdapter() {
@@ -62,6 +63,7 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("starting multiple messages test")
     val localhost = "127.0.0.1"
     val port = 15567
+    val hosts = Array(new HostConfiguration(localhost, port))
     val m = Map[Int,Long](0 -> 15L)
     val n = 1000
     @volatile var progressReceivedCt = 0
@@ -88,7 +90,7 @@ class ClientServerSpec extends FlatSpec {
     }
     s.run()
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelInboundHandler = {
         new ChannelInboundHandlerAdapter() {
@@ -112,6 +114,7 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("starting ping test")
     val localhost = "127.0.0.1"
     val port = 15567
+    val hosts = Array(new HostConfiguration(localhost, port))
     val m = Map[Int,Long](0 -> 15L)
     val n = 10
     @volatile var progressReceivedCt = 0
@@ -141,7 +144,7 @@ class ClientServerSpec extends FlatSpec {
     }
     s.run()
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelInboundHandler = {
         new ChannelInboundHandlerAdapter() {
@@ -175,6 +178,7 @@ class ClientServerSpec extends FlatSpec {
     val localhost = "127.0.0.1"
     val port1 = 15567
     val port2 = 15568
+    val hosts = Array(new HostConfiguration(localhost, port1), new HostConfiguration(localhost, port2))
     val m = Map[Int,Long](0 -> 15L)
     val n = 1000
     val progressReceivedCt = new AtomicInteger()
@@ -205,7 +209,7 @@ class ClientServerSpec extends FlatSpec {
     val s2 = getServer(port2)
     s2.run()
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelInboundHandler = {
         new ChannelInboundHandlerAdapter() {
@@ -244,6 +248,7 @@ class ClientServerSpec extends FlatSpec {
     val numServers = 50
     val numMessages = 10000
     val ports = (0 until numServers).map(_ + 15567).toArray
+    val hosts = ports.map(new HostConfiguration(localhost, _)).toArray
     val m = Map[Int,Long](0 -> 15L)
     val progressReceivedCt = new AtomicInteger()
     val sumResponseCt = new AtomicLong()
@@ -270,7 +275,7 @@ class ClientServerSpec extends FlatSpec {
     })
     servers.foreach(_.run())
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelInboundHandler = {
         new ChannelInboundHandlerAdapter() {
