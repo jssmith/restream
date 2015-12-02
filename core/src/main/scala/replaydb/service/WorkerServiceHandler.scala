@@ -61,6 +61,8 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                   eventStorage.readEvents(new FileInputStream(c.filename), e => {
                     if (e.ts >= batchEndTimestamp) {
                       logger.info(s"reached batch end on partition $partitionId phase $phaseId")
+                      // Send out StateUpdateCommands
+                      stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                       if (ct > 0) {
                         sendProgress()
                       }
@@ -95,17 +97,12 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
         }
       }
 
-      case src: StateRequestCommand => {
-        val resp = stateCommunicationService.handleStateRequestCommand(src)
-        ctx.executor.execute(new Runnable() {
-          override def run(): Unit = {
-            ctx.write(resp)
-          }
-        })
+      case srp: StateRequestResponse => {
+        stateCommunicationService.handleStateRequestResponse(srp)
       }
 
-      case swc: StateWriteCommand[_] => {
-        stateCommunicationService.handleStateWriteCommand(swc)
+      case suc: StateUpdateCommand => {
+        stateCommunicationService.handleStateUpdateCommand(suc)
       }
 
       case _ : CloseWorkerCommand => {

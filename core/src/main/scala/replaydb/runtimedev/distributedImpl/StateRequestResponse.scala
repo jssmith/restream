@@ -1,5 +1,6 @@
 package replaydb.runtimedev.distributedImpl
 
+import replaydb.runtimedev.distributedImpl.StateCommunicationService.StateResponse
 import replaydb.service.driver.Command
 
-case class StateRequestResponse(collectionId: Int, ts: Long, key: Any, value: Any) extends Command
+case class StateRequestResponse(phaseId: Int, batchEndTs: Long, responses: Array[StateResponse]) extends Command

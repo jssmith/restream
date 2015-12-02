@@ -98,6 +98,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
       }
 
       def batchId: Int = currentBatchId
+      def batchEndTs: Long = throw new UnsupportedOperationException
 
       override def reportFinished(): Unit = {
         val checkpointNumber = checkpoints.synchronized {
@@ -139,6 +140,7 @@ object RunProgressCoordinator {
       }
 
       override def batchId: Int = 0
+      override def batchEndTs: Long = 0
 
       override def reportCheckpoint(ts: Long, ct: Long): (Long, Long) = {
         throw new UnsupportedOperationException

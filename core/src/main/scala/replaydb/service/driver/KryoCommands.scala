@@ -1,7 +1,8 @@
 package replaydb.service.driver
 
 import com.twitter.chill.ScalaKryoInstantiator
-import replaydb.runtimedev.distributedImpl.{StateRequestResponse, StateRequestCommand, StateWriteCommand}
+import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateWrite, StateRead, StateResponse}
+import replaydb.runtimedev.distributedImpl.{StateRequestResponse, StateUpdateCommand}
 
 trait KryoCommands {
   private val instantiator = new ScalaKryoInstantiator
@@ -14,9 +15,14 @@ trait KryoCommands {
   kryo.register(classOf[InitReplayCommand[_]])
   kryo.register(classOf[ProgressUpdateCommand])
   kryo.register(classOf[UpdateAllProgressCommand])
-  kryo.register(classOf[StateWriteCommand[_]])
-  kryo.register(classOf[StateRequestCommand])
+  kryo.register(classOf[StateUpdateCommand])
   kryo.register(classOf[StateRequestResponse])
+  kryo.register(classOf[StateResponse])
+  kryo.register(classOf[StateRead])
+  kryo.register(classOf[StateWrite[_]])
+  kryo.register(classOf[Array[StateResponse]])
+  kryo.register(classOf[Array[StateRead]])
+  kryo.register(classOf[Array[StateWrite[_]]])
   kryo.register(classOf[RunConfiguration])
   kryo.register(classOf[Hosts.HostConfiguration])
   kryo.register(classOf[Array[Hosts.HostConfiguration]])
