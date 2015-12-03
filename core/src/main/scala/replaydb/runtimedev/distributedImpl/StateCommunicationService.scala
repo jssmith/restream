@@ -67,7 +67,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   // Send a request to the machine which owns this key
   def localPrepareState[K, V](collectionId: Int, phaseId: Int, batchEndTs: Long,
                               ts: Long, key: K, partitionFn: K => Int): Unit = {
-    val srcWorker = partitionFn(key) % workerCount
+    val srcWorker = (partitionFn(key) & 0x7FFFFFFF) % workerCount
     queuedReadPrepares(phaseId)(srcWorker).getOrElseUpdate(batchEndTs, ArrayBuffer()) +=
       StateRead(collectionId, ts, key)
   }
@@ -75,7 +75,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   // send this write to its appropriate partition to be stored
   def submitWrite[K, V](collectionId: Int, phaseId: Int, batchEndTs: Long,
                         ts: Long, key: K, merge: V => V, partitionFn: K => Int): Unit = {
-    val destWorker = partitionFn(key) % workerCount
+    val destWorker = (partitionFn(key) & 0x7FFFFFFF) % workerCount
     queuedWrites(phaseId)(destWorker).getOrElseUpdate(batchEndTs, ArrayBuffer()) +=
       StateWrite(collectionId, ts, key, merge)
   }
