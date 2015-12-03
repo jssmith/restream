@@ -118,6 +118,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
 
       case uap: UpdateAllProgressCommand => {
         logger.info(s"have new progress marks ${uap.progressMarks}")
+        while (server.startLatch == null) { } // just busy wait, shouldn't last long
         server.startLatch.await()
         for ((phaseId, maxTimestamp) <- uap.progressMarks) {
           server.batchProgressCoordinator.update(phaseId, maxTimestamp)
@@ -129,6 +130,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
       }
 
       case suc: StateUpdateCommand => {
+        while (server.startLatch == null) { } // just busy wait, shouldn't last long
         server.startLatch.await()
 
         logger.info(s"STARTING TO HANDLE StateUpdateCommand: $suc")
@@ -144,6 +146,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
         server.stateCommunicationService.close()
         server.stateCommunicationService = null
         server.batchProgressCoordinator = null
+        server.startLatch = null
         ctx.close()
       }
     }
