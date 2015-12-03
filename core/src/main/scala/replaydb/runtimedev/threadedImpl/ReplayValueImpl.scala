@@ -148,6 +148,11 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
     }
   }
 
+  // TODO remove
+  def gcWithCount(ts: Long): (Int, Int) = {
+    (size, gcOlderThan(ts))
+  }
+
   // returns the number of items collected
   def gcOlderThan(ts: Long): Int = {
     if (ts < oldestNonGCWrite) {

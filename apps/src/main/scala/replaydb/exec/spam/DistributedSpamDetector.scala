@@ -1,6 +1,7 @@
 package replaydb.exec.spam
 
 
+import io.netty.util.concurrent.{ImmediateEventExecutor, EventExecutor}
 import replaydb.runtimedev.{ReplayMap, ReplayCounter, ReplayTimestampLocalMap, ReplayStateFactory}
 import replaydb.service.{KryoCommandEncoder, ClientGroup}
 import replaydb.service.driver.{RunConfiguration, Hosts, InitReplayCommand}
@@ -60,9 +61,11 @@ object DistributedSpamDetector extends App {
   val clients = new ClientGroup(runConfiguration)
   clients.connect(hosts)
 
+  val exec = ImmediateEventExecutor.INSTANCE
+
   println("starting replay...")
   for (i <- filenames.indices) {
-    clients.issueCommand(i, new InitReplayCommand(i, filenames(i), classOf[SpamDetectorStats], i, runConfiguration))
+    clients.issueCommand(i, new InitReplayCommand(i, filenames(i), classOf[SpamDetectorStats], i, runConfiguration), exec)
   }
   clients.closeWhenDone()
 }

@@ -33,7 +33,7 @@ object ReplayDBBuild extends Build {
       name := "replaydb-core",
       libraryDependencies ++= Seq(
         "com.twitter" %% "chill" % "0.7.2",
-        "io.netty" % "netty-all" % "4.0.33.Final",
+        "io.netty" % "netty-all" % "5.0.0.Alpha2",
         "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
         "org.slf4j" % "slf4j-simple" % "1.7.13",
         "org.apache.commons" % "commons-math3" % "3.5",
@@ -48,7 +48,7 @@ object ReplayDBBuild extends Build {
       name := "replaydb-apps",
       libraryDependencies ++= Seq(
       // TODO why do I need to include this again? Why isn't it picked up from core?
-        "io.netty" % "netty-all" % "4.0.33.Final"
+        "io.netty" % "netty-all" % "5.0.0.Alpha2" // "4.0.33.Final"
       )
     )
   ) dependsOn (core)

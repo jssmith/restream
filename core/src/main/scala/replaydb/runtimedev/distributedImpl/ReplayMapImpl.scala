@@ -20,22 +20,26 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
     * different collections should become aware of each other at some level to allow for maximum comm batching
     */
 
-//  val preparedValues = new ConcurrentHashMap[(Long, K), Option[V]]()
-  val preparedValues: mutable.Map[(Long, K), Option[V]] = mutable.Map()
+  class PrepValue(val value: Option[V]) {
+    var count = 0
+    def incrementCount(): Unit = count += 1
+    def decrementCount(): Unit = count -= 1
+  }
 
-  // TODO this should be generalized a little - right now it assumes that each
-  // get(ts, key) only happens once, which may not be the case. the compiler will create
-  // multiple getPrepares if there are multiple gets so we should figure all of that out
+//  val preparedValues = new ConcurrentHashMap[(Long, K), Option[V]]()
+  val preparedValues: mutable.Map[(Long, K), PrepValue] = mutable.Map()
+
   override def get(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Option[V] = {
-//    Some(default)
     preparedValues.synchronized {
       while (!preparedValues.contains((ts, key))) {
         preparedValues.wait()
       }
       val ret = preparedValues((ts, key))
-      // TODO want to put this back in but can't because of comment above
-//      preparedValues.remove((ts, key))
-      ret
+      ret.decrementCount()
+      if (ret.count == 0) {
+        preparedValues.remove((ts, key))
+      }
+      ret.value
     }
   }
 
@@ -51,7 +55,7 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
 
   def insertPreparedValue(ts: Long, key: K, value: Option[V]): Unit = {
     preparedValues.synchronized {
-      preparedValues.put((ts, key), value)
+      preparedValues.getOrElseUpdate((ts, key), new PrepValue(value)).incrementCount()
       preparedValues.notifyAll()
     }
   }
@@ -67,4 +71,12 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
     internalReplayMap.get(ts, key)
   }
 
+  // TODO remove
+  def internalGc(ts: Long): (Int, Int, Int) = {
+    internalReplayMap.internalGc(ts)
+  }
+
+  def gcOlderThan(ts: Long): Int = {
+    internalReplayMap.gcOlderThan(ts)
+  }
 }

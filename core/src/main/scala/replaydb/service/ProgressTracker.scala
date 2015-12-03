@@ -5,9 +5,13 @@ import replaydb.service.driver.RunConfiguration
 class ProgressTracker(runConfiguration: RunConfiguration) {
   import runConfiguration._
 
+  // Number of batches the first phase is allowed to run ahead as compared
+  // to the last phase
+  val FirstPhaseBatchAllowance = 3 + numPhases
+
   private val allowedPositions = Array.ofDim[Long](numPhases,numPartitions)
   for (i <- 0 until numPartitions) {
-    allowedPositions(0)(i) = Long.MaxValue // let the first phase do whatever it wants
+    allowedPositions(0)(i) = startTimestamp + FirstPhaseBatchAllowance * batchTimeInterval
   }
   private def batchId(ts: Long): Int = {
     ((ts - startTimestamp) / batchTimeInterval).toInt
@@ -19,10 +23,10 @@ class ProgressTracker(runConfiguration: RunConfiguration) {
   var lastSummary = summarize()
   def update(partitionId: Int, phaseId: Int, latestTimestamp: Long): Option[Map[Int,Long]] = {
     if (phaseId == numPhases) {
-      return None // last phase, nothing to do
+      allowedPositions(0)(partitionId) = latestTimestamp + FirstPhaseBatchAllowance * batchTimeInterval
+    } else {
+      allowedPositions(phaseId)(partitionId) = latestTimestamp
     }
-    val prev = allowedPositions(phaseId)(partitionId)
-    allowedPositions(phaseId)(partitionId) = latestTimestamp
     val summary = summarize()
     for ((k, v) <- summary) {
       if (lastSummary(k) != v) {

@@ -34,12 +34,25 @@ class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] with
     }).merge(ts, fn)(coordinator)
   }
 
+  // TODO remove
+  def internalGc(ts: Long): (Int, Int, Int) = {
+    var gcCount = 0
+    var totalSize = 0
+    for (entry <- m.values()) {
+      val g = entry.gcWithCount(ts)
+      totalSize += g._1
+      gcCount += g._2
+    }
+    (m.size, totalSize, gcCount)
+  }
+
   override def gcOlderThan(ts: Long): Int = {
     // TODO should be a more efficient way to do this. Considering the idea
     // of maintaining a set of values which have been modified since the last GC
     // but not sure if that will add unnecessary overhead
-    (for (entry <- m.values()) yield {
-      entry.gcOlderThan(ts)
-    }).sum
+//    (for (entry <- m.values()) yield {
+//      entry.gcOlderThan(ts)
+//    }).sum
+    internalGc(ts)._3
   }
 }

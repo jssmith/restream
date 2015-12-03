@@ -1,7 +1,8 @@
 package replaydb.runtimedev.distributedImpl
 
 import com.typesafe.scalalogging.Logger
-import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter, ChannelInboundHandler}
+import io.netty.channel._
+import io.netty.util.concurrent.EventExecutor
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.{RunConfiguration, Command}
 import replaydb.service.ClientGroupBase
@@ -16,8 +17,8 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   val logger = Logger(LoggerFactory.getLogger(classOf[StateCommunicationService]))
   val workerCount = runConfiguration.hosts.length
   val client = new ClientGroupBase(runConfiguration) {
-    override def getHandler(): ChannelInboundHandler = {
-      new ChannelInboundHandlerAdapter() {
+    override def getHandler(): ChannelHandler = {
+      new ChannelHandlerAdapter() {
         override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
           msg.asInstanceOf[Command] match {
             case s: StateRequestResponse => {
@@ -34,8 +35,8 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
     client.closeWhenDone(true)
   }
 
-  def issueCommandToWorker(wId: Int, cmd: Command): Unit = {
-    client.issueCommand(if (wId > workerId) wId - 1 else wId, cmd)
+  def issueCommandToWorker(wId: Int, cmd: Command, exec: EventExecutor): Unit = {
+    client.issueCommand(if (wId > workerId) wId - 1 else wId, cmd, exec)
   }
 
   // State is owned by worker #: partitionFn(key) % workerCount
@@ -86,7 +87,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
     }
   }
 
-  def handleStateUpdateCommand(cmd: StateUpdateCommand): Unit = {
+  def handleStateUpdateCommand(cmd: StateUpdateCommand, exec: EventExecutor): Unit = {
     logger.info(s"Phase $workerId-${cmd.phaseId} received writes from ${cmd.originatingPartitionId} for batch ${cmd.batchEndTs}")
     val readRequestsToProcess = outstandingInboundReads.synchronized {
       val buf = outstandingInboundReads(cmd.phaseId).getOrElseUpdate(cmd.batchEndTs, ArrayBuffer())
@@ -103,11 +104,18 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
     }
     if (readRequestsToProcess.isDefined) {
       logger.info(s"Phase $workerId-${cmd.phaseId} processing read requests for ${readRequestsToProcess.get.size} partitions")
-      processStateReadRequests(readRequestsToProcess.get)
+      processStateReadRequests(readRequestsToProcess.get, exec)
+      // at this point, no more reads will be coming for this specific phase/batch...
+      if (cmd.phaseId == runConfiguration.numPhases - 1) {
+        for ((id, s) <- states) {
+//          s.gcOlderThan(cmd.batchEndTs)
+          println(s"FOR COLLECTION $id: " + s.internalGc(cmd.batchEndTs))
+        }
+      }
     }
   }
 
-  def processStateReadRequests(cmds: ArrayBuffer[StateUpdateCommand]): Unit = {
+  def processStateReadRequests(cmds: ArrayBuffer[StateUpdateCommand], exec: EventExecutor): Unit = {
     for (cmd <- cmds) {
       val responses: ArrayBuffer[StateResponse] = ArrayBuffer()
       for (rp <- cmd.readPrepares) {
@@ -120,13 +128,13 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
       if (cmd.originatingPartitionId == workerId) {
         handleStateRequestResponse(respCmd)
       } else {
-        issueCommandToWorker(cmd.originatingPartitionId, respCmd)
+        issueCommandToWorker(cmd.originatingPartitionId, respCmd, exec)
       }
     }
   }
 
   // Closes out a batch: sends out all of the outstanding writes and getPrepares
-  def finalizeBatch(phaseId: Int, batchEndTs: Long): Unit = {
+  def finalizeBatch(phaseId: Int, batchEndTs: Long, exec: EventExecutor): Unit = {
     logger.info(s"Phase $workerId-$phaseId finalizing batch $batchEndTs")
     if (phaseId == runConfiguration.numPhases) {
       return // nothing to be done - final fast can't have any readPrepares or writes
@@ -139,9 +147,9 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
       if (i != workerId) {
         logger.info(s"Phase $workerId-$phaseId sending updates to partition $i for batch $batchEndTs " +
           s"(${cmd.writes.length} writes and ${cmd.readPrepares.length} readPrepares)")
-        issueCommandToWorker(i, cmd)
+        issueCommandToWorker(i, cmd, exec)
       } else {
-        handleStateUpdateCommand(cmd)
+        handleStateUpdateCommand(cmd, exec)
       }
       queuedWrites(phaseId)(i).remove(batchEndTs)
       queuedReadPrepares(phaseId)(i).remove(batchEndTs)
