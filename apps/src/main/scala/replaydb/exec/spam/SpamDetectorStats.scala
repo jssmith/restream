@@ -206,7 +206,7 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
         }
     }
     bind {
-      e: PrintSpamCounter => println(s"spam count is ${spamCounter.get(e.ts, 0)}")
+      e: PrintSpamCounter => println(s"\n\nSPAM COUNT is ${spamCounter.get(e.ts, 0)}\n\n")
     }
   }
 }

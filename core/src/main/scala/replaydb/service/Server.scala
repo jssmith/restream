@@ -13,4 +13,5 @@ class Server(port: Int) extends ServerBase(port) {
   var batchProgressCoordinator: BatchProgressCoordinator = null
   var stateCommunicationService: StateCommunicationService = null
   var startLatch: CountDownLatch = null
+  var finishLatch: CountDownLatch = null
 }

@@ -16,16 +16,10 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long) {
   }
 
   def update(phaseId: Int, maxTimestamp: Long): Unit = {
-    x.get(phaseId + 1) match {
-      case Some(phaseProgress) =>
-        phaseProgress.update(maxTimestamp)
-      case None =>
-        // Last one
-        x(1).update(maxTimestamp + batchTimeInterval)
-    }
+    x(phaseId).update(maxTimestamp)
   }
 
-  class PhaseLimit(phaseId: Int) {
+  class PhaseLimit(phaseId: Int) extends ThreadCoordinator {
     var maxTimestamp: Long = startTimestamp
     def update(maxTimestamp: Long): Unit = {
       logger.info(s"update limit at phase $phaseId to $maxTimestamp")
@@ -38,8 +32,7 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long) {
     }
     def awaitAdvance(ts: Long): Unit = {
       this.synchronized {
-//        logger.info(s"test condition(pre): ${(if (phaseId == 1) ts - batchTimeInterval else ts) < maxTimestamp} $phaseId $ts $batchTimeInterval $ts")
-        while ((if (phaseId == 1) ts - batchTimeInterval else ts) > maxTimestamp) {
+        while (ts > maxTimestamp) {
           logger.info(s"awaiting advance for phase $phaseId, time requested ${tsToBatch(ts)}, time allowed ${tsToBatch(maxTimestamp)}")
           wait()
         }
@@ -55,10 +48,6 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long) {
     if (!x.contains(phaseId)) {
       x += phaseId -> new PhaseLimit(phaseId)
     }
-    new ThreadCoordinator() {
-      override def awaitAdvance(ts: Long): Unit = {
-        x(phaseId).awaitAdvance(ts)
-      }
-    }
+    x(phaseId)
   }
 }

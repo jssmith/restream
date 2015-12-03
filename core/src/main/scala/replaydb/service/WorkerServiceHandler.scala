@@ -33,6 +33,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
         server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval)
         server.startLatch = new CountDownLatch(runConfig.numPhases)
+        server.finishLatch = new CountDownLatch(runConfig.numPartitions)
 
         val partitionId = c.partitionId
         logger.info(s"launching threads... number of phases ${runConfig.numPhases}")
@@ -87,9 +88,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
                       logger.info(s"reached batch end on partition $partitionId phase $phaseId")
                       // Send out StateUpdateCommands
                       server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
-                      if (ct > 0) {
-                        sendProgress()
-                      }
+                      sendProgress()
                       batchEndTimestamp += runConfig.batchTimeInterval
                       coordinator.setBatchEndTs(batchEndTimestamp)
                       logger.info(s"advancing endtime $batchEndTimestamp on partition $partitionId phase $phaseId")
@@ -118,7 +117,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
 
       case uap: UpdateAllProgressCommand => {
         logger.info(s"have new progress marks ${uap.progressMarks}")
-        while (server.startLatch == null) { } // just busy wait, shouldn't last long
+        while (server.startLatch == null) { Thread.`yield`() } // just busy wait, shouldn't last long
         server.startLatch.await()
         for ((phaseId, maxTimestamp) <- uap.progressMarks) {
           server.batchProgressCoordinator.update(phaseId, maxTimestamp)
@@ -130,24 +129,25 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
       }
 
       case suc: StateUpdateCommand => {
-        while (server.startLatch == null) { } // just busy wait, shouldn't last long
+        while (server.startLatch == null) { Thread.`yield`() } // just busy wait, shouldn't last long
         server.startLatch.await()
 
-        logger.info(s"STARTING TO HANDLE StateUpdateCommand: $suc")
         server.stateCommunicationService.handleStateUpdateCommand(suc)
-        logger.info(s"FINISHED HANDLING StateUpdateCommand: $suc")
       }
 
       case _ : CloseWorkerCommand => {
         ctx.close()
+        server.finishLatch.countDown()
       }
 
       case _ : CloseCommand => {
         server.stateCommunicationService.close()
+        server.finishLatch.countDown()
+        server.finishLatch.await()
+        ctx.close()
         server.stateCommunicationService = null
         server.batchProgressCoordinator = null
         server.startLatch = null
-        ctx.close()
       }
     }
     // TODO is this needed?

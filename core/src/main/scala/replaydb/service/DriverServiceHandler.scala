@@ -16,12 +16,14 @@ class DriverServiceHandler(clientGroup: ClientGroup, runConfiguration: RunConfig
         if (p.done) {
           clientGroup.workLatch.countDown()
         } else {
-          clientGroup.progressTracker.update(p.partitionId, p.phaseId, p.finishedTimestamp) match {
-            case Some(newProgressMarks) =>
-              logger.info(s"have new progress marks $newProgressMarks")
-              clientGroup.broadcastCommand(new UpdateAllProgressCommand(newProgressMarks))
-            case None =>
-              logger.info(s"no new progress to send")
+          clientGroup.progressTracker.synchronized {
+            clientGroup.progressTracker.update(p.partitionId, p.phaseId, p.finishedTimestamp) match {
+              case Some(newProgressMarks) =>
+                logger.info(s"have new progress marks $newProgressMarks")
+                clientGroup.broadcastCommand(new UpdateAllProgressCommand(newProgressMarks))
+              case None =>
+                logger.info(s"no new progress to send")
+            }
           }
         }
       }

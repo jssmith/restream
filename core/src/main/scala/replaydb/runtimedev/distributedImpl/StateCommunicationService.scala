@@ -23,7 +23,6 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
             case s: StateRequestResponse => {
               handleStateRequestResponse(s)
             }
-            case _ => throw new RuntimeException("!!!!") //TODO
           }
         }
       }
@@ -129,6 +128,9 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   // Closes out a batch: sends out all of the outstanding writes and getPrepares
   def finalizeBatch(phaseId: Int, batchEndTs: Long): Unit = {
     logger.info(s"Phase $workerId-$phaseId finalizing batch $batchEndTs")
+    if (phaseId == runConfiguration.numPhases) {
+      return // nothing to be done - final fast can't have any readPrepares or writes
+    }
     for (i <- 0 until workerCount) {
       val writes = queuedWrites(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
       val readPrepares = queuedReadPrepares(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
@@ -136,7 +138,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
       // TODO does this require a new thread? executor?
       if (i != workerId) {
         logger.info(s"Phase $workerId-$phaseId sending updates to partition $i for batch $batchEndTs " +
-          s"(${cmd.writes.size} writes and ${cmd.readPrepares.size} readPrepares)")
+          s"(${cmd.writes.length} writes and ${cmd.readPrepares.length} readPrepares)")
         issueCommandToWorker(i, cmd)
       } else {
         handleStateUpdateCommand(cmd)
