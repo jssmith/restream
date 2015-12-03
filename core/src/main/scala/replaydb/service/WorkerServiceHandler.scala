@@ -1,6 +1,7 @@
 package replaydb.service
 
 import java.io.FileInputStream
+import java.util.concurrent.CountDownLatch
 
 import scala.language.reflectiveCalls // TODO
 
@@ -31,6 +32,7 @@ class WorkerServiceHandler(server: Server) extends ChannelInboundHandlerAdapter 
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
         server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval)
+        server.startLatch = new CountDownLatch(runConfig.numPhases)
 
         val partitionId = c.partitionId
         logger.info(s"launching threads... number of phases ${runConfig.numPhases}")

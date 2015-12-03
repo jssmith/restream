@@ -12,6 +12,5 @@ class Server(port: Int) extends ServerBase(port) {
 
   var batchProgressCoordinator: BatchProgressCoordinator = null
   var stateCommunicationService: StateCommunicationService = null
-
-  val startLatch = new CountDownLatch(5) // TODO this should be numPhases
+  var startLatch: CountDownLatch = null
 }
