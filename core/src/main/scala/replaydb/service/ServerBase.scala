@@ -23,8 +23,8 @@ abstract class ServerBase(port: Int) {
 
   def run(): Unit = {
     logger.info(s"starting server on port $port")
-    val bossGroup = new NioEventLoopGroup(10, Executors.newCachedThreadPool())
-    val workerGroup = new NioEventLoopGroup(50,  Executors.newCachedThreadPool()) // Executors.newCachedThreadPool())
+    val bossGroup = new NioEventLoopGroup(1, Executors.newCachedThreadPool())
+    val workerGroup = new NioEventLoopGroup(10,  Executors.newCachedThreadPool()) // Executors.newCachedThreadPool())
     val b = new ServerBootstrap()
     b.group(bossGroup, workerGroup)
       .channel(classOf[NioServerSocketChannel])

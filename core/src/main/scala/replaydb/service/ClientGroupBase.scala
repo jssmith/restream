@@ -18,7 +18,7 @@ import scala.collection.mutable.ArrayBuffer
 
 abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
   val logger = Logger(LoggerFactory.getLogger(classOf[ClientGroupBase]))
-  val group = new NioEventLoopGroup(50, Executors.newCachedThreadPool())
+  val group = new NioEventLoopGroup(10, Executors.newCachedThreadPool())
   val cf = new ArrayBuffer[ChannelFuture]()
   val progressTracker = new ProgressTracker(runConfiguration)
   var workLatch: CountDownLatch = _
