@@ -3,7 +3,8 @@ package replaydb.service
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 
 import com.typesafe.scalalogging.Logger
-import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandler, ChannelInboundHandlerAdapter}
+import io.netty.channel.{ChannelHandlerAdapter, ChannelHandler, ChannelHandlerContext}
+import io.netty.util.concurrent.ImmediateEventExecutor
 import org.scalatest.FlatSpec
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.Hosts.HostConfiguration
@@ -21,8 +22,8 @@ class ClientServerSpec extends FlatSpec {
     @volatile var progressReceived = false
     @volatile var closeReceived = false
     val s = new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
             val c = msg.asInstanceOf[Command]
             c match {
@@ -43,16 +44,16 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = ???
         }
       }
     }
     val localHostConfiguration = new HostConfiguration(localhost, port)
     c.connect(Array(localHostConfiguration))
-    c.issueCommand(0, new UpdateAllProgressCommand(m))
-    c.issueCommand(0, new CloseCommand())
+    c.issueCommand(0, new UpdateAllProgressCommand(m), ImmediateEventExecutor.INSTANCE)
+    c.issueCommand(0, new CloseCommand(), ImmediateEventExecutor.INSTANCE)
     logger.debug("close issued")
     s.close()
     assert(progressReceived)
@@ -69,8 +70,8 @@ class ClientServerSpec extends FlatSpec {
     @volatile var progressReceivedCt = 0
     @volatile var closeReceived = false
     val s = new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
             val c = msg.asInstanceOf[Command]
             c match {
@@ -92,8 +93,8 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = ???
         }
       }
@@ -101,9 +102,9 @@ class ClientServerSpec extends FlatSpec {
     val localHostConfiguration = new HostConfiguration(localhost, port)
     c.connect(Array(localHostConfiguration))
     for (i <- 1 to n) {
-      c.issueCommand(0, new UpdateAllProgressCommand(m + (i -> 10)))
+      c.issueCommand(0, new UpdateAllProgressCommand(m + (i -> 10)), ImmediateEventExecutor.INSTANCE)
     }
-    c.issueCommand(0, new CloseCommand())
+    c.issueCommand(0, new CloseCommand(), ImmediateEventExecutor.INSTANCE)
     logger.debug("close issued")
     s.close()
     assert(progressReceivedCt === n)
@@ -122,8 +123,8 @@ class ClientServerSpec extends FlatSpec {
     @volatile var responseCt = 0
     @volatile var closeReceived = false
     val s = new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
             val c = msg.asInstanceOf[Command]
             c match {
@@ -146,8 +147,8 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
             val c = msg.asInstanceOf[Command]
             c match {
@@ -162,9 +163,9 @@ class ClientServerSpec extends FlatSpec {
     val localHostConfiguration = new HostConfiguration(localhost, port)
     c.connect(Array(localHostConfiguration))
     for (i <- 1 to n) {
-      c.issueCommand(0, new UpdateAllProgressCommand(m + (i -> 10)))
+      c.issueCommand(0, new UpdateAllProgressCommand(m + (i -> 10)), ImmediateEventExecutor.INSTANCE)
     }
-    c.issueCommand(0, new CloseCommand())
+    c.issueCommand(0, new CloseCommand(), ImmediateEventExecutor.INSTANCE)
     logger.debug("close issued")
     s.close()
     assert(progressReceivedCt === n)
@@ -186,8 +187,8 @@ class ClientServerSpec extends FlatSpec {
     val responseCt = new AtomicInteger()
     val closeReceivedCt = new AtomicInteger()
     def getServer(port: Int): ServerBase = new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
             val c = msg.asInstanceOf[Command]
             c match {
@@ -211,8 +212,8 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
             val c = msg.asInstanceOf[Command]
             c match {
@@ -228,10 +229,10 @@ class ClientServerSpec extends FlatSpec {
     val localHostConfiguration2 = new HostConfiguration(localhost, port2)
     c.connect(Array(localHostConfiguration1, localHostConfiguration2))
     for (i <- 1 to n) {
-      c.issueCommand(i % 2, new UpdateAllProgressCommand(m + (i -> 10)))
+      c.issueCommand(i % 2, new UpdateAllProgressCommand(m + (i -> 10)), ImmediateEventExecutor.INSTANCE)
     }
-    c.issueCommand(0, new CloseCommand())
-    c.issueCommand(1, new CloseCommand())
+    c.issueCommand(0, new CloseCommand(), ImmediateEventExecutor.INSTANCE)
+    c.issueCommand(1, new CloseCommand(), ImmediateEventExecutor.INSTANCE)
     logger.debug("close issued")
     s1.close()
     s2.close()
@@ -255,8 +256,8 @@ class ClientServerSpec extends FlatSpec {
     val responseCt = new AtomicInteger()
     val closeReceivedCt = new AtomicInteger()
     val servers = ports.map(port => new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
             val c = msg.asInstanceOf[Command]
             c match {
@@ -277,8 +278,8 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
+      override def getHandler(): ChannelHandler = {
+        new ChannelHandlerAdapter() {
           override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
             val c = msg.asInstanceOf[Command]
             c match {
@@ -292,10 +293,10 @@ class ClientServerSpec extends FlatSpec {
     }
     c.connect(ports.map(port => new HostConfiguration(localhost, port)))
     for (i <- 1 to numMessages) {
-      c.issueCommand(i % numServers, new UpdateAllProgressCommand(m + (i -> 10)))
+      c.issueCommand(i % numServers, new UpdateAllProgressCommand(m + (i -> 10)), ImmediateEventExecutor.INSTANCE)
     }
     for (i <- 0 until numServers) {
-      c.issueCommand(i, new CloseCommand())
+      c.issueCommand(i, new CloseCommand(), ImmediateEventExecutor.INSTANCE)
     }
     logger.debug("close issued")
     servers.foreach(_.close)
