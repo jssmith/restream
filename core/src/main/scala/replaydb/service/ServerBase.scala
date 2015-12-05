@@ -8,11 +8,12 @@ import org.jboss.netty.bootstrap.ServerBootstrap
 import org.jboss.netty.channel._
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory
 import org.jboss.netty.handler.logging.LoggingHandler
-import org.jboss.netty.logging.InternalLogLevel
+import org.jboss.netty.logging.{Slf4JLoggerFactory, InternalLoggerFactory, InternalLogLevel}
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.Command
 
 abstract class ServerBase(port: Int) {
+  InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory)
   val logger = Logger(LoggerFactory.getLogger(classOf[ServerBase]))
   var f: Channel = _
   var closeRunnable: Runnable = _

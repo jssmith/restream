@@ -8,13 +8,14 @@ import org.jboss.netty.bootstrap.ClientBootstrap
 import org.jboss.netty.channel.{ChannelPipeline, ChannelPipelineFactory, ChannelUpstreamHandler, ChannelFuture}
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.handler.logging.LoggingHandler
-import org.jboss.netty.logging.InternalLogLevel
+import org.jboss.netty.logging.{Slf4JLoggerFactory, InternalLoggerFactory, InternalLogLevel}
 import org.slf4j.LoggerFactory
 import replaydb.service.driver._
 
 import scala.collection.mutable.ArrayBuffer
 
 abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
+  InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory)
   val logger = Logger(LoggerFactory.getLogger(classOf[ClientGroupBase]))
   val cf = new ArrayBuffer[ChannelFuture]()
   val progressTracker = new ProgressTracker(runConfiguration)
