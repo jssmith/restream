@@ -98,6 +98,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
       }
 
       def batchId: Int = currentBatchId
+      def batchEndTs: Long = throw new UnsupportedOperationException
 
       override def reportFinished(): Unit = {
         val checkpointNumber = checkpoints.synchronized {
@@ -131,7 +132,8 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
 }
 
 object RunProgressCoordinator {
-  // TODO probably a cleaner way to achieve this?
+  // TODO probably a cleaner way to achieve this? it's only present since Coordinator is necessary
+  // as an (implicit) parameter to update
   def getDriverCoordinator: CoordinatorInterface = {
     new CoordinatorInterface(0, 1) {
       override def gcAllReplayState(): Unit = {
@@ -139,6 +141,7 @@ object RunProgressCoordinator {
       }
 
       override def batchId: Int = 0
+      override def batchEndTs: Long = 0
 
       override def reportCheckpoint(ts: Long, ct: Long): (Long, Long) = {
         throw new UnsupportedOperationException

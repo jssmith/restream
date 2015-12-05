@@ -8,7 +8,7 @@ import replaydb.util.time._
 import replaydb.event.Event
 
 import scala.collection.immutable
-import scala.reflect.ClassTag
+
 
 /*
 RULES:
@@ -22,16 +22,17 @@ RULES:
 
  */
 
-class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) {
+class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface {
   import replayStateFactory._
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
   val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
-  val spamCounter: ReplayCounter = getReplayCounter
+//  val spamCounter: ReplayCounter = getReplayCounter
+  val spamCounter: ReplayMap[Int, Long] = getReplayMap(0) // TODO this is a map but really should just be a ReplayCounter
   val nonfriendMessagesInLastInterval: ReplayMap[Long, Long] = getReplayMap(0)
   // Mapping userIDa -> (userIDb -> # messages sent userIDa to userIDb in last NonfriendMessageCountInterval)
-  val uniqueNonfriendsSentToInLastInterval: ReplayMap[Long, immutable.Map[Long, Long]] =
-    getReplayMap(new immutable.HashMap)
+//  val uniqueNonfriendsSentToInLastInterval: ReplayMap[Long, immutable.Map[Long, Long]] =
+//    getReplayMap(new immutable.HashMap)
   val messageContainingEmailFraction: ReplayMap[Long, (Long, Long)] = getReplayMap((0L, 0L))
   val messagesFractionLast7DaysInLast24Hours: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
   val userFirstMessageTS: ReplayMap[Long, Long] = getReplayMap(Long.MaxValue)
@@ -42,7 +43,7 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState with Threaded] = {
-    val states = List(friendships, friendSendRatio, spamCounter, messageSpamRatings, uniqueNonfriendsSentToInLastInterval,
+    val states = List(friendships, friendSendRatio, spamCounter, messageSpamRatings, //uniqueNonfriendsSentToInLastInterval,
       nonfriendMessagesInLastInterval, messageContainingEmailFraction, messagesFractionLast7DaysInLast24Hours,
       userFirstMessageTS, userMostRecentReceivedMessage, messageSentInResponseFraction)
     for (s <- states) {
@@ -78,42 +79,42 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
           case None =>
         }
     }
-    // RULE 2 STATE
-    bind {
-      me: MessageEvent =>
-        friendships.get(ts = me.ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
-          case Some(_) =>
-          case None =>
-            nonfriendMessagesInLastInterval.merge(me.ts, me.senderUserId, _ + 1)
-            nonfriendMessagesInLastInterval.merge(me.ts + NonfriendMessageCountInterval, me.senderUserId, _ - 1)
-            uniqueNonfriendsSentToInLastInterval.merge(me.ts, me.senderUserId,
-              map => map.updated(me.recipientUserId, map.getOrElse(me.recipientUserId, 0L) + 1))
-            uniqueNonfriendsSentToInLastInterval.merge(me.ts + NonfriendMessageCountInterval, me.senderUserId,
-              map => { val x = map.getOrElse(me.recipientUserId, 0L); if (x > 0) map.updated(me.recipientUserId, x - 1) else null })
-              // null case should never happen - leave null to throw NPE
-        }
-    }
-    // RULE 2 EVALUATION
-    bind {
-      // if sent more than NonfriendMessageCountSpamThreshold messages to > UniqueNonfriendCountSpamThreshold
-      // distinct nonfriends in last NonfriendMessageCountInterval, spam
-      // NOTE: these numbers should probably be higher (and the time period shorter) but our current
-      //       generator doesn't actually create any messages matching this if I turn them up
-      me: MessageEvent =>
-        val msgCnt = nonfriendMessagesInLastInterval.get(me.ts, me.senderUserId) match {
-          case Some(cnt) => cnt
-          case None => 0
-        }
-        if (msgCnt > NonfriendMessageCountSpamThreshold) {
-          val nonfriendCnt = uniqueNonfriendsSentToInLastInterval.get(me.ts, me.senderUserId) match {
-            case Some(friendMap) => friendMap.count(_._2 > 0)
-            case None => 0
-          }
-          if (nonfriendCnt > UniqueNonfriendCountSpamThreshold) {
-            messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
-          }
-        }
-    }
+//    // RULE 2 STATE
+//    bind {
+//      me: MessageEvent =>
+//        friendships.get(ts = me.ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
+//          case Some(_) =>
+//          case None =>
+//            nonfriendMessagesInLastInterval.merge(me.ts, me.senderUserId, _ + 1)
+//            nonfriendMessagesInLastInterval.merge(me.ts + NonfriendMessageCountInterval, me.senderUserId, _ - 1)
+//            uniqueNonfriendsSentToInLastInterval.merge(me.ts, (me.senderUserId, me.recipientUserId),
+//              map => map.updated(me.recipientUserId, map.getOrElse(me.recipientUserId, 0L) + 1))
+//            uniqueNonfriendsSentToInLastInterval.merge(me.ts + NonfriendMessageCountInterval, me.senderUserId,
+//              map => { val x = map.getOrElse(me.recipientUserId, 0L); if (x > 0) map.updated(me.recipientUserId, x - 1) else null })
+//              // null case should never happen - leave null to throw NPE
+//        }
+//    }
+//    // RULE 2 EVALUATION
+//    bind {
+//      // if sent more than NonfriendMessageCountSpamThreshold messages to > UniqueNonfriendCountSpamThreshold
+//      // distinct nonfriends in last NonfriendMessageCountInterval, spam
+//      // NOTE: these numbers should probably be higher (and the time period shorter) but our current
+//      //       generator doesn't actually create any messages matching this if I turn them up
+//      me: MessageEvent =>
+//        val msgCnt = nonfriendMessagesInLastInterval.get(me.ts, me.senderUserId) match {
+//          case Some(cnt) => cnt
+//          case None => 0
+//        }
+//        if (msgCnt > NonfriendMessageCountSpamThreshold) {
+//          val nonfriendCnt = uniqueNonfriendsSentToInLastInterval.get(me.ts, me.senderUserId) match {
+//            case Some(friendMap) => friendMap.count(_._2 > 0)
+//            case None => 0
+//          }
+//          if (nonfriendCnt > UniqueNonfriendCountSpamThreshold) {
+//            messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
+//          }
+//        }
+//    }
     // RULE 3 STATE
     bind {
       me: MessageEvent =>
@@ -142,8 +143,7 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
     // RULE 4 STATE
     bind {
       me: MessageEvent =>
-        val ts = me.ts
-        userFirstMessageTS.merge(me.ts, me.senderUserId, Math.min(_, ts)) // kind of wasteful...
+        userFirstMessageTS.merge(me.ts, me.senderUserId, Math.min(_, me.ts)) // kind of wasteful...
         messagesFractionLast7DaysInLast24Hours.merge(me.ts, me.senderUserId, old => (old._1 + 1, old._2 + 1))
         messagesFractionLast7DaysInLast24Hours.merge(me.ts + 1.days, me.senderUserId, old => (old._1 - 1, old._2))
         messagesFractionLast7DaysInLast24Hours.merge(me.ts + 7.days, me.senderUserId, old => (old._1, old._2 - 1))
@@ -200,12 +200,13 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
     bind {
       me: MessageEvent =>
         messageSpamRatings.get(me.ts, me.messageId) match {
-          case Some(score) => if (score >= SpamScoreThreshold) spamCounter.add(1, me.ts)
+          //case Some(score) => if (score >= SpamScoreThreshold) spamCounter.add(1, me.ts)
+          case Some(score) => if (score >= SpamScoreThreshold) spamCounter.merge(me.ts, 0, _ + 1)
           case None =>
         }
     }
     bind {
-      e: PrintSpamCounter => println(s"spam count is ${spamCounter.get(e.ts)}")
+      e: PrintSpamCounter => println(s"\n\nSPAM COUNT is ${spamCounter.get(e.ts, 0)}\n\n")
     }
   }
 }

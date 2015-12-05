@@ -5,7 +5,6 @@ import replaydb.runtimedev.{ReplayCounter, ReplayMap, ReplayTimestampLocalMap}
 import scala.reflect.ClassTag
 
 class ReplayStateFactory extends replaydb.runtimedev.ReplayStateFactory {
-
   def getReplayMap[K, V : ClassTag](default: => V): ReplayMap[K, V] = {
     new ReplayMapImpl[K, V](default)
   }

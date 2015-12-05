@@ -1,7 +1,5 @@
 package replaydb.util
 
-import replaydb.language.time.TimeOffset
-
 package object time {
 
   implicit def intToTimeWrappedDouble(v: Int): TimeWrappedDouble = {

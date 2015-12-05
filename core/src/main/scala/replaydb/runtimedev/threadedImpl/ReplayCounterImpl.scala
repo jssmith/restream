@@ -9,7 +9,6 @@ class ReplayCounterImpl extends ReplayCounter with Threaded {
   override def add(value: Long, ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
     replayValue.merge(ts, _ + value)(coordinator)
   }
-
   override def get(ts: Long)(implicit coordinator: CoordinatorInterface): Long = {
     replayValue.get(ts)(coordinator) match {
       case Some(x) => x

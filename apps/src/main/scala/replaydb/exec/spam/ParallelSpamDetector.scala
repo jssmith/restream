@@ -1,6 +1,6 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.{ReplayState, MemoryStats}
+import replaydb.runtimedev.{PrintSpamCounter, ReplayState, MemoryStats}
 import replaydb.runtimedev.threadedImpl.{ReplayStateFactory, MultiReaderEventSource, RunProgressCoordinator}
 import replaydb.util.ProgressMeter
 import replaydb.util
@@ -14,10 +14,6 @@ object ParallelSpamDetector extends App {
       """.stripMargin)
     System.exit(1)
   }
-
-  // TODO right now batchSize is specified in time, since the time is what needs to be synchronized,
-  // but really the important batching parameter is message count. Need to write some logic for phase 0
-  // to batch based on message count then disseminate the batch as a timestamp boundary?
 
   val partitionFnBase = args(0)
   val numPartitions = args(1).toInt
@@ -86,5 +82,5 @@ object ParallelSpamDetector extends App {
   // TODO should support an aggregate / counter type that is write-only during
   // execution ( + commutative/associative) and then you can access at the end
   // -> the pause right now to roll-up all of the spamcounters is completely unnecessary
-  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue)(RunProgressCoordinator.getDriverCoordinator))
+  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue, 0)(RunProgressCoordinator.getDriverCoordinator))
 }

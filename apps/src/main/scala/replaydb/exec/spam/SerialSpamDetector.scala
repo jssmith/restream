@@ -3,9 +3,8 @@ package replaydb.exec.spam
 import java.io.FileInputStream
 
 import replaydb.io.SocialNetworkStorage
-import replaydb.runtimedev.ReplayState
+import replaydb.runtimedev.PrintSpamCounter
 import replaydb.runtimedev.serialImpl.ReplayStateFactory
-import replaydb.runtimedev.threadedImpl.RunProgressCoordinator
 import replaydb.util.ProgressMeter
 
 /**
@@ -23,7 +22,6 @@ object SerialSpamDetector extends App {
   val stats = new SpamDetectorStats(new ReplayStateFactory)
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
-
   val pm = new ProgressMeter(printInterval = 1000000, () => { si.updateAllPhases(new PrintSpamCounter(lastTimestamp)); ""})
   val r = eventStorage.readEvents(new FileInputStream(inputFilename), e => {
     si.updateAllPhases(e)
@@ -31,5 +29,5 @@ object SerialSpamDetector extends App {
     pm.increment()
   })
   pm.finished()
-  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue))
+  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue, 0))
 }
