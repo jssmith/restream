@@ -18,8 +18,11 @@ object EventGenerator extends App {
     val Tunable = Value("tunable")
   }
 
-  if (args.length < 3 || args.length > 4) {
-    println("Usage: EventGenerator ( uniform | tunable ) numUsers numEvents [ numSplits ]")
+  if (args.length < 4 || args.length > 5) {
+    println(
+      """Usage: EventGenerator ( uniform | tunable ) numUsers numEvents baseFilename [ numSplits ]
+        |  example EventGenerator tunable 100000 5000000 /tmp/events-split-4/events.out 4
+      """.stripMargin)
     System.exit(1)
   }
 
@@ -28,8 +31,9 @@ object EventGenerator extends App {
   val generator = Generators.withName(args(0))
   val numUsers = Integer.parseInt(args(1))
   val numEvents = Integer.parseInt(args(2))
-  var startTime = util.Date.df.parse("2015-01-01 00:00:00.000").getTime
-  val numSplits = if (args.length == 4) { Integer.parseInt(args(3)) } else { 1 }
+  val startTime = util.Date.df.parse("2015-01-01 00:00:00.000").getTime
+  val baseFilename = args(3)
+  val numSplits = if (args.length == 5) { Integer.parseInt(args(4)) } else { 1 }
   val rnd = new MersenneTwister(903485435L)
   val eventSource = generator match {
     case Generators.Uniform => new UniformEventSource(startTime, numUsers, rnd)
@@ -40,7 +44,7 @@ object EventGenerator extends App {
     case Generators.Uniform => 1000000
     case Generators.Tunable => 1000000
   })
-  val w = eventStorage.getSplitEventWriter("/tmp/events.out", numSplits)
+  val w = eventStorage.getSplitEventWriter(baseFilename, numSplits)
   try {
     eventSource.genEvents(numEvents, e => {
       w.write(e)
