@@ -18,7 +18,8 @@ object BuildSettings {
     assemblyMergeStrategy in assembly := {
       case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
       case _ => MergeStrategy.first
-    }
+    },
+    test in assembly := {}
   )
 }
 
