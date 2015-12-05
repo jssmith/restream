@@ -6,7 +6,7 @@ import java.util.concurrent.locks.ReentrantLock
 
 import org.jboss.netty.channel._
 
-import scala.language.reflectiveCalls // TODO
+import scala.language.reflectiveCalls // TODO remove this after the relevant TODO below is dealt with
 
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
@@ -44,7 +44,10 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
           for (phaseId <- 1 to runtime.numPhases) yield {
             new Thread(s"replay-$partitionId-$phaseId") {
               val progressCoordinator = server.batchProgressCoordinator.getCoordinator(phaseId)
-              // TODO
+              // TODO ETK this whole `coordinator` business needs to be completely revamped -
+              // I implemented this assuming we would be using something like the CoordinatorInterface
+              // for the distributed implementation as well, but now it doesn't really make sense in its current state.
+              // I have ideas on how to deal with this
               implicit val coordinator = new CoordinatorInterface(partitionId, phaseId) {
 
                 var bets: Long = 0
@@ -99,7 +102,12 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                     runtime.update(e)
                     ct += 1
                   })
-                  // TODO need a better way to extract info than this
+                  // TODO ETK need a better way to extract info than this - two notes on that
+                  // 1. We need a way to access the state from the Stats object in general, some way
+                  //    to get info from our collections at the end of the run
+                  // 2. In addition to that, we should implement something like a Spark accumulator
+                  //    that only accepts cumulative/associative operations but operates very efficiently
+                  //    and can only be read at the end of the run
                   runtime.update(PrintSpamCounter(batchEndTimestamp - 1))
                   server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                   logger.info(s"finished phase $phaseId on partition $partitionId")
@@ -155,10 +163,8 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
 //    ReferenceCountUtil.release(msg)
   }
 
-  // TODO leaving commented out for now so that the whole system will die
-  // if any IO thread throws an exception; easier to debug
-//   override def exceptionCaught(ctx: ChannelHandlerContext, event: ExceptionEvent): Unit = {
-//     event.getCause.printStackTrace()
-//     event.getChannel.close()
-//   }
+   override def exceptionCaught(ctx: ChannelHandlerContext, event: ExceptionEvent): Unit = {
+     event.getCause.printStackTrace()
+     event.getChannel.close()
+   }
  }

@@ -1,7 +1,7 @@
 package replaydb.service
 
 import com.typesafe.scalalogging.Logger
-import org.jboss.netty.channel.{MessageEvent, ChannelHandlerContext, SimpleChannelUpstreamHandler}
+import org.jboss.netty.channel.{ExceptionEvent, MessageEvent, ChannelHandlerContext, SimpleChannelUpstreamHandler}
 import org.slf4j.LoggerFactory
 import replaydb.service.driver._
 
@@ -32,13 +32,10 @@ class DriverServiceHandler(clientGroup: ClientGroup, runConfiguration: RunConfig
 //   ReferenceCountUtil.release(msg)
   }
 
-  // Leaving this commented out for now because otherwise the program will continue
-  // once one thread has an exception, easier to debug if everything dies after an
-  // exception occurs
-//  override def exceptionCaught(ctx: ChannelHandlerContext, event: ExceptionEvent): Unit = {
-//    logger.error("driver error", event.getCause)
-//    event.getChannel.close()
-//  }
+  override def exceptionCaught(ctx: ChannelHandlerContext, event: ExceptionEvent): Unit = {
+    logger.error("driver error", event.getCause)
+    event.getChannel.close()
+  }
 
   // Additional logging code can be useful
   /*

@@ -23,6 +23,11 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
 
   def getHandler(): ChannelUpstreamHandler
 
+  // TODO Synchronization is necessary to make sure two threads don't write
+  // to the same channel at the same time, but right now only one thing can be writing
+  // to *any* channel at a time - the synchronization should be moved to a per-channel
+  // basis rather than a per group basis
+
   val executor = Executors.newCachedThreadPool()
   val b = new ClientBootstrap(new NioClientSocketChannelFactory(executor, executor))
   b.setPipelineFactory(new ChannelPipelineFactory {
@@ -70,9 +75,7 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
   }
 
   def issueCommand(i: Int, c: Command): Unit = {
-    // TODO - do we need to sync here?
     this.synchronized {
-      logger.info(s"attempting to issue command on partition $i: ${c.toString}")
       logger.info(s"issuing command on partition $i: ${c.toString}")
       cf(i).getChannel.write(c) //.sync()
       logger.info(s"finished issuing command on partition $i: ${c.toString}")

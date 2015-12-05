@@ -7,7 +7,8 @@ abstract class CoordinatorInterface(val partitionId: Int, val phaseId: Int) {
 
   def gcAllReplayState(): Unit
 
-  // TODO should only have one of these two
+  // TODO should only have one of these two but right now batchId is used by threadedImpl and
+  // batchEndTs is used by distributedImpl
   def batchId: Int
   def batchEndTs: Long
 }

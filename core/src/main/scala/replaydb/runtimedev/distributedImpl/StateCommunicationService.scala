@@ -10,7 +10,14 @@ import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateRespo
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-// TODO check for places where this needs gc - also need to call gc on the ReplayStates
+// TODO ETK - I *think* this is cleaning up all unnecessary state (i.e. GC'ing itself)
+//            but want to think more about it and make sure that's true
+
+// TODO ETK - the other big thing to do here is break up the massive StateUpdateCommand and
+//            StateReadRequests into smaller chunks (which I said I was going to do but haven't
+//            gotten to yet). My idea is to have each of them contain the total number of commands
+//            that we expect to be sent, and then store the count of received messages alongside
+//            outstandingInboundReads. I don't think this is urgent, though
 
 class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguration) {
   val logger = Logger(LoggerFactory.getLogger(classOf[StateCommunicationService]))
@@ -33,27 +40,19 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   }
 
   def issueCommandToWorker(wId: Int, cmd: Command): Unit = {
+    // subtract 1 since the local partition isn't in the array
     client.issueCommand(if (wId > workerId) wId - 1 else wId, cmd)
   }
 
   // State is owned by worker #: partitionFn(key) % workerCount
 
-  // array index: phaseId. entries: map of batchId -> outstandingRequests
-  //    (number of read requests not yet received a response, must be 0 to advance)
-//  val outstandingReadRequests: Array[mutable.Map[Int, Long]] = Array.ofDim(numPhases)
-  // not using ^ for now, just going to let worker threads block on *get* if the
-  // state isn't there which should achieve basically the same thing
-
-  // array index: phaseId. entries: map of batchId -> expected writes
-  //    (number of partitions from which we expect to receive writes but have not yet,
-  //     cannot service a read request until this is 0)
-//  val expectedWritesRemaining: Array[mutable.Map[Long, Int]] = Array.ofDim(numPhases)
+  // stores read requests that have been received but can't yet be processed because not all writes have arrived
   val outstandingInboundReads: Array[mutable.Map[Long, ArrayBuffer[StateUpdateCommand]]] = Array.ofDim(runConfiguration.numPhases + 1)
+  // stores writes that are going out to their respective partitions
   val queuedWrites: Array[Array[mutable.Map[Long, ArrayBuffer[StateWrite[_]]]]] = Array.ofDim(runConfiguration.numPhases + 1, workerCount)
+  // stores read prepares that are going out to their respective paritions
   val queuedReadPrepares: Array[Array[mutable.Map[Long, ArrayBuffer[StateRead]]]] = Array.ofDim(runConfiguration.numPhases + 1, workerCount)
   for (i <- 1 to runConfiguration.numPhases) {
-    //      outstandingReadRequests(i) = mutable.Map()
-//    expectedWritesRemaining(i) = mutable.Map()
     outstandingInboundReads(i) = mutable.Map()
     for (j <- 0 until workerCount) {
       queuedWrites(i)(j) = mutable.Map()
@@ -103,10 +102,11 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
       logger.info(s"Phase $workerId-${cmd.phaseId} processing read requests for ${readRequestsToProcess.get.size} partitions")
       processStateReadRequests(readRequestsToProcess.get)
       // at this point, no more reads will be coming for this specific phase/batch...
+      // Can GC after the second to last phase since the last phase doesn't read or write anything
+      // (last phase's reads are carried out by the second to last phase)
       if (cmd.phaseId == runConfiguration.numPhases - 1) {
         for ((id, s) <- states) {
-//          s.gcOlderThan(cmd.batchEndTs)
-          println(s"FOR COLLECTION $id: " + s.internalGc(cmd.batchEndTs))
+          s.gcOlderThan(cmd.batchEndTs)
         }
       }
     }
@@ -120,7 +120,6 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
         val value = states(rp.collectionId).asInstanceOf[ReplayMapImpl[Any, Any]].requestRemoteRead(rp.ts, rp.key)
         responses += StateResponse(rp.collectionId, rp.ts, rp.key, value)
       }
-      // TODO does this require a new thread? executor?
       val respCmd = StateRequestResponse(cmd.phaseId, cmd.batchEndTs, responses.toArray)
       if (cmd.originatingPartitionId == workerId) {
         handleStateRequestResponse(respCmd)
@@ -134,13 +133,12 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   def finalizeBatch(phaseId: Int, batchEndTs: Long): Unit = {
     logger.info(s"Phase $workerId-$phaseId finalizing batch $batchEndTs")
     if (phaseId == runConfiguration.numPhases) {
-      return // nothing to be done - final fast can't have any readPrepares or writes
+      return // nothing to be done - final phase can't have any readPrepares or writes
     }
     for (i <- 0 until workerCount) {
       val writes = queuedWrites(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
       val readPrepares = queuedReadPrepares(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
       val cmd = StateUpdateCommand(workerId, phaseId, batchEndTs, writes.toArray, readPrepares.toArray)
-      // TODO does this require a new thread? executor?
       if (i != workerId) {
         logger.info(s"Phase $workerId-$phaseId sending updates to partition $i for batch $batchEndTs " +
           s"(${cmd.writes.length} writes and ${cmd.readPrepares.length} readPrepares)")

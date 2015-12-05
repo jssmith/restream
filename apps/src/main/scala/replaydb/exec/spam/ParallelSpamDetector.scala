@@ -15,10 +15,6 @@ object ParallelSpamDetector extends App {
     System.exit(1)
   }
 
-  // TODO right now batchSize is specified in time, since the time is what needs to be synchronized,
-  // but really the important batching parameter is message count. Need to write some logic for phase 0
-  // to batch based on message count then disseminate the batch as a timestamp boundary?
-
   val partitionFnBase = args(0)
   val numPartitions = args(1).toInt
   val batchSize = args(2).toInt

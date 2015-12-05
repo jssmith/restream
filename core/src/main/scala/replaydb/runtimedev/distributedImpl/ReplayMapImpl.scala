@@ -71,11 +71,6 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
     internalReplayMap.get(ts, key)
   }
 
-  // TODO remove
-  def internalGc(ts: Long): (Int, Int, Int) = {
-    internalReplayMap.internalGc(ts)
-  }
-
   def gcOlderThan(ts: Long): Int = {
     internalReplayMap.gcOlderThan(ts)
   }

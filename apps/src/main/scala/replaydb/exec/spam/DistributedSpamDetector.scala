@@ -1,12 +1,13 @@
 package replaydb.exec.spam
 
 import replaydb.runtimedev.{ReplayMap, ReplayCounter, ReplayTimestampLocalMap, ReplayStateFactory}
-import replaydb.service.{KryoCommandEncoder, ClientGroup}
+import replaydb.service.ClientGroup
 import replaydb.service.driver.{RunConfiguration, Hosts, InitReplayCommand}
 import replaydb.util.EventRateEstimator
 
-import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
+
+// TODO this needs a way to time how long things take to do performance checks, like the serial/parallel ones
 
 object DistributedSpamDetector extends App {
   if (args.length != 4) {

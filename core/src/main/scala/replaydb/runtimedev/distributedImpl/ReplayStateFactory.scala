@@ -17,7 +17,9 @@ class ReplayStateFactory(commService: StateCommunicationService) extends replayd
   }
 
   def getReplayCounter: ReplayCounter = {
-    // TODO there is no distributedImpl of ReplayCounter yet
+    // TODO there is no distributedImpl of ReplayCounter yet - in fact the only distributedImpl is
+    // ReplayMap (ReplayTimestampLocalMap implementation is identical to threadedImpl since
+    // it's all local)
     throw new UnsupportedOperationException
   }
 

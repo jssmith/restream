@@ -27,11 +27,12 @@ class KryoCommandDecoder extends FrameDecoder with KryoCommands {
        return null
      }
      input.rewind()
-     // TODO any way to do this without copying the buffer?
+     // TODO any way to do this without copying the buffer? to have Kryo read directly from Netty's buffer?
+     // maybe we could write a little wrapper class or something?
      buffer.readBytes(buf, 0, dataLen)
      input.setLimit(dataLen)
      val obj = kryo.readClassAndObject(input)
-     logger.debug(s"kryo decoded class of type ${obj.getClass}")
+     logger.debug(s"kryo decoded class of type ${obj.getClass} of size $dataLen")
      obj
    }
  }
