@@ -79,7 +79,6 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
           case None =>
         }
     }
-    /*
     // RULE 2 STATE
     bind {
       me: MessageEvent =>
@@ -209,6 +208,5 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
     bind {
       e: PrintSpamCounter => println(s"\n\nSPAM COUNT is ${spamCounter.get(e.ts, 0)}\n\n")
     }
-    */
   }
 }

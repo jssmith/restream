@@ -2,11 +2,11 @@ package replaydb.service
 
 import java.util.concurrent.CountDownLatch
 
-import io.netty.channel.ChannelHandler
+import org.jboss.netty.channel.ChannelUpstreamHandler
 import replaydb.runtimedev.distributedImpl.StateCommunicationService
 
 class Server(port: Int) extends ServerBase(port) {
-  override def getHandler(): ChannelHandler = {
+  override def getHandler(): ChannelUpstreamHandler = {
     new WorkerServiceHandler(Server.this)
   }
 

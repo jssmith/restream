@@ -1,53 +1,49 @@
 package replaydb.service
 
+import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 
 import com.typesafe.scalalogging.Logger
-import io.netty.bootstrap.ServerBootstrap
-import io.netty.channel.nio.NioEventLoopGroup
-import io.netty.channel.socket.SocketChannel
-import io.netty.channel.socket.nio.NioServerSocketChannel
-import io.netty.channel._
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder
-import io.netty.handler.logging.{LogLevel, LoggingHandler}
-import io.netty.util.concurrent.EventExecutor
+import org.jboss.netty.bootstrap.ServerBootstrap
+import org.jboss.netty.channel._
+import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory
+import org.jboss.netty.handler.logging.LoggingHandler
+import org.jboss.netty.logging.InternalLogLevel
 import org.slf4j.LoggerFactory
-import replaydb.service.driver.{Command, KryoCommands}
+import replaydb.service.driver.Command
 
 abstract class ServerBase(port: Int) {
   val logger = Logger(LoggerFactory.getLogger(classOf[ServerBase]))
-  var f: ChannelFuture = _
+  var f: Channel = _
   var closeRunnable: Runnable = _
 
   def getHandler(): ChannelHandler
 
   def run(): Unit = {
     logger.info(s"starting server on port $port")
-    val bossGroup = new NioEventLoopGroup(10, Executors.newCachedThreadPool())
-    val workerGroup = new NioEventLoopGroup(50,  Executors.newCachedThreadPool()) // Executors.newCachedThreadPool())
-    val b = new ServerBootstrap()
-    b.group(bossGroup, workerGroup)
-      .channel(classOf[NioServerSocketChannel])
-      .option(ChannelOption.SO_BACKLOG.asInstanceOf[ChannelOption[Any]], 100)
-      .option(ChannelOption.TCP_NODELAY.asInstanceOf[ChannelOption[Any]], true)
-      .handler(new LoggingHandler(LogLevel.DEBUG))
-      .childHandler(new ChannelInitializer[SocketChannel] {
-        override def initChannel(ch: SocketChannel): Unit = {
-          val p = ch.pipeline()
-          p.addLast(new KryoCommandEncoder())
-          p.addLast(new LengthFieldBasedFrameDecoder(KryoCommands.MAX_KRYO_MESSAGE_SIZE, 0, 4, 0, 4))
-          p.addLast(new KryoCommandDecoder())
-          p.addLast(getHandler())
-        }
-      })
-    f = b.bind(port).sync()
+    val b = new ServerBootstrap(new NioServerSocketChannelFactory(Executors.newCachedThreadPool(), Executors.newCachedThreadPool()))
+    b.setPipelineFactory(new ChannelPipelineFactory {
+      override def getPipeline: ChannelPipeline = {
+        val p = org.jboss.netty.channel.Channels.pipeline()
+        p.addLast("Logger", new LoggingHandler(InternalLogLevel.DEBUG))
+        p.addLast("KryoEncoder", new KryoCommandEncoder())
+
+        // Decode commands received from clients
+        p.addLast("KryoDecoder", new KryoCommandDecoder())
+        p.addLast("Handler", getHandler())
+        p
+      }
+    })
+    b.setOption("tcpNoDelay", true)
+//    b.setOption("")
+//      .option(ChannelOption.SO_BACKLOG.asInstanceOf[ChannelOption[Any]], 100)
+    f = b.bind(new InetSocketAddress(port))
     closeRunnable = new Runnable() {
       override def run(): Unit = {
         try {
-          f.channel().closeFuture().sync()
+          f.getCloseFuture.sync()
         } finally {
-          bossGroup.shutdownGracefully()
-          workerGroup.shutdownGracefully()
+          b.releaseExternalResources()
         }
       }
     }
@@ -57,9 +53,7 @@ abstract class ServerBase(port: Int) {
     closeRunnable.run()
   }
 
-  def write(c: Command, exec: EventExecutor): Unit = {
-    exec.execute(new Runnable {
-      override def run(): Unit = f.channel().writeAndFlush(c) //.sync()
-    })
+  def write(c: Command): Unit = {
+    f.write(c) //.sync()
   }
 }

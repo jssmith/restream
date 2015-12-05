@@ -3,7 +3,7 @@ package replaydb.service
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 
 import com.typesafe.scalalogging.Logger
-import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandler, ChannelInboundHandlerAdapter}
+import org.jboss.netty.channel.{MessageEvent, SimpleChannelUpstreamHandler, ChannelUpstreamHandler, ChannelHandlerContext}
 import org.scalatest.FlatSpec
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.Hosts.HostConfiguration
@@ -21,17 +21,17 @@ class ClientServerSpec extends FlatSpec {
     @volatile var progressReceived = false
     @volatile var closeReceived = false
     val s = new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
-            val c = msg.asInstanceOf[Command]
+      override def getHandler(): ChannelUpstreamHandler = {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
+            val c = me.getMessage.asInstanceOf[Command]
             c match {
               case p: UpdateAllProgressCommand =>
                 assert(p.progressMarks === m)
               case c: CloseCommand =>
                 // shut down the server
-                ctx.channel().close().sync()
-                ctx.channel().parent().close().sync()
+                ctx.getChannel.close().sync()
+                ctx.getChannel.getParent.close().sync()
                 closeReceived = true
                 progressReceived = true
             }
@@ -43,9 +43,9 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = ???
+      override def getHandler(): ChannelUpstreamHandler= {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = ???
         }
       }
     }
@@ -69,10 +69,10 @@ class ClientServerSpec extends FlatSpec {
     @volatile var progressReceivedCt = 0
     @volatile var closeReceived = false
     val s = new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
-            val c = msg.asInstanceOf[Command]
+      override def getHandler(): ChannelUpstreamHandler= {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
+            val c = me.getMessage.asInstanceOf[Command]
             c match {
               case p: UpdateAllProgressCommand =>
                 progressReceivedCt += 1
@@ -80,8 +80,8 @@ class ClientServerSpec extends FlatSpec {
                 assert(p.progressMarks.values.sum === 25)
               case c: CloseCommand =>
                 // shut down the server
-                ctx.channel().close().sync()
-                ctx.channel().parent().close().sync()
+                me.getChannel.close().sync()
+                me.getChannel.getParent.close().sync()
                 closeReceived = true
             }
           }
@@ -92,9 +92,9 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = ???
+      override def getHandler(): ChannelUpstreamHandler= {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = ???
         }
       }
     }
@@ -122,20 +122,20 @@ class ClientServerSpec extends FlatSpec {
     @volatile var responseCt = 0
     @volatile var closeReceived = false
     val s = new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
-            val c = msg.asInstanceOf[Command]
+      override def getHandler(): ChannelUpstreamHandler= {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
+            val c = me.getMessage.asInstanceOf[Command]
             c match {
               case p: UpdateAllProgressCommand =>
                 progressReceivedCt += 1
                 assert(p.progressMarks.keys.max === progressReceivedCt)
                 assert(p.progressMarks.values.sum === 25)
-                ctx.writeAndFlush(new ProgressUpdateCommand(0, 0, progressReceivedCt, 0, false))
+                me.getChannel.write(new ProgressUpdateCommand(0, 0, progressReceivedCt, 0, false))
               case c: CloseCommand =>
                 // shut down the server
-                ctx.channel().close().sync()
-                ctx.channel().parent().close().sync()
+                me.getChannel.close().sync()
+                me.getChannel.getParent.close().sync()
                 closeReceived = true
             }
           }
@@ -146,10 +146,10 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
-            val c = msg.asInstanceOf[Command]
+      override def getHandler(): ChannelUpstreamHandler= {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
+            val c = me.getMessage.asInstanceOf[Command]
             c match {
               case p: ProgressUpdateCommand =>
                 sumResponseCt += p.numProcessed
@@ -186,19 +186,19 @@ class ClientServerSpec extends FlatSpec {
     val responseCt = new AtomicInteger()
     val closeReceivedCt = new AtomicInteger()
     def getServer(port: Int): ServerBase = new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
-            val c = msg.asInstanceOf[Command]
+      override def getHandler(): ChannelUpstreamHandler= {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
+            val c = me.getMessage.asInstanceOf[Command]
             c match {
               case c: CloseCommand =>
                 // shut down the server
-                ctx.channel().close().sync()
-                ctx.channel().parent().close().sync()
+                me.getChannel.close().sync()
+                me.getChannel.getParent.close().sync()
                 closeReceivedCt.incrementAndGet()
               case p: UpdateAllProgressCommand =>
                 val x = progressReceivedCt.incrementAndGet()
-                ctx.writeAndFlush(new ProgressUpdateCommand(0, 0, x, 0, false))
+                me.getChannel.write(new ProgressUpdateCommand(0, 0, x, 0, false))
             }
           }
         }
@@ -211,10 +211,10 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
-            val c = msg.asInstanceOf[Command]
+      override def getHandler(): ChannelUpstreamHandler= {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
+            val c = me.getMessage.asInstanceOf[Command]
             c match {
               case p: ProgressUpdateCommand =>
                 sumResponseCt.addAndGet(p.numProcessed)
@@ -255,19 +255,19 @@ class ClientServerSpec extends FlatSpec {
     val responseCt = new AtomicInteger()
     val closeReceivedCt = new AtomicInteger()
     val servers = ports.map(port => new ServerBase(port) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
-            val c = msg.asInstanceOf[Command]
+      override def getHandler(): ChannelUpstreamHandler= {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
+            val c = me.getMessage.asInstanceOf[Command]
             c match {
               case c: CloseCommand =>
                 // shut down the server
-                ctx.channel().close().sync()
-                ctx.channel().parent().close().sync()
+                me.getChannel.close().sync()
+                me.getChannel.getParent.close().sync()
                 closeReceivedCt.incrementAndGet()
               case p: UpdateAllProgressCommand =>
                 val x = progressReceivedCt.incrementAndGet()
-                ctx.writeAndFlush(new ProgressUpdateCommand(0, 0, x, 0, false))
+                me.getChannel.write(new ProgressUpdateCommand(0, 0, x, 0, false))
             }
           }
         }
@@ -277,10 +277,10 @@ class ClientServerSpec extends FlatSpec {
     logger.debug("server started")
     val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
     val c = new ClientGroupBase(rc) {
-      override def getHandler(): ChannelInboundHandler = {
-        new ChannelInboundHandlerAdapter() {
-          override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
-            val c = msg.asInstanceOf[Command]
+      override def getHandler(): ChannelUpstreamHandler= {
+        new SimpleChannelUpstreamHandler() {
+          override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
+            val c = me.getMessage.asInstanceOf[Command]
             c match {
               case p: ProgressUpdateCommand =>
                 sumResponseCt.addAndGet(p.numProcessed)

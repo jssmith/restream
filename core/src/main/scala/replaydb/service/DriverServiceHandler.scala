@@ -1,16 +1,15 @@
 package replaydb.service
 
 import com.typesafe.scalalogging.Logger
-import io.netty.channel.{ChannelHandlerAdapter, ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import io.netty.util.ReferenceCountUtil
+import org.jboss.netty.channel.{MessageEvent, ChannelHandlerContext, SimpleChannelUpstreamHandler}
 import org.slf4j.LoggerFactory
 import replaydb.service.driver._
 
-class DriverServiceHandler(clientGroup: ClientGroup, runConfiguration: RunConfiguration) extends ChannelHandlerAdapter {
+class DriverServiceHandler(clientGroup: ClientGroup, runConfiguration: RunConfiguration) extends SimpleChannelUpstreamHandler {
   val logger = Logger(LoggerFactory.getLogger(classOf[DriverServiceHandler]))
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
-    msg.asInstanceOf[Command] match {
+  override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
+    me.getMessage.asInstanceOf[Command] match {
       case p: ProgressUpdateCommand => {
         logger.info(s"received progress update $p")
         if (p.done) {
@@ -20,7 +19,7 @@ class DriverServiceHandler(clientGroup: ClientGroup, runConfiguration: RunConfig
             clientGroup.progressTracker.update(p.partitionId, p.phaseId, p.finishedTimestamp) match {
               case Some(newProgressMarks) =>
                 logger.info(s"have new progress marks $newProgressMarks")
-                clientGroup.broadcastCommand(new UpdateAllProgressCommand(newProgressMarks), ctx.executor())
+                clientGroup.broadcastCommand(new UpdateAllProgressCommand(newProgressMarks))
               case None =>
                 logger.info(s"no new progress to send")
             }
@@ -29,14 +28,17 @@ class DriverServiceHandler(clientGroup: ClientGroup, runConfiguration: RunConfig
       }
     }
 
-   // TODO is this needed?
-   ReferenceCountUtil.release(msg)
+   // TODO is this needed? - not supported in Netty 3 so hopefully not...
+//   ReferenceCountUtil.release(msg)
   }
 
-  override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
-    logger.error("driver error", cause)
-    ctx.close()
-  }
+  // Leaving this commented out for now because otherwise the program will continue
+  // once one thread has an exception, easier to debug if everything dies after an
+  // exception occurs
+//  override def exceptionCaught(ctx: ChannelHandlerContext, event: ExceptionEvent): Unit = {
+//    logger.error("driver error", event.getCause)
+//    event.getChannel.close()
+//  }
 
   // Additional logging code can be useful
   /*

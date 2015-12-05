@@ -2,12 +2,13 @@ package replaydb.service
 
 import java.io.FileInputStream
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.locks.ReentrantLock
+
+import org.jboss.netty.channel._
 
 import scala.language.reflectiveCalls // TODO
 
 import com.typesafe.scalalogging.Logger
-import io.netty.channel.{ChannelHandlerAdapter, ChannelHandlerContext}
-import io.netty.util.ReferenceCountUtil
 import org.slf4j.LoggerFactory
 import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.{PrintSpamCounter, CoordinatorInterface, HasRuntimeInterface}
@@ -15,12 +16,12 @@ import replaydb.runtimedev.distributedImpl._
 import replaydb.service.driver._
 
 
-class WorkerServiceHandler(server: Server) extends ChannelHandlerAdapter {
+class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler {
   val logger = Logger(LoggerFactory.getLogger(classOf[WorkerServiceHandler]))
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
+  override def messageReceived(ctx: ChannelHandlerContext, msg: MessageEvent): Unit = {
     logger.info(s"received message $msg")
-    msg.asInstanceOf[Command] match {
+    msg.getMessage.asInstanceOf[Command] match {
       case c : InitReplayCommand[_] => {
         if (server.stateCommunicationService != null) {
           server.stateCommunicationService.close()
@@ -34,6 +35,8 @@ class WorkerServiceHandler(server: Server) extends ChannelHandlerAdapter {
         server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval)
         server.startLatch = new CountDownLatch(runConfig.numPhases)
         server.finishLatch = new CountDownLatch(runConfig.numPartitions)
+
+        val progressSendLock = new ReentrantLock()
 
         val partitionId = c.partitionId
         logger.info(s"launching threads... number of phases ${runConfig.numPhases}")
@@ -75,19 +78,17 @@ class WorkerServiceHandler(server: Server) extends ChannelHandlerAdapter {
                   def sendProgress(done: Boolean = false): Unit = {
                     val progressUpdateCommand = new ProgressUpdateCommand(partitionId, phaseId, ct, batchEndTimestamp, done)
                     logger.info(s"preparing progress update $progressUpdateCommand)")
-                    ctx.executor.execute(new Runnable() {
-                      override def run(): Unit = {
-                        logger.info(s"sending progress update $progressUpdateCommand)")
-                        ctx.writeAndFlush(progressUpdateCommand).sync()
-                        logger.debug(s"finished sending progress update")
-                      }
-                    })
+                    progressSendLock.lock()
+                    logger.info(s"sending progress update $progressUpdateCommand)")
+                    msg.getChannel.write(progressUpdateCommand) //.sync()
+                    logger.debug(s"finished sending progress update")
+                    progressSendLock.unlock()
                   }
                   eventStorage.readEvents(new FileInputStream(c.filename), e => {
                     if (e.ts >= batchEndTimestamp) {
                       logger.info(s"reached batch end on partition $partitionId phase $phaseId")
                       // Send out StateUpdateCommands
-                      server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp, ctx.executor())
+                      server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                       sendProgress()
                       batchEndTimestamp += runConfig.batchTimeInterval
                       coordinator.setBatchEndTs(batchEndTimestamp)
@@ -100,7 +101,7 @@ class WorkerServiceHandler(server: Server) extends ChannelHandlerAdapter {
                   })
                   // TODO need a better way to extract info than this
                   runtime.update(PrintSpamCounter(batchEndTimestamp - 1))
-                  server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp, ctx.executor())
+                  server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                   logger.info(s"finished phase $phaseId on partition $partitionId")
                   // Send progress for all phases, but only set done flag when the last phase is done
                   sendProgress(phaseId == runtime.numPhases)
@@ -132,11 +133,11 @@ class WorkerServiceHandler(server: Server) extends ChannelHandlerAdapter {
         while (server.startLatch == null) { Thread.`yield`() } // just busy wait, shouldn't last long
         server.startLatch.await()
 
-        server.stateCommunicationService.handleStateUpdateCommand(suc, ctx.executor())
+        server.stateCommunicationService.handleStateUpdateCommand(suc)
       }
 
       case _ : CloseWorkerCommand => {
-        ctx.close()
+        msg.getChannel.close()
         server.finishLatch.countDown()
       }
 
@@ -144,18 +145,20 @@ class WorkerServiceHandler(server: Server) extends ChannelHandlerAdapter {
         server.stateCommunicationService.close()
         server.finishLatch.countDown()
         server.finishLatch.await()
-        ctx.close()
+        msg.getChannel.close()
         server.stateCommunicationService = null
         server.batchProgressCoordinator = null
         server.startLatch = null
       }
     }
     // TODO is this needed?
-    ReferenceCountUtil.release(msg)
+//    ReferenceCountUtil.release(msg)
   }
 
-   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
-     cause.printStackTrace()
-     ctx.close()
-   }
+  // TODO leaving commented out for now so that the whole system will die
+  // if any IO thread throws an exception; easier to debug
+//   override def exceptionCaught(ctx: ChannelHandlerContext, event: ExceptionEvent): Unit = {
+//     event.getCause.printStackTrace()
+//     event.getChannel.close()
+//   }
  }
