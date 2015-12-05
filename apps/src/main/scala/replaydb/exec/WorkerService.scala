@@ -1,4 +1,4 @@
-package replaydb.service.exec
+package replaydb.exec
 
 import org.slf4j.LoggerFactory
 import replaydb.service.Server
