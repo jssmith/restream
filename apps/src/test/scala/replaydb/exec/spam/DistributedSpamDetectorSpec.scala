@@ -34,15 +34,15 @@ class DistributedSpamDetectorSpec extends FlatSpec {
     }
   }
 
-  "A distributed spam detector" should "run with a single split" in {
-    runTest(1, true)
-  }
+//  "A distributed spam detector" should "run with a single split" in {
+//    runTest(1, true)
+//  }
 
-  it should "run with a two-way split" in {
+//  it should "run with a two-way split" in {
 //    runTest(2, true)
-  }
+//  }
 
   it should "run with a four-way split" in {
-//    runTest(4, true)
+    runTest(4, true)
   }
 }
