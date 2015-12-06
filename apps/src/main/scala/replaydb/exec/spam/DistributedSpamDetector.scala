@@ -1,9 +1,9 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.{ReplayMap, ReplayCounter, ReplayTimestampLocalMap, ReplayStateFactory}
+import replaydb.runtimedev.{ReplayCounter, ReplayMap, ReplayStateFactory, ReplayTimestampLocalMap}
 import replaydb.service.ClientGroup
-import replaydb.service.driver.{RunConfiguration, Hosts, InitReplayCommand}
-import replaydb.util.EventRateEstimator
+import replaydb.service.driver.{Hosts, InitReplayCommand, RunConfiguration}
+import replaydb.util.{EventRateEstimator, LoggerConfiguration}
 
 import scala.reflect.ClassTag
 
@@ -17,6 +17,8 @@ object DistributedSpamDetector extends App {
       """.stripMargin)
     System.exit(1)
   }
+
+  LoggerConfiguration.configureDriver()
 
   val partitionFnBase = args(0)
   val numPartitions = args(1).toInt

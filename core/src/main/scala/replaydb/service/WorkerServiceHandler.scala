@@ -1,10 +1,12 @@
 package replaydb.service
 
 import java.io.FileInputStream
+import java.lang.management.ManagementFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.locks.ReentrantLock
 
 import org.jboss.netty.channel._
+import replaydb.util.PerfLogger
 
 import scala.language.reflectiveCalls // TODO remove this after the relevant TODO below is dealt with
 
@@ -71,6 +73,11 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                 // TODO
                 //  - separate reader thread
                 try {
+                  val threadId = Thread.currentThread().getId
+                  val threadMxBean = ManagementFactory.getThreadMXBean()
+                  val threadCpuTime = threadMxBean.getCurrentThreadCpuTime()
+                  PerfLogger.log(s"thread $threadId started with cpu time $threadCpuTime")
+
                   server.startLatch.countDown()
 
                   logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
@@ -115,6 +122,14 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                   sendProgress(phaseId == runtime.numPhases)
                 } catch {
                   case e: Throwable => logger.error("server execution error", e)
+                } finally {
+                  // Print out performance statistics
+                  val threadId = Thread.currentThread().getId
+                  val threadMxBean = ManagementFactory.getThreadMXBean()
+//                  val threadInfo = threadMxBean.getThreadInfo(threadId)
+//                  threadMxBean.getThreadCpuTime(threadId)
+                  val threadCpuTime = threadMxBean.getCurrentThreadCpuTime()
+                  PerfLogger.log(s"thread $threadId finished with cpu time $threadCpuTime")
                 }
               }
             }

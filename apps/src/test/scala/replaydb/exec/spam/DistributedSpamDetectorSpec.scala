@@ -1,5 +1,7 @@
 package replaydb.exec.spam
 
+import java.lang.management.{ManagementFactory, ThreadMXBean}
+
 import org.scalatest.FlatSpec
 import replaydb.util.MemoryStats
 import replaydb.service.Server
@@ -43,6 +45,13 @@ class DistributedSpamDetectorSpec extends FlatSpec {
     println(MemoryStats.getMemoryStats())
     runTest(2, true)
     println(MemoryStats.getMemoryStats())
+    // dump all of the threads
+//    val threadId = Thread.currentThread().getId
+//    val threadMxBean = ManagementFactory.getThreadMXBean()
+    //                  val threadInfo = threadMxBean.getThreadInfo(threadId)
+    //                  threadMxBean.getThreadCpuTime(threadId)
+
+    //    val tmx = ThreadMXBean
   }
 
 //  it should "run with a four-way split" in {
