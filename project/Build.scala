@@ -40,7 +40,8 @@ object ReplayDBBuild extends Build {
         "com.twitter" %% "chill" % "0.7.2",
         "io.netty" % "netty" % "3.10.5.Final",
         "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
-        "org.slf4j" % "slf4j-simple" % "1.7.13",
+        "org.slf4j" % "slf4j-log4j12" % "1.7.13",
+        "log4j" % "log4j" % "1.2.17",
         "org.apache.commons" % "commons-math3" % "3.5",
         "com.google.guava" % "guava" % "18.0",
         "org.scalatest" %% "scalatest" % "2.2.5"
