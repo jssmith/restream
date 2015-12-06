@@ -55,9 +55,7 @@ object ReplayDBBuild extends Build {
       libraryDependencies ++= Seq(
       // TODO why do I need to include this again? Why isn't it picked up from core?
         "io.netty" % "netty" % "3.10.5.Final"
-      ),
-      fork in Test := true,
-      javaOptions in test += "-Xmx3G"
+      )
     )
   ) dependsOn (core)
 
