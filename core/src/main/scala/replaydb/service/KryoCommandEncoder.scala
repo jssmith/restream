@@ -13,6 +13,7 @@ class KryoCommandEncoder(networkStats: NetworkStats) extends OneToOneEncoder wit
   val logger = Logger(LoggerFactory.getLogger(classOf[KryoCommandEncoder]))
   val output = new Output(KryoCommands.MAX_KRYO_MESSAGE_SIZE + 4)
   override def encode(ctx: ChannelHandlerContext, channel: Channel, msg: AnyRef): AnyRef = {
+    val startNanoTime = System.nanoTime()
     output.clear()
     // TODO is there any way to do this without having to copy the buffer, instead writing directly?
     kryo.writeClassAndObject(output, msg)
@@ -21,7 +22,7 @@ class KryoCommandEncoder(networkStats: NetworkStats) extends OneToOneEncoder wit
     buf.writeInt(len)
     logger.debug(s"kryo encoding class of type ${msg.getClass} of size $len")
     buf.writeBytes(output.getBuffer, 0, len)
-    networkStats.recordSent(len + 4)
+    networkStats.recordSent(len + 4, System.nanoTime() - startNanoTime)
     buf
   }
 }
