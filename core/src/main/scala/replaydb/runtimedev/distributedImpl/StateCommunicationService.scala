@@ -13,15 +13,13 @@ import scala.collection.mutable.ArrayBuffer
 // TODO ETK - I *think* this is cleaning up all unnecessary state (i.e. GC'ing itself)
 //            but want to think more about it and make sure that's true
 
-// TODO ETK - the other big thing to do here is break up the massive StateUpdateCommand and
-//            StateReadRequests into smaller chunks (which I said I was going to do but haven't
-//            gotten to yet). My idea is to have each of them contain the total number of commands
-//            that we expect to be sent, and then store the count of received messages alongside
-//            outstandingInboundReads. I don't think this is urgent, though
-
-class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguration) {
+class StateCommunicationService(partitionId: Int, runConfiguration: RunConfiguration) {
+  
+  val MaxMessagesPerCommand = 50000
+  
   val logger = Logger(LoggerFactory.getLogger(classOf[StateCommunicationService]))
-  val workerCount = runConfiguration.hosts.length
+  val numPhases = runConfiguration.numPhases
+  val numPartitions = runConfiguration.numPartitions
   val client = new ClientGroupBase(runConfiguration) {
     override def getHandler(): SimpleChannelUpstreamHandler = new SimpleChannelUpstreamHandler {
       override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
@@ -33,7 +31,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
       }
     }
   }
-  client.connect(runConfiguration.hosts.zipWithIndex.filter(_._2 != workerId).map(_._1))
+  client.connect(runConfiguration.hosts.zipWithIndex.filter(_._2 != partitionId).map(_._1))
 
   def close(): Unit = {
     client.closeWhenDone(true)
@@ -41,30 +39,28 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
 
   def issueCommandToWorker(wId: Int, cmd: Command): Unit = {
     // subtract 1 since the local partition isn't in the array
-    client.issueCommand(if (wId > workerId) wId - 1 else wId, cmd)
+    client.issueCommand(if (wId > partitionId) wId - 1 else wId, cmd)
   }
 
   // State is owned by worker #: partitionFn(key) % workerCount
   val states: mutable.Map[Int, ReplayMapImpl[Any, Any]] = mutable.HashMap()
 
   // stores read requests that have been received but can't yet be processed because not all writes have arrived
-  val outstandingInboundReads: Array[mutable.Map[Long, ArrayBuffer[StateUpdateCommand]]] = Array.ofDim(runConfiguration.numPhases)
+  val outstandingInboundReads: Array[Array[mutable.Map[Long, ArrayBuffer[StateUpdateCommand]]]] = Array.ofDim(numPhases, numPartitions)
   // stores writes that are going out to their respective partitions
-  val queuedWrites: Array[Array[mutable.Map[Long, ArrayBuffer[StateWrite[_]]]]] = Array.ofDim(runConfiguration.numPhases, workerCount)
+  val queuedWrites: Array[Array[mutable.Map[Long, ArrayBuffer[StateWrite[_]]]]] = Array.ofDim(numPhases, numPartitions)
   // stores read prepares that are going out to their respective paritions
-  val queuedReadPrepares: Array[Array[mutable.Map[Long, ArrayBuffer[StateRead]]]] = Array.ofDim(runConfiguration.numPhases, workerCount)
-  for (i <- 0 until runConfiguration.numPhases) {
-    outstandingInboundReads(i) = mutable.Map()
-    for (j <- 0 until workerCount) {
-      queuedWrites(i)(j) = mutable.Map()
-      queuedReadPrepares(i)(j) = mutable.Map()
-    }
+  val queuedReadPrepares: Array[Array[mutable.Map[Long, ArrayBuffer[StateRead]]]] = Array.ofDim(numPhases, numPartitions)
+  for (i <- 0 until numPhases; j <- 0 until numPartitions) {
+    outstandingInboundReads(i)(j) = mutable.Map()
+    queuedWrites(i)(j) = mutable.Map()
+    queuedReadPrepares(i)(j) = mutable.Map()
   }
 
   // Send a request to the machine which owns this key
   def localPrepareState[K, V](collectionId: Int, phaseId: Int, batchEndTs: Long,
                               ts: Long, key: K, partitionFn: K => Int): Unit = {
-    val srcWorker = (partitionFn(key) & 0x7FFFFFFF) % workerCount
+    val srcWorker = (partitionFn(key) & 0x7FFFFFFF) % numPartitions
     queuedReadPrepares(phaseId)(srcWorker).getOrElseUpdate(batchEndTs, ArrayBuffer()) +=
       StateRead(collectionId, ts, key)
   }
@@ -72,7 +68,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   // send this write to its appropriate partition to be stored
   def submitWrite[K, V](collectionId: Int, phaseId: Int, batchEndTs: Long,
                         ts: Long, key: K, merge: V => V, partitionFn: K => Int): Unit = {
-    val destWorker = (partitionFn(key) & 0x7FFFFFFF) % workerCount
+    val destWorker = (partitionFn(key) & 0x7FFFFFFF) % numPartitions
     queuedWrites(phaseId)(destWorker).getOrElseUpdate(batchEndTs, ArrayBuffer()) +=
       StateWrite(collectionId, ts, key, merge)
   }
@@ -85,12 +81,13 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   }
 
   def handleStateUpdateCommand(cmd: StateUpdateCommand): Unit = {
-    logger.info(s"Phase $workerId-${cmd.phaseId} received writes from ${cmd.originatingPartitionId} for batch ${cmd.batchEndTs}")
+    logger.info(s"Phase $partitionId-${cmd.phaseId} received writes from ${cmd.originatingPartitionId} for batch ${cmd.batchEndTs}")
     val readRequestsToProcess = outstandingInboundReads.synchronized {
-      val buf = outstandingInboundReads(cmd.phaseId).getOrElseUpdate(cmd.batchEndTs, ArrayBuffer())
+      val buf = outstandingInboundReads(cmd.phaseId)(cmd.originatingPartitionId).getOrElseUpdate(cmd.batchEndTs, ArrayBuffer())
       buf += cmd
-      if (buf.size == runConfiguration.numPartitions) {
-        outstandingInboundReads(cmd.phaseId).remove(cmd.batchEndTs)
+      if (buf.size == cmd.cmdsInBatch
+        && outstandingInboundReads(cmd.phaseId).map(_.getOrElseUpdate(cmd.batchEndTs, ArrayBuffer())).forall(b => b.nonEmpty && b.size == b(0).cmdsInBatch)) {
+        Some(outstandingInboundReads(cmd.phaseId).map(_.remove(cmd.batchEndTs).get).reduce(_ ++ _))
       } else {
         None
       }
@@ -100,12 +97,12 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
       states(w.collectionId).insertRemoteWrite(w.ts, w.key, w.asInstanceOf[StateWrite[Any]].merge)
     }
     if (readRequestsToProcess.isDefined) {
-      logger.info(s"Phase $workerId-${cmd.phaseId} processing read requests for ${readRequestsToProcess.get.size} partitions")
+      logger.info(s"Phase $partitionId-${cmd.phaseId} processing read requests for ${readRequestsToProcess.get.size} partitions")
       processStateReadRequests(readRequestsToProcess.get)
       // at this point, no more reads will be coming for this specific phase/batch...
       // Can GC after the second to last phase since the last phase doesn't read or write anything
       // (last phase's reads are carried out by the second to last phase)
-      if (cmd.phaseId == runConfiguration.numPhases - 2) {
+      if (cmd.phaseId == numPhases - 2) {
         for ((id, s) <- states) {
           s.gcOlderThan(cmd.batchEndTs)
         }
@@ -120,32 +117,47 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
         val value = states(rp.collectionId).requestRemoteRead(rp.ts, rp.key)
         responses += StateResponse(rp.collectionId, rp.ts, rp.key, value)
       }
-      val respCmd = StateRequestResponse(cmd.phaseId, cmd.batchEndTs, responses.toArray)
-      if (cmd.originatingPartitionId == workerId) {
-        handleStateRequestResponse(respCmd)
-      } else {
-        issueCommandToWorker(cmd.originatingPartitionId, respCmd)
-      }
+      var rIdx = 0
+      val respsInBatch = Math.ceil(responses.length.toDouble / MaxMessagesPerCommand).toInt
+      do {
+        val respCmd = StateRequestResponse(cmd.phaseId, cmd.batchEndTs,
+          responses.slice(rIdx, rIdx + MaxMessagesPerCommand).toArray)
+        if (cmd.originatingPartitionId == partitionId) {
+          handleStateRequestResponse(respCmd)
+        } else {
+          issueCommandToWorker(cmd.originatingPartitionId, respCmd)
+        }
+        rIdx += MaxMessagesPerCommand
+      } while (rIdx < responses.length)
     }
   }
 
   // Closes out a batch: sends out all of the outstanding writes and getPrepares
   def finalizeBatch(phaseId: Int, batchEndTs: Long): Unit = {
-    logger.info(s"Phase $workerId-$phaseId finalizing batch $batchEndTs")
-    if (phaseId == runConfiguration.numPhases - 1) {
+    logger.info(s"Phase $partitionId-$phaseId finalizing batch $batchEndTs")
+    if (phaseId == numPhases - 1) {
       return // nothing to be done - final phase can't have any readPrepares or writes
     }
-    for (i <- 0 until workerCount) {
+    for (i <- 0 until numPartitions) {
       val writes = queuedWrites(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
       val readPrepares = queuedReadPrepares(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
-      val cmd = StateUpdateCommand(workerId, phaseId, batchEndTs, writes.toArray, readPrepares.toArray)
-      if (i != workerId) {
-        logger.info(s"Phase $workerId-$phaseId sending updates to partition $i for batch $batchEndTs " +
-          s"(${cmd.writes.length} writes and ${cmd.readPrepares.length} readPrepares)")
-        issueCommandToWorker(i, cmd)
-      } else {
-        handleStateUpdateCommand(cmd)
-      }
+      var (wIdx, rIdx, cmdIdx) = (0, 0, 0)
+      val cmdsInBatch = Math.ceil(Math.max(writes.length.toDouble / MaxMessagesPerCommand, readPrepares.length.toDouble / MaxMessagesPerCommand)).toInt
+      do {
+        val cmd = StateUpdateCommand(partitionId, phaseId, batchEndTs, cmdsInBatch,
+          writes.slice(wIdx, wIdx + MaxMessagesPerCommand).toArray,
+          readPrepares.slice(rIdx, rIdx + MaxMessagesPerCommand).toArray)
+        wIdx += MaxMessagesPerCommand
+        rIdx += MaxMessagesPerCommand
+        if (i != partitionId) {
+          logger.info(s"Phase $partitionId-$phaseId sending #$cmdIdx of $cmdsInBatch updates to partition $i for batch $batchEndTs " +
+            s"(${cmd.writes.length} writes and ${cmd.readPrepares.length} readPrepares)")
+          issueCommandToWorker(i, cmd)
+        } else {
+          handleStateUpdateCommand(cmd)
+        }
+        cmdIdx += 1
+      } while (wIdx < writes.size || rIdx < readPrepares.size)
       queuedWrites(phaseId)(i).remove(batchEndTs)
       queuedReadPrepares(phaseId)(i).remove(batchEndTs)
     }
