@@ -127,7 +127,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                   val threadMxBean = ManagementFactory.getThreadMXBean
                   val threadCpuTime = threadMxBean.getCurrentThreadCpuTime
                   val elapsedThreadCpuTime = threadCpuTime - startThreadCpuTime
-                  PerfLogger.log(s"thread $threadId finished with elapsed cpu time ${elapsedThreadCpuTime/1000000} ms")
+                  PerfLogger.log(s"thread $threadId (phase $phaseId) finished with elapsed cpu time ${elapsedThreadCpuTime/1000000} ms")
                 }
               }
             }
