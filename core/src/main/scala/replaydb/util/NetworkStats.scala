@@ -4,24 +4,33 @@ import java.util.concurrent.atomic.AtomicLong
 
 class NetworkStats {
 
-  val sent = new AtomicLong
-  val received = new AtomicLong
+  val sentBytes = new AtomicLong()
+  val receivedBytes = new AtomicLong()
+  val sentObjects = new AtomicLong()
+  val receivedObjects = new AtomicLong()
+  val sentKryoTime = new AtomicLong()
+  val receivedKryoTime = new AtomicLong()
 
   def reset(): Unit = {
-    sent.set(0)
-    received.set(0)
+    sentBytes.set(0)
+    receivedBytes.set(0)
   }
 
-  def recordSent(bytes: Long): Unit = {
-    sent.addAndGet(bytes)
+  def recordSent(bytes: Long, kryoTimeNanos: Long): Unit = {
+    sentBytes.addAndGet(bytes)
+    sentObjects.incrementAndGet()
+    sentKryoTime.addAndGet(kryoTimeNanos)
   }
 
-  def recordReceived(bytes: Long): Unit = {
-    received.addAndGet(bytes)
+  def recordReceived(bytes: Long, kryoTimeNanos: Long): Unit = {
+    receivedBytes.addAndGet(bytes)
+    receivedObjects.incrementAndGet()
+    receivedKryoTime.addAndGet(kryoTimeNanos)
   }
 
   override def toString(): String = {
-    s"{sent=$sent,received=$received}"
+    s"{sent_bytes=$sentBytes,sent_objects=$sentObjects,sent_kryo_ms=${sentKryoTime.get()/1000000}" +
+      s"recv_bytes=$receivedBytes,recv_objects=$receivedObjects,recv_kryo_ms=${receivedKryoTime.get()/1000000}"
   }
 
 }

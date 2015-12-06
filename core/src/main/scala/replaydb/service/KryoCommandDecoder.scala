@@ -15,6 +15,7 @@ class KryoCommandDecoder(networkStats: NetworkStats) extends FrameDecoder with K
    val input = new Input(buf)
 
    override def decode(ctx: ChannelHandlerContext, channel: Channel, buffer: ChannelBuffer): AnyRef = {
+     val startNanoTime = System.nanoTime()
      if (buffer.readableBytes() < 4) {
        return null
      }
@@ -33,8 +34,8 @@ class KryoCommandDecoder(networkStats: NetworkStats) extends FrameDecoder with K
      buffer.readBytes(buf, 0, dataLen)
      input.setLimit(dataLen)
      val obj = kryo.readClassAndObject(input)
+     networkStats.recordReceived(dataLen + 4, System.nanoTime() - startNanoTime)
      logger.debug(s"kryo decoded class of type ${obj.getClass} of size $dataLen")
-     networkStats.recordReceived(dataLen + 4)
      obj
    }
  }
