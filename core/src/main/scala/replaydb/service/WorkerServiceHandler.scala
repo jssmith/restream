@@ -114,8 +114,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                   // Send progress for all phases, but only set done flag when the last phase is done
                   sendProgress(phaseId == runtime.numPhases)
                 } catch {
-                  case e: Exception => e.printStackTrace()
-                  case e: Throwable => e.printStackTrace()
+                  case e: Throwable => logger.error("server execution error", e)
                 }
               }
             }

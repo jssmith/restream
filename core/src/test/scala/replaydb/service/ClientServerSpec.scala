@@ -8,6 +8,7 @@ import org.scalatest.FlatSpec
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.Hosts.HostConfiguration
 import replaydb.service.driver._
+import replaydb.util.MemoryStats
 
 class ClientServerSpec extends FlatSpec {
   val logger = Logger(LoggerFactory.getLogger(classOf[ClientServerSpec]))
@@ -242,10 +243,10 @@ class ClientServerSpec extends FlatSpec {
   }
 
 
-  "A client and many servers should" should "ping back and forth" in {
+  "A client and many servers" should "ping back and forth" in {
     logger.debug("starting many server ping test")
     val localhost = "127.0.0.1"
-    val numServers = 50
+    val numServers = 25
     val numMessages = 10000
     val ports = (0 until numServers).map(_ + 15567).toArray
     val hosts = ports.map(new HostConfiguration(localhost, _)).toArray

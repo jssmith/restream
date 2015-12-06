@@ -50,8 +50,12 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
     // Netty complains if `connect`/`sync` is called in an I/O thread, so spin up another to run it
     val t = new Thread() {
       override def run(): Unit = {
-        for (hostConfiguration <- hostConfigurations) {
-          cf += b.connect(new InetSocketAddress(hostConfiguration.host, hostConfiguration.port)).sync()
+        try {
+          for (hostConfiguration <- hostConfigurations) {
+            cf += b.connect(new InetSocketAddress(hostConfiguration.host, hostConfiguration.port)).sync()
+          }
+        } catch {
+          case e: Throwable => logger.error("connection error", e)
         }
       }
     }
@@ -69,16 +73,16 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
         }
         logger.info("finished broadcast")
       } catch {
-        case e: Throwable => e.printStackTrace()
+        case e: Throwable => logger.error("broadcast error", e)
       }
     }
   }
 
   def issueCommand(i: Int, c: Command): Unit = {
     this.synchronized {
-      logger.info(s"issuing command on partition $i: ${c.toString}")
+      logger.debug(s"issuing command on partition $i: ${c.toString}")
       cf(i).getChannel.write(c) //.sync()
-      logger.info(s"finished issuing command on partition $i: ${c.toString}")
+      logger.debug(s"finished issuing command on partition $i: ${c.toString}")
     }
   }
 

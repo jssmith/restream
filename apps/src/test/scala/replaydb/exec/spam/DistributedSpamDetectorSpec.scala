@@ -1,6 +1,7 @@
 package replaydb.exec.spam
 
 import org.scalatest.FlatSpec
+import replaydb.util.MemoryStats
 import replaydb.service.Server
 
 /**
@@ -26,7 +27,7 @@ class DistributedSpamDetectorSpec extends FlatSpec {
     try {
       DistributedSpamDetector.main(Array[String](
         s"${System.getProperty("user.home")}/tmp/events-${if (short) "short-" else ""}split-$numServers/events.out",
-        s"$numServers", "50000", s"apps/src/test/resources/hosts-$numServers.txt")
+        s"$numServers", "50000", s"src/test/resources/hosts-$numServers.txt")
       )
     } finally {
       // TODO shutdown doesn't seem to work properly
@@ -38,11 +39,13 @@ class DistributedSpamDetectorSpec extends FlatSpec {
 //    runTest(1, true)
 //  }
 
-//  it should "run with a two-way split" in {
-//    runTest(2, true)
-//  }
-
-  it should "run with a four-way split" in {
-    runTest(4, true)
+  it should "run with a two-way split" in {
+    println(MemoryStats.getMemoryStats())
+    runTest(2, true)
+    println(MemoryStats.getMemoryStats())
   }
+
+//  it should "run with a four-way split" in {
+//    runTest(4, true)
+//  }
 }

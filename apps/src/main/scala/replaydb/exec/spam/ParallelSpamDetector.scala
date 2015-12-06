@@ -1,8 +1,8 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.{PrintSpamCounter, ReplayState, MemoryStats}
+import replaydb.runtimedev.PrintSpamCounter
 import replaydb.runtimedev.threadedImpl.{ReplayStateFactory, MultiReaderEventSource, RunProgressCoordinator}
-import replaydb.util.ProgressMeter
+import replaydb.util.{ProgressMeter, MemoryStats}
 import replaydb.util
 
 object ParallelSpamDetector extends App {
@@ -39,7 +39,7 @@ object ParallelSpamDetector extends App {
         implicit val b = barrier.getCoordinatorInterface(partitionId, phaseId)
         override def run(): Unit = {
           var lastTimestamp = 0L
-          val pm = new ProgressMeter(printInterval = 1000000, () => s"${MemoryStats.getStats()}", name = Some(s"$partitionId-$phaseId"))
+          val pm = new ProgressMeter(printInterval = 1000000, () => s"${MemoryStats.getMemoryStats()}", name = Some(s"$partitionId-$phaseId"))
           var ct = 0L
           var nextCheckpointTs = 0L
           var nextCheckpointCt = 0L

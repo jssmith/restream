@@ -15,6 +15,9 @@ object BuildSettings {
       "-language:experimental.macros",
       "-deprecation"
     ),
+    fork in Test := true,
+    testForkedParallel := false,
+    javaOptions in Test ++= Seq("-Xmx6G", "-Xms6G"),
     assemblyMergeStrategy in assembly := {
       case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
       case _ => MergeStrategy.first
