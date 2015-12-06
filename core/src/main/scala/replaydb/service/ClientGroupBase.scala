@@ -1,6 +1,7 @@
 package replaydb.service
 
 import java.net.InetSocketAddress
+import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.{Executors, CountDownLatch}
 
 import com.typesafe.scalalogging.Logger
@@ -20,15 +21,11 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
   val logger = Logger(LoggerFactory.getLogger(classOf[ClientGroupBase]))
   val networkStats = new NetworkStats()
   val cf = new ArrayBuffer[ChannelFuture]()
+  val channelLocks = new ArrayBuffer[ReentrantLock]()
   val progressTracker = new ProgressTracker(runConfiguration)
   var workLatch: CountDownLatch = _
 
   def getHandler(): ChannelUpstreamHandler
-
-  // TODO Synchronization is necessary to make sure two threads don't write
-  // to the same channel at the same time, but right now only one thing can be writing
-  // to *any* channel at a time - the synchronization should be moved to a per-channel
-  // basis rather than a per group basis
 
   val executor = Executors.newCachedThreadPool()
   val b = new ClientBootstrap(new NioClientSocketChannelFactory(executor, executor))
@@ -55,6 +52,7 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
         try {
           for (hostConfiguration <- hostConfigurations) {
             cf += b.connect(new InetSocketAddress(hostConfiguration.host, hostConfiguration.port)).sync()
+            channelLocks += new ReentrantLock()
           }
         } catch {
           case e: Throwable => logger.error("connection error", e)
@@ -67,25 +65,25 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
 
   def broadcastCommand(c: Command): Unit = {
     logger.info("Attempting to broadcast")
-    this.synchronized {
-      try {
-        logger.info(s"started broadcast of $c")
-        cf.foreach {
-          _.getChannel.write(c) //.sync()
-        }
-        logger.info("finished broadcast")
-      } catch {
-        case e: Throwable => logger.error("broadcast error", e)
+    try {
+      logger.info(s"started broadcast of $c")
+      for (i <- cf.indices) {
+        channelLocks(i).lock()
+        cf(i).getChannel.write(c) //.sync()
+        channelLocks(i).unlock()
       }
+      logger.info("finished broadcast")
+    } catch {
+      case e: Throwable => logger.error("broadcast error", e)
     }
   }
 
   def issueCommand(i: Int, c: Command): Unit = {
-    this.synchronized {
-      logger.debug(s"issuing command on partition $i: ${c.toString}")
-      cf(i).getChannel.write(c) //.sync()
-      logger.debug(s"finished issuing command on partition $i: ${c.toString}")
-    }
+    channelLocks(i).lock()
+    logger.debug(s"issuing command on partition $i: ${c.toString}")
+    cf(i).getChannel.write(c) //.sync()
+    logger.debug(s"finished issuing command on partition $i: ${c.toString}")
+    channelLocks(i).unlock()
   }
 
   def closeWhenDone(isWorker: Boolean = false): Unit = {
@@ -100,13 +98,11 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
       // Netty complains if we `sync` within an IO thread
       val t = new Thread() {
         override def run(): Unit = {
-          this.synchronized {
-            cf.foreach {
-              _.getChannel.write(closeCmd)
-            }
-            cf.foreach {
-              _.getChannel.getCloseFuture.sync()
-            }
+          for (i <- cf.indices) {
+            channelLocks(i).lock()
+            cf(i).getChannel.write(closeCmd)
+            cf(i).getChannel.getCloseFuture.sync()
+            channelLocks(i).unlock()
           }
         }
       }
