@@ -98,9 +98,9 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
       // Netty complains if we `sync` within an IO thread
       val t = new Thread() {
         override def run(): Unit = {
+          cf.indices.foreach(issueCommand(_, closeCmd))
           for (i <- cf.indices) {
             channelLocks(i).lock()
-            cf(i).getChannel.write(closeCmd)
             cf(i).getChannel.getCloseFuture.sync()
             channelLocks(i).unlock()
           }
