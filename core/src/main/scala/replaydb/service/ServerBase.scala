@@ -11,12 +11,13 @@ import org.jboss.netty.handler.logging.LoggingHandler
 import org.jboss.netty.logging.{Slf4JLoggerFactory, InternalLoggerFactory, InternalLogLevel}
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.Command
-import replaydb.util.{PerfLogger, NetworkStats}
+import replaydb.util.{GarbageCollectorStats, PerfLogger, NetworkStats}
 
 abstract class ServerBase(port: Int) {
   InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory)
   val logger = Logger(LoggerFactory.getLogger(classOf[ServerBase]))
-  var networkStats = new NetworkStats()
+  val networkStats = new NetworkStats()
+  val garbageCollectorStats = new GarbageCollectorStats()
   var f: Channel = _
   var closeRunnable: Runnable = _
 

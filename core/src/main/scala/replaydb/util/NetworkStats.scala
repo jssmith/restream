@@ -30,7 +30,7 @@ class NetworkStats {
 
   override def toString(): String = {
     s"{sent_bytes=$sentBytes,sent_objects=$sentObjects,sent_kryo_ms=${sentKryoTime.get()/1000000}" +
-      s"recv_bytes=$receivedBytes,recv_objects=$receivedObjects,recv_kryo_ms=${receivedKryoTime.get()/1000000}"
+      s",recv_bytes=$receivedBytes,recv_objects=$receivedObjects,recv_kryo_ms=${receivedKryoTime.get()/1000000}"
   }
 
 }

@@ -1,12 +1,12 @@
 package replaydb.service
 
 import java.io.FileInputStream
-import java.lang.management.ManagementFactory
+import java.lang.management.{GarbageCollectorMXBean, ManagementFactory}
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.locks.ReentrantLock
 
 import org.jboss.netty.channel._
-import replaydb.util.{NetworkStats, PerfLogger}
+import replaydb.util.PerfLogger
 
 import scala.language.reflectiveCalls // TODO remove this after the relevant TODO below is dealt with
 
@@ -16,6 +16,8 @@ import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.{PrintSpamCounter, CoordinatorInterface, HasRuntimeInterface}
 import replaydb.runtimedev.distributedImpl._
 import replaydb.service.driver._
+
+import scala.collection.JavaConversions._
 
 
 class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler {
@@ -30,6 +32,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         }
         server.stateCommunicationService = new StateCommunicationService(c.hostId, c.runConfiguration)
         server.networkStats.reset()
+        server.garbageCollectorStats.reset()
         val stateFactory = new ReplayStateFactory(server.stateCommunicationService)
         val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
         val runConfig = c.runConfiguration
@@ -73,7 +76,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
               override def run(): Unit = {
                 // TODO
                 //  - separate reader thread
-                val startThreadCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime()
+                val startThreadCpuTime = ManagementFactory.getThreadMXBean.getCurrentThreadCpuTime
                 try {
                   server.startLatch.countDown()
                   logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
@@ -160,6 +163,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
 
       case _ : CloseCommand => {
         PerfLogger.log(s"server network stats ${server.networkStats}")
+        PerfLogger.log(s"garbage collector stats ${server.garbageCollectorStats}")
         server.stateCommunicationService.close()
         server.finishLatch.countDown()
         server.finishLatch.await()
