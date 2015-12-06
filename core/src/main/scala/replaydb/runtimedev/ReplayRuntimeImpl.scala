@@ -94,7 +94,7 @@ class ReplayRuntimeImpl(val c: Context) {
 
     var outstandingPrepares: mutable.Map[Type, ArrayBuffer[(TermName, Tree)]] = mutable.Map()
 
-    val phaseCases = (for (i <- bindingsAnalyzed.size to 1 by -1) yield {
+    val phaseCases = (for (i <- bindingsAnalyzed.size-1 to 0 by -1) yield {
       val m = mutable.HashMap[Type, ArrayBuffer[(TermName,Tree)]]()
 
       for (preps <- outstandingPrepares) preps match {
@@ -102,7 +102,7 @@ class ReplayRuntimeImpl(val c: Context) {
       }
       outstandingPrepares = mutable.Map()
 
-      for (b <- bindingsAnalyzed(i - 1)) {
+      for (b <- bindingsAnalyzed(i)) {
         b.tree match {
           case Function(params, body) =>
             if (params.size == 1 && params(0).tpt.tpe <:< typeOf[Event]) {

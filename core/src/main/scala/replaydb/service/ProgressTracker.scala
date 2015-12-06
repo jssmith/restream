@@ -18,14 +18,14 @@ class ProgressTracker(runConfiguration: RunConfiguration) {
   }
   private def summarize(): Map[Int,Long] = {
     //allowedPositions.map(_.min).zipWithIndex.map{ case (ts, phase) => (phase + 1, ts) }.toMap
-    allowedPositions.map(_.min).zipWithIndex.map{ case (ts, phase) => (phase + 1, ts) }.toMap
+    allowedPositions.map(_.min).zipWithIndex.map(_.swap).toMap
   }
   var lastSummary = summarize()
   def update(partitionId: Int, phaseId: Int, latestTimestamp: Long): Option[Map[Int,Long]] = {
-    if (phaseId == numPhases) {
+    if (phaseId == numPhases-1) {
       allowedPositions(0)(partitionId) = latestTimestamp + FirstPhaseBatchAllowance * batchTimeInterval
     } else {
-      allowedPositions(phaseId)(partitionId) = latestTimestamp
+      allowedPositions(phaseId + 1)(partitionId) = latestTimestamp
     }
     val summary = summarize()
     for ((k, v) <- summary) {

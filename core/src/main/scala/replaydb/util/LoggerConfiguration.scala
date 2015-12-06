@@ -15,23 +15,28 @@ object LoggerConfiguration {
   def configureWorker(processName: String): Unit = {
     val logsDir = System.getProperty("replaydb-logdir")
     if (logsDir == null) {
-      throw new RuntimeException("must set system property replaydb-logdir")
+      System.err.println(s"logs for $processName are going to console")
+    } else {
+      val f = new File(logsDir)
+      if (!f.exists() || !f.isDirectory()) {
+        throw new RuntimeException(s"repladb-logdir must be a directory but is ${f.getPath}")
+      }
+      System.err.println(s"logs for $processName are going to directory $f")
     }
-    val f = new File(logsDir)
-    if (!f.exists() || !f.isDirectory()) {
-      throw new RuntimeException(s"repladb-logdir must be a directory but is ${f.getPath}")
-    }
-    System.err.println(s"logs for $processName are going to directory $f")
 
     Logger.getRootLogger.setLevel(Level.DEBUG)
     Logger.getLogger("org.jboss.netty").setLevel(Level.INFO)
 
     def getAppender(suffix: String) = {
-      new FileAppender(
-        new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN),
-        s"$logsDir/$processName.$suffix",
-        false
-      )
+      if (logsDir == null) {
+        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), ConsoleAppender.SYSTEM_OUT)
+      } else {
+        new FileAppender(
+          new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN),
+          s"$logsDir/$processName.$suffix",
+          false
+        )
+      }
     }
 
     val mainAppender = getAppender("log")

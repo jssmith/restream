@@ -7,19 +7,11 @@ import scala.collection.mutable
 // Assuming we know the startTime in advance
 class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: Int, startTime: Long) {
 
-  val checkpoints = Array.ofDim[Int](numPhases + 2, numPartitions)
+  val checkpoints = Array.ofDim[Int](numPhases, numPartitions)
   val replayStates = mutable.Set[ReplayState with Threaded]()
 
   val MaxInFlightBatches = 50
-  val readUntil = Array.ofDim[Long](numPhases + 1, MaxInFlightBatches, numPartitions)
-
-  for (i <- 0 until numPartitions) {
-    checkpoints(0)(i) = Int.MaxValue
-    checkpoints(numPhases + 1)(i) = Int.MaxValue
-    for (j <- 0 until MaxInFlightBatches) {
-      readUntil(0)(j)(i) = Long.MaxValue
-    }
-  }
+  val readUntil = Array.ofDim[Long](numPhases, MaxInFlightBatches, numPartitions)
 
   def registerReplayStates(states: Iterable[ReplayState with Threaded]): Unit = {
     states.foreach(this.registerReplayState)
@@ -63,8 +55,8 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
           checkpoints(phaseId)(partitionId) = checkpointNumber
           checkpoints.notifyAll()
 
-          while (checkpointNumber - (MaxInFlightBatches-1) > checkpoints(phaseId + 1).min
-            || (checkpointNumber >= checkpoints(phaseId - 1).min)) {
+          while ((phaseId != numPhases-1 && checkpointNumber - (MaxInFlightBatches-1) > checkpoints(phaseId + 1).min)
+            || (phaseId != 0 && (checkpointNumber >= checkpoints(phaseId - 1).min))) {
 //            println(s"phase $phaseId WAITing because chkpts(${phaseId + 1}).min is ${checkpoints(phaseId + 1).min}" +
 //              s" and chkpts(${phaseId - 1}).min is ${checkpoints(phaseId - 1).min} but this is at chkptNum $checkpointNumber")
             val t = System.currentTimeMillis()
@@ -80,7 +72,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
         // Ready to move forward; state is ready
 
 //        val deltaMap = stateToDeltasMap.synchronized {
-//          if (phaseId != 1) {
+//          if (phaseId != 0) {
 //            for (entry <- stateToDeltasMap) entry match {
 //              case (rs, deltas) =>
 //                for (part <- 0 until numPartitions) {
@@ -91,7 +83,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
 //          stateToDeltasMap.mapValues(_(partitionId)(phaseId)(batchId).asInstanceOf[ReplayState])
 ////          stateToDeltasMap.map(entry => (entry._1.asInstanceOf[ReplayState], entry._2(partitionId)(phaseId)(batchId)))
 //        }
-        val nextCheckpointTs = readUntil.synchronized {
+        val nextCheckpointTs = if (phaseId == 0) Long.MaxValue else readUntil.synchronized {
           readUntil(phaseId - 1)(currentBatchId).min
         } - 1
         (nextCheckpointTs, ct + batchSizeGoal)
@@ -124,7 +116,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
       // For now doing GC based off of the farthest back thread in the farthest back phase
       def getOldestTSProgressMark: Long = {
         readUntil.synchronized {
-          readUntil(numPhases).map(_.min).min
+          readUntil(numPhases - 1).map(_.min).min
         }
       }
     }
@@ -135,7 +127,7 @@ object RunProgressCoordinator {
   // TODO probably a cleaner way to achieve this? it's only present since Coordinator is necessary
   // as an (implicit) parameter to update
   def getDriverCoordinator: CoordinatorInterface = {
-    new CoordinatorInterface(0, 1) {
+    new CoordinatorInterface(0, 0) {
       override def gcAllReplayState(): Unit = {
         throw new UnsupportedOperationException
       }

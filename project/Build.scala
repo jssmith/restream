@@ -17,7 +17,7 @@ object BuildSettings {
     ),
     fork in Test := true,
     testForkedParallel := false,
-    javaOptions in Test ++= Seq("-Xmx6G", "-Xms6G"),
+    javaOptions in Test ++= Seq("-Xmx4G", "-Xms4G"),
     assemblyMergeStrategy in assembly := {
       case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
       case _ => MergeStrategy.first

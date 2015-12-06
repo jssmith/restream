@@ -10,7 +10,7 @@ import replaydb.runtimedev.{DistributedRuntimeInterface, ReplayState}
 class ExplicitSpamDetectorRuntime extends DistributedRuntimeInterface {
   override def numPhases: Int = 4
 
-  override def update(partitionId: Int, phase: Int, e: Event, deltaMap: Map[ReplayState, ReplayState]): Unit = {
+  override def update(partitionId: Int, phase: Int, e: Event): Unit = {
     phase match {
       case 0 =>
       case 1 =>

@@ -34,7 +34,7 @@ object ParallelSpamDetector extends App {
     new MultiReaderEventSource(s"$partitionFnBase-$partitionId", numPhases, bufferSize = 100000)
   }).toArray
   val threads =
-    for (partitionId <- 0 until numPartitions; phaseId <- 1 to si.numPhases) yield {
+    for (partitionId <- 0 until numPartitions; phaseId <- 0 until si.numPhases) yield {
       new Thread(new Runnable {
         implicit val b = barrier.getCoordinatorInterface(partitionId, phaseId)
         override def run(): Unit = {
@@ -51,12 +51,12 @@ object ParallelSpamDetector extends App {
             }
             si.update(e)
             ct += 1
-            if (ct % batchSize == 0 && phaseId == numPhases) {
+            if (ct % batchSize == 0 && phaseId == numPhases-1) {
               overallProgressMeter.synchronized { overallProgressMeter.add(batchSize) }
             }
             lastTimestamp = e.ts
             pm.increment()
-            if (partitionId == numPartitions - 1 && phaseId == numPhases) {
+            if (partitionId == numPartitions - 1 && phaseId == numPhases-1) {
               if (ct % gcInterval == 0) {
                 b.gcAllReplayState()
               }
@@ -65,7 +65,7 @@ object ParallelSpamDetector extends App {
               }
             }
           })
-          if (phaseId == numPhases) {
+          if (phaseId == numPhases-1) {
             overallProgressMeter.synchronized { overallProgressMeter.add((ct % batchSize).toInt) }
           }
           b.reportFinished()

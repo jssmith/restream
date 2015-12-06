@@ -44,7 +44,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         val partitionId = c.partitionId
         logger.info(s"launching threads... number of phases ${runConfig.numPhases}")
         val threads =
-          for (phaseId <- 1 to runtime.numPhases) yield {
+          for (phaseId <- 0 until runtime.numPhases) yield {
             new Thread(s"replay-$partitionId-$phaseId") {
               val progressCoordinator = server.batchProgressCoordinator.getCoordinator(phaseId)
               // TODO ETK this whole `coordinator` business needs to be completely revamped -
@@ -73,7 +73,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
               override def run(): Unit = {
                 // TODO
                 //  - separate reader thread
-                val startThreadCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime()
+                val startThreadCpuTime = ManagementFactory.getThreadMXBean.getCurrentThreadCpuTime
                 try {
                   server.startLatch.countDown()
                   logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
@@ -115,7 +115,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                   server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                   logger.info(s"finished phase $phaseId on partition $partitionId")
                   // Send progress for all phases, but only set done flag when the last phase is done
-                  sendProgress(phaseId == runtime.numPhases)
+                  sendProgress(phaseId == runtime.numPhases-1)
                 } catch {
                   case e: Throwable => logger.error("server execution error", e)
                 } finally {

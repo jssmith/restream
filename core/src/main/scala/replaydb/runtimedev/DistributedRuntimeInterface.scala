@@ -5,10 +5,10 @@ import replaydb.event.Event
 
 trait DistributedRuntimeInterface {
   def numPhases: Int
-  def update(partitionId: Int, phase: Int, e: Event, deltaMap: Map[ReplayState, ReplayState]): Unit
-  def update(partitionId: Int, e: Event, deltaMap: Map[ReplayState, ReplayState]): Unit = {
-    for (i <- 1 to numPhases) {
-      update(partitionId, i, e, deltaMap)
+  def update(partitionId: Int, phase: Int, e: Event): Unit
+  def update(partitionId: Int, e: Event): Unit = {
+    for (i <- 0 until numPhases) {
+      update(partitionId, i, e)
     }
   }
 }

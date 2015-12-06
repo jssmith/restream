@@ -9,7 +9,7 @@ trait RuntimeInterface {
     update(coordinator.phaseId, e)(coordinator)
   }
   def updateAllPhases(e: Event)(implicit coordinator: CoordinatorInterface): Unit = {
-    for (i <- 1 to numPhases) {
+    for (i <- 0 until numPhases) {
       update(i, e)(coordinator)
     }
   }

@@ -45,14 +45,15 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   }
 
   // State is owned by worker #: partitionFn(key) % workerCount
+  val states: mutable.Map[Int, ReplayMapImpl[Any, Any]] = mutable.HashMap()
 
   // stores read requests that have been received but can't yet be processed because not all writes have arrived
-  val outstandingInboundReads: Array[mutable.Map[Long, ArrayBuffer[StateUpdateCommand]]] = Array.ofDim(runConfiguration.numPhases + 1)
+  val outstandingInboundReads: Array[mutable.Map[Long, ArrayBuffer[StateUpdateCommand]]] = Array.ofDim(runConfiguration.numPhases)
   // stores writes that are going out to their respective partitions
-  val queuedWrites: Array[Array[mutable.Map[Long, ArrayBuffer[StateWrite[_]]]]] = Array.ofDim(runConfiguration.numPhases + 1, workerCount)
+  val queuedWrites: Array[Array[mutable.Map[Long, ArrayBuffer[StateWrite[_]]]]] = Array.ofDim(runConfiguration.numPhases, workerCount)
   // stores read prepares that are going out to their respective paritions
-  val queuedReadPrepares: Array[Array[mutable.Map[Long, ArrayBuffer[StateRead]]]] = Array.ofDim(runConfiguration.numPhases + 1, workerCount)
-  for (i <- 1 to runConfiguration.numPhases) {
+  val queuedReadPrepares: Array[Array[mutable.Map[Long, ArrayBuffer[StateRead]]]] = Array.ofDim(runConfiguration.numPhases, workerCount)
+  for (i <- 0 until runConfiguration.numPhases) {
     outstandingInboundReads(i) = mutable.Map()
     for (j <- 0 until workerCount) {
       queuedWrites(i)(j) = mutable.Map()
@@ -79,7 +80,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   def handleStateRequestResponse(resp: StateRequestResponse): Unit = {
     for (r <- resp.responses) {
       // TODO the typing here needs work...
-      states(r.collectionId).asInstanceOf[ReplayMapImpl[Any, Any]].insertPreparedValue(r.ts, r.key, r.value)
+      states(r.collectionId).insertPreparedValue(r.ts, r.key, r.value)
     }
   }
 
@@ -96,7 +97,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
     }
     for (w <- cmd.writes) {
       // TODO the typing here needs work...
-      states(w.collectionId).asInstanceOf[ReplayMapImpl[Any, Any]].insertRemoteWrite(w.ts, w.key, w.asInstanceOf[StateWrite[Any]].merge)
+      states(w.collectionId).insertRemoteWrite(w.ts, w.key, w.asInstanceOf[StateWrite[Any]].merge)
     }
     if (readRequestsToProcess.isDefined) {
       logger.info(s"Phase $workerId-${cmd.phaseId} processing read requests for ${readRequestsToProcess.get.size} partitions")
@@ -104,7 +105,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
       // at this point, no more reads will be coming for this specific phase/batch...
       // Can GC after the second to last phase since the last phase doesn't read or write anything
       // (last phase's reads are carried out by the second to last phase)
-      if (cmd.phaseId == runConfiguration.numPhases - 1) {
+      if (cmd.phaseId == runConfiguration.numPhases - 2) {
         for ((id, s) <- states) {
           s.gcOlderThan(cmd.batchEndTs)
         }
@@ -116,8 +117,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
     for (cmd <- cmds) {
       val responses: ArrayBuffer[StateResponse] = ArrayBuffer()
       for (rp <- cmd.readPrepares) {
-        // TODO the typing here needs work...
-        val value = states(rp.collectionId).asInstanceOf[ReplayMapImpl[Any, Any]].requestRemoteRead(rp.ts, rp.key)
+        val value = states(rp.collectionId).requestRemoteRead(rp.ts, rp.key)
         responses += StateResponse(rp.collectionId, rp.ts, rp.key, value)
       }
       val respCmd = StateRequestResponse(cmd.phaseId, cmd.batchEndTs, responses.toArray)
@@ -132,7 +132,7 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
   // Closes out a batch: sends out all of the outstanding writes and getPrepares
   def finalizeBatch(phaseId: Int, batchEndTs: Long): Unit = {
     logger.info(s"Phase $workerId-$phaseId finalizing batch $batchEndTs")
-    if (phaseId == runConfiguration.numPhases) {
+    if (phaseId == runConfiguration.numPhases - 1) {
       return // nothing to be done - final phase can't have any readPrepares or writes
     }
     for (i <- 0 until workerCount) {
@@ -151,13 +151,11 @@ class StateCommunicationService(workerId: Int, runConfiguration: RunConfiguratio
     }
   }
 
-  val states: mutable.Map[Int, ReplayMapImpl[_, _]] = mutable.HashMap()
-
   def registerReplayState(collectionId: Int, rs: ReplayMapImpl[_, _]): Unit = {
     if (states.contains(collectionId)) {
       throw new IllegalStateException("Can't have two collections with the same ID")
     }
-    states += collectionId -> rs
+    states += collectionId -> rs.asInstanceOf[ReplayMapImpl[Any, Any]]
   }
 
 }
