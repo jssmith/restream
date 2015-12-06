@@ -7,8 +7,9 @@ import org.jboss.netty.channel.{Channel, ChannelHandlerContext}
 import org.jboss.netty.handler.codec.oneone.OneToOneEncoder
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.{Command, KryoCommands}
+import replaydb.util.NetworkStats
 
-class KryoCommandEncoder extends OneToOneEncoder with KryoCommands {
+class KryoCommandEncoder(networkStats: NetworkStats) extends OneToOneEncoder with KryoCommands {
   val logger = Logger(LoggerFactory.getLogger(classOf[KryoCommandEncoder]))
   val output = new Output(KryoCommands.MAX_KRYO_MESSAGE_SIZE + 4)
   override def encode(ctx: ChannelHandlerContext, channel: Channel, msg: AnyRef): AnyRef = {
@@ -20,6 +21,7 @@ class KryoCommandEncoder extends OneToOneEncoder with KryoCommands {
     buf.writeInt(len)
     logger.debug(s"kryo encoding class of type ${msg.getClass} of size $len")
     buf.writeBytes(output.getBuffer, 0, len)
+    networkStats.recordSent(len + 4)
     buf
   }
 }

@@ -11,10 +11,12 @@ import org.jboss.netty.handler.logging.LoggingHandler
 import org.jboss.netty.logging.{Slf4JLoggerFactory, InternalLoggerFactory, InternalLogLevel}
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.Command
+import replaydb.util.{PerfLogger, NetworkStats}
 
 abstract class ServerBase(port: Int) {
   InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory)
   val logger = Logger(LoggerFactory.getLogger(classOf[ServerBase]))
+  var networkStats = new NetworkStats()
   var f: Channel = _
   var closeRunnable: Runnable = _
 
@@ -27,10 +29,10 @@ abstract class ServerBase(port: Int) {
       override def getPipeline: ChannelPipeline = {
         val p = org.jboss.netty.channel.Channels.pipeline()
         p.addLast("Logger", new LoggingHandler(InternalLogLevel.DEBUG))
-        p.addLast("KryoEncoder", new KryoCommandEncoder())
+        p.addLast("KryoEncoder", new KryoCommandEncoder(networkStats))
 
         // Decode commands received from clients
-        p.addLast("KryoDecoder", new KryoCommandDecoder())
+        p.addLast("KryoDecoder", new KryoCommandDecoder(networkStats))
         p.addLast("Handler", getHandler())
         p
       }

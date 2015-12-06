@@ -6,7 +6,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.locks.ReentrantLock
 
 import org.jboss.netty.channel._
-import replaydb.util.PerfLogger
+import replaydb.util.{NetworkStats, PerfLogger}
 
 import scala.language.reflectiveCalls // TODO remove this after the relevant TODO below is dealt with
 
@@ -29,6 +29,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
           server.stateCommunicationService.close()
         }
         server.stateCommunicationService = new StateCommunicationService(c.hostId, c.runConfiguration)
+        server.networkStats.reset()
         val stateFactory = new ReplayStateFactory(server.stateCommunicationService)
         val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
         val runConfig = c.runConfiguration
@@ -72,14 +73,9 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
               override def run(): Unit = {
                 // TODO
                 //  - separate reader thread
+                val startThreadCpuTime = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime()
                 try {
-                  val threadId = Thread.currentThread().getId
-                  val threadMxBean = ManagementFactory.getThreadMXBean()
-                  val threadCpuTime = threadMxBean.getCurrentThreadCpuTime()
-                  PerfLogger.log(s"thread $threadId started with cpu time $threadCpuTime")
-
                   server.startLatch.countDown()
-
                   logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
                   var batchEndTimestamp = c.runConfiguration.startTimestamp
                   val eventStorage = new SocialNetworkStorage
@@ -125,11 +121,10 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                 } finally {
                   // Print out performance statistics
                   val threadId = Thread.currentThread().getId
-                  val threadMxBean = ManagementFactory.getThreadMXBean()
-//                  val threadInfo = threadMxBean.getThreadInfo(threadId)
-//                  threadMxBean.getThreadCpuTime(threadId)
-                  val threadCpuTime = threadMxBean.getCurrentThreadCpuTime()
-                  PerfLogger.log(s"thread $threadId finished with cpu time $threadCpuTime")
+                  val threadMxBean = ManagementFactory.getThreadMXBean
+                  val threadCpuTime = threadMxBean.getCurrentThreadCpuTime
+                  val elapsedThreadCpuTime = threadCpuTime - startThreadCpuTime
+                  PerfLogger.log(s"thread $threadId finished with elapsed cpu time ${elapsedThreadCpuTime/1000000} ms")
                 }
               }
             }
@@ -164,6 +159,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
       }
 
       case _ : CloseCommand => {
+        PerfLogger.log(s"server network stats ${server.networkStats}")
         server.stateCommunicationService.close()
         server.finishLatch.countDown()
         server.finishLatch.await()

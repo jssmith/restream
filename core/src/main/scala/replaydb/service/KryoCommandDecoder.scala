@@ -7,8 +7,9 @@ import org.jboss.netty.channel.{Channel, ChannelHandlerContext}
 import org.jboss.netty.handler.codec.frame.FrameDecoder
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.KryoCommands
+import replaydb.util.NetworkStats
 
-class KryoCommandDecoder extends FrameDecoder with KryoCommands {
+class KryoCommandDecoder(networkStats: NetworkStats) extends FrameDecoder with KryoCommands {
   val logger = Logger(LoggerFactory.getLogger(classOf[KryoCommandDecoder]))
    val buf = new Array[Byte](KryoCommands.MAX_KRYO_MESSAGE_SIZE + 4)
    val input = new Input(buf)
@@ -33,6 +34,7 @@ class KryoCommandDecoder extends FrameDecoder with KryoCommands {
      input.setLimit(dataLen)
      val obj = kryo.readClassAndObject(input)
      logger.debug(s"kryo decoded class of type ${obj.getClass} of size $dataLen")
+     networkStats.recordReceived(dataLen + 4)
      obj
    }
  }
