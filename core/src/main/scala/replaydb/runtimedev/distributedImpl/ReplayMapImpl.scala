@@ -31,7 +31,7 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
 
   override def get(ts: Long, key: K)(implicit batchInfo: BatchInfo): Option[V] = {
     preparedValues.synchronized {
-      while (!preparedValues.contains((ts, key))) {
+      while (!preparedValues.contains((ts, key)) || preparedValues((ts, key)).count == 0) {
         preparedValues.wait()
       }
       val ret = preparedValues((ts, key))
