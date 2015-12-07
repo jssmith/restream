@@ -49,6 +49,7 @@ abstract class ServerBase(port: Int) {
         } finally {
           b.releaseExternalResources()
         }
+        PerfLogger.log(s"Garbage collection stats: $garbageCollectorStats")
       }
     }
   }

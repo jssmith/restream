@@ -108,7 +108,7 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
         val ts = getOldestTSProgressMark
         val totalCollected = (for (rs <- replayStates) yield {
           rs.gcOlderThan(ts)
-        }).sum
+        }).map(_._4).sum
         ReplayValueImpl.gcAvg.add(totalCollected)
       }
 

@@ -34,12 +34,15 @@ class ReplayMapImpl[K, V : ClassTag](default: => V) extends ReplayMap[K, V] with
     }).merge(ts, fn)(batchInfo)
   }
 
-  override def gcOlderThan(ts: Long): Int = {
+  override def gcOlderThan(ts: Long): (Int, Int, Int, Int) = {
     // TODO should be a more efficient way to do this? Considering the idea
     // of maintaining a set of values which have been modified since the last GC
     // but not sure if that will add unnecessary overhead
     (for (entry <- m.values()) yield {
       entry.gcOlderThan(ts)
-    }).sum
+    }).reduceOption((a, b) => (a._1 + b._1, a._2 + b._2, a._3 + b._3, a._4 + b._4)) match {
+      case Some(x) => x
+      case _ => (0, 0, 0, 0)
+    }
   }
 }

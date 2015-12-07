@@ -46,8 +46,10 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
     }
   }
 
-  override def gcOlderThan(ts: Long): Int = {
+  // (total merged values in collection, total unmerged values, number of ReplayValues, GC'd values)
+  override def gcOlderThan(ts: Long): (Int, Int, Int, Int) = {
     var cnt = 0
+    val oldSize = m.size
     m.forEach(new BiConsumer[K, ValueWithTimestamp] {
       override def accept(key: K, value: ValueWithTimestamp): Unit = {
         if (value.ts < ts) {
@@ -56,7 +58,7 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
         }
       }
     })
-    cnt
+    (oldSize, 0, oldSize, cnt)
   }
 
 }

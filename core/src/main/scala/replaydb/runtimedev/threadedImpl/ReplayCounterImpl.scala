@@ -20,7 +20,7 @@ class ReplayCounterImpl extends ReplayCounter with Threaded {
     // Nothing to be done
   }
 
-  override def gcOlderThan(ts: Long): Int = {
+  override def gcOlderThan(ts: Long): (Int, Int, Int, Int) = {
     replayValue.gcOlderThan(ts)
   }
 

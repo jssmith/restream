@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory
 import replaydb.service.driver.{RunConfiguration, Command}
 import replaydb.service.ClientGroupBase
 import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateResponse, StateRead, StateWrite}
+import replaydb.util.PerfLogger
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -103,9 +104,10 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
       // Can GC after the second to last phase since the last phase doesn't read or write anything
       // (last phase's reads are carried out by the second to last phase)
       if (cmd.phaseId == numPhases - 2) {
-        for ((id, s) <- states) {
-          s.gcOlderThan(cmd.batchEndTs)
-        }
+        PerfLogger.log("Custom GC stats: (total merged values in collection, total unmerged values, number of ReplayValues, GC'd values)"
+          + (for ((id, s) <- states) yield {
+          s"State ID $id: ${s.gcOlderThan(cmd.batchEndTs)}"
+        }).mkString(", "))
       }
     }
   }

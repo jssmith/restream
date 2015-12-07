@@ -148,10 +148,12 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
     }
   }
 
-  // returns the number of items collected
-  def gcOlderThan(ts: Long): Int = {
+  // (total merged values in collection, total unmerged values, number of ReplayValues, GC'd values)
+  def gcOlderThan(ts: Long): (Int, Int, Int, Int) = {
+    val mergedValueCount = size
+    val unmergedValueCount = updates.size
     if (ts < oldestNonGCWrite) {
-      return 0 // Nothing to be done:
+      return (mergedValueCount, unmergedValueCount, 1, 0) // Nothing to be done:
     }
     var valuesCollected: Int = 0
     this.synchronized {
@@ -176,7 +178,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
         case None =>
           val (index, value) = findValue(ts)
           if (value.isEmpty) {
-            return 0 // No values older than ts, nothing to garbage collect
+            return (mergedValueCount, unmergedValueCount, 1, 0) // No values older than ts, nothing to garbage collect
           }
           for (i <- validDataStart until index) {
             values(i) = null.asInstanceOf[T] // Give JVM a chance to GC objects
@@ -185,7 +187,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
           validDataStart = index
       }
     }
-    valuesCollected
+    (mergedValueCount, unmergedValueCount, 1, valuesCollected)
   }
 }
 
