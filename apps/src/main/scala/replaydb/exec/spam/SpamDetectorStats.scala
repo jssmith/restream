@@ -36,8 +36,7 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
   val messageContainingEmailFraction: ReplayMap[Long, (Long, Long)] = getReplayMap((0L, 0L))
   val messagesFractionLast7DaysInLast24Hours: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
   val userFirstMessageTS: ReplayMap[Long, Long] = getReplayMap(Long.MaxValue)
-  val userMostRecentReceivedMessage: ReplayMap[Long, immutable.Map[Long, Long]] =
-    getReplayMap(new immutable.HashMap)
+  val userMostRecentReceivedMessage: ReplayMap[(Long, Long), Long] = getReplayMap(Long.MinValue)
   val messageSentInResponseFraction: ReplayMap[Long, (Long, Long)] = getReplayMap((0L, 0L))
   val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = getReplayTimestampLocalMap(0)
 
@@ -168,15 +167,13 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
     // RULE 5 STATE 1
     bind {
       me: MessageEvent =>
-        userMostRecentReceivedMessage.merge(me.ts, me.recipientUserId, map => {
-          map.updated(me.senderUserId, me.ts)
-        })
+        userMostRecentReceivedMessage.merge(me.ts, (me.recipientUserId, me.senderUserId), Math.max(_, me.ts))
     }
     // RULE 5 STATE 2
     bind {
       me: MessageEvent =>
-        val isResponse = userMostRecentReceivedMessage.get(me.ts, me.senderUserId) match {
-          case Some(map) => map.getOrElse(me.recipientUserId, Long.MinValue) > (me.ts - 7.days)
+        val isResponse = userMostRecentReceivedMessage.get(me.ts, (me.senderUserId, me.recipientUserId)) match {
+          case Some(v) => v > (me.ts - 7.days)
           case None => false
         }
         if (isResponse) {
