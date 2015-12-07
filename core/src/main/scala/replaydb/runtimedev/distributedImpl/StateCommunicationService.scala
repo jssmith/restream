@@ -30,6 +30,9 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
           }
         }
       }
+      override def exceptionCaught(ctx: ChannelHandlerContext, ee: ExceptionEvent): Unit = {
+        logger.error(s"caught exception ${ee.getCause} on local: ${ctx.getChannel.getLocalAddress} remote: ${ctx.getChannel.getRemoteAddress}")
+      }
     }
   }
   client.connect(runConfiguration.hosts.zipWithIndex.filter(_._2 != partitionId).map(_._1))
