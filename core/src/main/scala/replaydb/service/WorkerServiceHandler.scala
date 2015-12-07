@@ -1,26 +1,23 @@
 package replaydb.service
 
-import java.io.FileInputStream
 import java.lang.management.ManagementFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.locks.ReentrantLock
 
-import org.jboss.netty.channel._
-import replaydb.runtimedev.threadedImpl.MultiReaderEventSource
-import replaydb.util.PerfLogger
-
 import com.typesafe.scalalogging.Logger
+import org.jboss.netty.channel._
 import org.slf4j.LoggerFactory
-import replaydb.io.SocialNetworkStorage
-import replaydb.runtimedev.{PrintSpamCounter, HasRuntimeInterface}
 import replaydb.runtimedev.distributedImpl._
+import replaydb.runtimedev.threadedImpl.MultiReaderEventSource
+import replaydb.runtimedev.{HasRuntimeInterface, PrintSpamCounter}
 import replaydb.service.driver._
+import replaydb.util.PerfLogger
 
 class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler {
   val logger = Logger(LoggerFactory.getLogger(classOf[WorkerServiceHandler]))
 
   override def messageReceived(ctx: ChannelHandlerContext, msg: MessageEvent): Unit = {
-    logger.info(s"received message $msg")
+    logger.debug(s"received message $msg")
     msg.getMessage.asInstanceOf[Command] match {
       case c : InitReplayCommand[_] => {
         if (server.stateCommunicationService != null) {
@@ -56,14 +53,13 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                   server.startLatch.countDown()
                   logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
                   var batchEndTimestamp = c.runConfiguration.startTimestamp
-                  val eventStorage = new SocialNetworkStorage
                   var lastTimestamp = Long.MinValue
                   var ct = 0
                   def sendProgress(done: Boolean = false): Unit = {
                     val progressUpdateCommand = new ProgressUpdateCommand(partitionId, phaseId, ct, batchEndTimestamp, done)
-                    logger.info(s"preparing progress update $progressUpdateCommand)")
+                    logger.debug(s"preparing progress update $progressUpdateCommand)")
                     progressSendLock.lock()
-                    logger.info(s"sending progress update $progressUpdateCommand)")
+                    logger.debug(s"sending progress update $progressUpdateCommand)")
                     msg.getChannel.write(progressUpdateCommand) //.sync()
                     logger.debug(s"finished sending progress update")
                     progressSendLock.unlock()
@@ -108,7 +104,6 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
           }
         readerThread.start()
         threads.foreach(_.start())
-//        threads.foreach(_.join())
       }
 
       case uap: UpdateAllProgressCommand => {
@@ -132,11 +127,13 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
       }
 
       case _ : CloseWorkerCommand => {
+        logger.info("received worker close command")
         msg.getChannel.close()
         server.finishLatch.countDown()
       }
 
       case _ : CloseCommand => {
+        logger.info("received driver close command")
         PerfLogger.log(s"server network stats ${server.networkStats}")
         PerfLogger.log(s"garbage collector stats ${server.garbageCollectorStats}")
         server.stateCommunicationService.close()
