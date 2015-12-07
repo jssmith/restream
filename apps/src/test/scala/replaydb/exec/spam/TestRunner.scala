@@ -20,8 +20,7 @@ trait TestRunner {
         s"$numServers", "50000", s"src/test/resources/hosts-$numServers.txt")
       )
     } finally {
-      // TODO should shut down cleanly
-//      servers.foreach(_.close())
+      servers.foreach(_.close())
     }
   }
 

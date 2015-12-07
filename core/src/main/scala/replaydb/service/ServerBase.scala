@@ -48,7 +48,7 @@ abstract class ServerBase(port: Int) {
     closeRunnable = new Runnable() {
       override def run(): Unit = {
         try {
-          f.getCloseFuture.sync()
+          f.close().sync()
         } finally {
           b.releaseExternalResources()
         }

@@ -18,13 +18,13 @@ import replaydb.util.MemoryStats
  */
 class DistributedSimpleSpamDetectorSpec extends FlatSpec with TestRunner {
 
-//  it should "run with a one-way split" in {
-//    runSpamDetector(1, classOf[SimpleSpamDetectorStats], DataDesc.SHORT)
-//  }
+  it should "run with a one-way split" in {
+    runSpamDetector(1, classOf[SimpleSpamDetectorStats], DataDesc.SHORT)
+  }
 
-//  it should "run with a two-way split" in {
-//    runSpamDetector(2, classOf[SimpleSpamDetectorStats], DataDesc.SHORT)
-//  }
+  it should "run with a two-way split" in {
+    runSpamDetector(2, classOf[SimpleSpamDetectorStats], DataDesc.SHORT)
+  }
 
   it should "run with a four-way split" in {
     runSpamDetector(4, classOf[SimpleSpamDetectorStats], DataDesc.SHORT)

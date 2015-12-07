@@ -78,10 +78,13 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
     }
   }
 
-  def issueCommand(i: Int, c: Command): Unit = {
+  def issueCommand(i: Int, c: Command, sync: Boolean = false): Unit = {
     channelLocks(i).lock()
     logger.debug(s"issuing command on partition $i: ${c.toString}")
-    cf(i).getChannel.write(c) //.sync()
+    val f = cf(i).getChannel.write(c)
+    if (sync) {
+      f.sync()
+    }
     logger.debug(s"finished issuing command on partition $i: ${c.toString}")
     channelLocks(i).unlock()
   }
@@ -91,23 +94,30 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
       val closeCmd = if (isWorker) {
         new CloseWorkerCommand()
       } else {
+        logger.debug("driver awaiting close in closeWhenDone")
         workLatch.await()
+        logger.debug("driver finished awaiting close in closeWhenDone")
         new CloseCommand()
       }
       PerfLogger.log(s"client network stats $networkStats")
       // Netty complains if we `sync` within an IO thread
       val t = new Thread() {
         override def run(): Unit = {
-          cf.indices.foreach(issueCommand(_, closeCmd))
+          logger.debug(s"closing ${cf.indices.size} connections")
+          cf.indices.foreach(issueCommand(_, closeCmd, true))
           for (i <- cf.indices) {
             channelLocks(i).lock()
-            cf(i).getChannel.getCloseFuture.sync()
+            logger.debug(s"closing channel $i")
+            cf(i).getChannel.close().sync()
             channelLocks(i).unlock()
+            logger.debug(s"done closing channel $i")
           }
         }
       }
       t.start()
+      logger.debug("awaiting closeWhenDone thread completion")
       t.join()
+      logger.debug("finished awaiting closeWhenDone thread completion")
     } finally {
       b.releaseExternalResources()
     }

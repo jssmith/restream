@@ -148,7 +148,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
   }
 
    override def exceptionCaught(ctx: ChannelHandlerContext, event: ExceptionEvent): Unit = {
-     event.getCause.printStackTrace()
+     logger.error("worker error", event.getCause)
      event.getChannel.close()
    }
  }
