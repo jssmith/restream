@@ -71,7 +71,7 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
     val queue = queuedReadPrepares(phaseId)(srcWorker).getOrElseUpdate(batchEndTs, ArrayBuffer())
     queue += StateRead(collectionId, ts, key)
     if (queue.size >= MaxMessagesPerCommand) {
-      sendStateUpdateCommand(StateUpdateCommand(partitionId, phaseId, batchEndTs, false, Array(), queue.toArray), srcWorker)
+      sendStateUpdateCommand(StateUpdateCommand(partitionId, phaseId, batchEndTs, -1, Array(), queue.toArray), srcWorker)
       queue.clear()
       commandsSent(phaseId)(srcWorker).put(batchEndTs, commandsSent(phaseId)(srcWorker).getOrElse(batchEndTs, 0) + 1)
     }
@@ -94,7 +94,7 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
     val queue = queuedWrites(phaseId)(destWorker).getOrElseUpdate(batchEndTs, ArrayBuffer())
     queue += StateWrite(collectionId, ts, key, merge)
     if (queue.size >= MaxMessagesPerCommand) {
-      sendStateUpdateCommand(StateUpdateCommand(partitionId, phaseId, batchEndTs, false, queue.toArray, Array()), destWorker)
+      sendStateUpdateCommand(StateUpdateCommand(partitionId, phaseId, batchEndTs, -1, queue.toArray, Array()), destWorker)
       queue.clear()
       commandsSent(phaseId)(destWorker).put(batchEndTs, commandsSent(phaseId)(destWorker).getOrElse(batchEndTs, 0) + 1)
     }
@@ -112,8 +112,8 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
     val readRequestsToProcess = outstandingInboundReads.synchronized {
       val buf = outstandingInboundReads(cmd.phaseId)(cmd.originatingPartitionId).getOrElseUpdate(cmd.batchEndTs, ArrayBuffer())
       buf += cmd
-      if (cmd.finalized
-        && outstandingInboundReads(cmd.phaseId).map(_.getOrElseUpdate(cmd.batchEndTs, ArrayBuffer())).forall(b => b.nonEmpty && b.last.finalized)) {
+      if (buf.exists(_.cmdsInBatch == buf.size)
+        && outstandingInboundReads(cmd.phaseId).map(_.getOrElseUpdate(cmd.batchEndTs, ArrayBuffer())).forall(b => b.exists(_.cmdsInBatch == b.size))) {
         Some(outstandingInboundReads(cmd.phaseId).map(_.remove(cmd.batchEndTs).get).reduce(_ ++ _))
       } else {
         None
@@ -168,10 +168,13 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
     for (i <- 0 until numPartitions) {
       val writes = queuedWrites(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
       val readPrepares = queuedReadPrepares(phaseId)(i).getOrElse(batchEndTs, ArrayBuffer())
-      sendStateUpdateCommand(StateUpdateCommand(partitionId, phaseId, batchEndTs, true, writes.toArray, readPrepares.toArray), i)
+      val cmdsInBatch = 1 + (commandsSent(phaseId)(i).remove(batchEndTs) match {
+        case Some(cnt) => cnt
+        case _ => 0
+      })
+      sendStateUpdateCommand(StateUpdateCommand(partitionId, phaseId, batchEndTs, cmdsInBatch, writes.toArray, readPrepares.toArray), i)
       queuedWrites(phaseId)(i).remove(batchEndTs)
       queuedReadPrepares(phaseId)(i).remove(batchEndTs)
-      commandsSent(phaseId)(i).remove(batchEndTs)
     }
   }
 
