@@ -2,12 +2,13 @@ package replaydb.service
 
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
+import replaydb.runtimedev.BatchInfo
 
 import scala.collection.mutable
 
-class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long) {
+class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long, partitionId: Int) {
   val logger = Logger(LoggerFactory.getLogger(classOf[BatchProgressCoordinator]))
-  trait ThreadCoordinator {
+  abstract class ThreadCoordinator(partitionId: Int, phaseId: Int) extends BatchInfo(partitionId, phaseId) {
     def awaitAdvance(ts: Long): Unit
   }
 
@@ -19,8 +20,9 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long) {
     x(phaseId).update(maxTimestamp)
   }
 
-  class PhaseLimit(phaseId: Int) extends ThreadCoordinator {
+  class PhaseLimit(phaseId: Int) extends ThreadCoordinator(partitionId, phaseId) {
     var maxTimestamp: Long = startTimestamp
+    var currentBatchEndTs: Long = startTimestamp
     def update(maxTimestamp: Long): Unit = {
       logger.info(s"update limit at phase $phaseId to $maxTimestamp")
       this.synchronized {
@@ -32,6 +34,7 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long) {
     }
     def awaitAdvance(ts: Long): Unit = {
       this.synchronized {
+        currentBatchEndTs = ts
         while (ts > maxTimestamp) {
           logger.info(s"awaiting advance for phase $phaseId, time requested ${tsToBatch(ts)}, time allowed ${tsToBatch(maxTimestamp)}")
           wait()
@@ -40,6 +43,9 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long) {
         logger.info(s"advancing for phase $phaseId, time requested ${tsToBatch(ts)}, time allowed ${tsToBatch(maxTimestamp)}")
       }
     }
+
+    def batchEndTs: Long = currentBatchEndTs
+    def batchId: Int = throw new UnsupportedOperationException
   }
 
   val x = mutable.HashMap[Int, PhaseLimit]()

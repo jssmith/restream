@@ -1,7 +1,6 @@
 package replaydb.exec.spam
 
 import replaydb.event.{MessageEvent, NewFriendshipEvent}
-import replaydb.exec.spam.UserPair
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
 import replaydb.runtimedev.threadedImpl._

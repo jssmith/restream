@@ -1,6 +1,6 @@
 package replaydb.runtimedev.distributedImpl
 
-import replaydb.runtimedev.{CoordinatorInterface, ReplayCounter}
+import replaydb.runtimedev.{BatchInfo, ReplayCounter}
 
 class ReplayCounterImpl(collectionId: Int, commService: StateCommunicationService) extends ReplayCounter {
 
@@ -9,18 +9,18 @@ class ReplayCounterImpl(collectionId: Int, commService: StateCommunicationServic
   // ReplayCounters will end up located in different places
   val internalMap = new ReplayMapImpl[Int, Long](0L, collectionId, commService)
 
-  def add(value: Long, ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
+  def add(value: Long, ts: Long)(implicit batchInfo: BatchInfo): Unit = {
     internalMap.merge(ts, collectionId, _ + value)
   }
 
-  def get(ts: Long)(implicit coordinator: CoordinatorInterface): Long = {
+  def get(ts: Long)(implicit batchInfo: BatchInfo): Long = {
     internalMap.get(ts, collectionId) match {
       case Some(v) => v
       case None => 0
     }
   }
 
-  def getPrepare(ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
+  def getPrepare(ts: Long)(implicit batchInfo: BatchInfo): Unit = {
     internalMap.getPrepare(ts, collectionId)
   }
 }

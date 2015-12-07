@@ -1,6 +1,6 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.{CoordinatorInterface, ReplayState}
+import replaydb.runtimedev.ReplayState
 
 import scala.collection.mutable
 
@@ -90,7 +90,6 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
       }
 
       def batchId: Int = currentBatchId
-      def batchEndTs: Long = throw new UnsupportedOperationException
 
       override def reportFinished(): Unit = {
         val checkpointNumber = checkpoints.synchronized {
@@ -118,29 +117,6 @@ class RunProgressCoordinator(numPartitions: Int, numPhases: Int, batchSizeGoal: 
         readUntil.synchronized {
           readUntil(numPhases - 1).map(_.min).min
         }
-      }
-    }
-  }
-}
-
-object RunProgressCoordinator {
-  // TODO probably a cleaner way to achieve this? it's only present since Coordinator is necessary
-  // as an (implicit) parameter to update
-  def getDriverCoordinator: CoordinatorInterface = {
-    new CoordinatorInterface(0, 0) {
-      override def gcAllReplayState(): Unit = {
-        throw new UnsupportedOperationException
-      }
-
-      override def batchId: Int = 0
-      override def batchEndTs: Long = 0
-
-      override def reportCheckpoint(ts: Long, ct: Long): (Long, Long) = {
-        throw new UnsupportedOperationException
-      }
-
-      override def reportFinished(): Unit = {
-        throw new UnsupportedOperationException
       }
     }
   }

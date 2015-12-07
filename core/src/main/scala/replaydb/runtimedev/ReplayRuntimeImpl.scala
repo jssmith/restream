@@ -1,7 +1,7 @@
 package replaydb.runtimedev
 
 import replaydb.event.Event
-import replaydb.runtimedev.threadedImpl.RunProgressCoordinator
+import replaydb.runtimedev.threadedImpl.{CoordinatorInterface, RunProgressCoordinator}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -112,7 +112,7 @@ class ReplayRuntimeImpl(val c: Context) {
                   meth match {
                     case TermName("get") | TermName("getRandom") =>
                       outstandingPrepares.getOrElseUpdate(params.head.tpt.tpe, ArrayBuffer()) += ((params.head.name,
-                        Apply(Apply(Select(obj, TermName("getPrepare")), args), List(q"coordinator"))))
+                        Apply(Apply(Select(obj, TermName("getPrepare")), args), List(q"batchInfo"))))
                     case TermName("merge") | TermName("add") =>
                       // Nothing to be done
                     case _ =>
@@ -134,9 +134,9 @@ class ReplayRuntimeImpl(val c: Context) {
           val rt = replaceTransform(termName, TermName("zz"))
           new Transformer {
             override def transform(tree: Tree): Tree = tree match {
-              case st: SymTree if st.tpe != null && st.tpe <:< typeOf[CoordinatorInterface]
-                && st.symbol.name == TermName("defaultCoordinatorInterface") =>
-                q"coordinator"
+              case st: SymTree if st.tpe != null && st.tpe <:< typeOf[BatchInfo]
+                && st.symbol.name == TermName("defaultBatchInfo") =>
+                q"batchInfo"
               case _ => super.transform(tree)
             }
           }.transform(rt.transform(body))
@@ -155,7 +155,7 @@ class ReplayRuntimeImpl(val c: Context) {
       q"""
          new RuntimeInterface {
            def numPhases: Int = $numPhases
-           def update(phase: Int, e: Event)(implicit coordinator: CoordinatorInterface): Unit = {
+           def update(phase: Int, e: Event)(implicit batchInfo: BatchInfo): Unit = {
              $me
            }
          }

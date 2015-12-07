@@ -2,7 +2,7 @@ package replaydb.runtimedev.threadedImpl
 
 import java.util.function.BiConsumer
 
-import replaydb.runtimedev.{CoordinatorInterface, ReplayTimestampLocalMap}
+import replaydb.runtimedev.{BatchInfo, ReplayTimestampLocalMap}
 
 // NOTE: Should only be used with associative, commutative operators
 class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLocalMap[K, V] with Threaded {
@@ -18,7 +18,7 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
   }
 
   val m = new java.util.concurrent.ConcurrentHashMap[K, ValueWithTimestamp]()
-  override def get(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Option[V] = {
+  override def get(ts: Long, key: K)(implicit batchInfo: BatchInfo): Option[V] = {
     val x = m.get(key)
     if (x == null) {
       None
@@ -31,11 +31,11 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
     }
   }
 
-  override def getPrepare(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Unit = {
+  override def getPrepare(ts: Long, key: K)(implicit batchInfo: BatchInfo): Unit = {
     // Nothing to be done
   }
 
-  override def merge(ts: Long, key: K, fn: (V) => V)(implicit coordinator: CoordinatorInterface): Unit = {
+  override def merge(ts: Long, key: K, fn: (V) => V)(implicit batchInfo: BatchInfo): Unit = {
     val x = m.get(key)
     if (x == null) {
       m.put(key, new ValueWithTimestamp(fn(default), ts))

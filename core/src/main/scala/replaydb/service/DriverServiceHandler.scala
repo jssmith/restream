@@ -27,9 +27,6 @@ class DriverServiceHandler(clientGroup: ClientGroup, runConfiguration: RunConfig
         }
       }
     }
-
-   // TODO is this needed? - not supported in Netty 3 so hopefully not...
-//   ReferenceCountUtil.release(msg)
   }
 
   override def exceptionCaught(ctx: ChannelHandlerContext, event: ExceptionEvent): Unit = {

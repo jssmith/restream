@@ -1,6 +1,6 @@
 package replaydb.runtimedev.serialImpl
 
-import replaydb.runtimedev.{CoordinatorInterface, ReplayTimestampLocalMap}
+import replaydb.runtimedev.{BatchInfo, ReplayTimestampLocalMap}
 
 
 class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLocalMap[K, V] with Serial {
@@ -8,7 +8,7 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
   var currentTs: Long = _
   var currentMap: Map[K, V] = Map()
 
-  override def get(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Option[V] = {
+  override def get(ts: Long, key: K)(implicit batchInfo: BatchInfo): Option[V] = {
     if (ts == currentTs) {
       currentMap.get(key)
     } else {
@@ -16,11 +16,11 @@ class ReplayTimestampLocalMapImpl[K, V](default: => V) extends ReplayTimestampLo
     }
   }
 
-  override def getPrepare(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Unit = {
+  override def getPrepare(ts: Long, key: K)(implicit batchInfo: BatchInfo): Unit = {
     // Nothing to be done
   }
 
-  override def merge(ts: Long, key: K, fn: (V) => V)(implicit coordinator: CoordinatorInterface): Unit = {
+  override def merge(ts: Long, key: K, fn: (V) => V)(implicit batchInfo: BatchInfo): Unit = {
     if (ts != currentTs) {
       currentTs = ts
       currentMap = Map((key, fn(default)))

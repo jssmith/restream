@@ -1,6 +1,6 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.{CoordinatorInterface, ReplayValue}
+import replaydb.runtimedev.{BatchInfo, ReplayValue}
 import replaydb.runtimedev.threadedImpl.ReplayValueImpl.MergeRecord
 
 import scala.collection.mutable
@@ -40,7 +40,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
 
   // TODO we should be able to use ReadWrite locks here, right?
 
-  override def merge(ts: Long, merge: T => T)(implicit coordinator: CoordinatorInterface): Unit = {
+  override def merge(ts: Long, merge: T => T)(implicit batchInfo: BatchInfo): Unit = {
     this.synchronized {
       if (ts <= lastRead || ts <= lastGC) {
         throw new IllegalArgumentException(s"add at $ts must precede get at $lastRead and GC at $lastGC")
@@ -57,7 +57,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
     }
   }
 
-  override def get(ts: Long)(implicit coordinator: CoordinatorInterface): Option[T] = {
+  override def get(ts: Long)(implicit batchInfo: BatchInfo): Option[T] = {
     this.synchronized {
       lastRead = math.max(lastRead, ts)
       if (updates.nonEmpty) {
@@ -72,7 +72,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
     }
   }
 
-  override def getPrepare(ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
+  override def getPrepare(ts: Long)(implicit batchInfo: BatchInfo): Unit = {
     // Nothing to be done
   }
 

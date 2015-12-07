@@ -1,6 +1,6 @@
 package replaydb.runtimedev.serialImpl
 
-import replaydb.runtimedev.{CoordinatorInterface, ReplayValue}
+import replaydb.runtimedev.{BatchInfo, ReplayValue}
 
 import scala.collection.mutable
 
@@ -15,18 +15,18 @@ class ReplayValueImpl[T](default: => T) extends ReplayValue[T] with Serial {
   val outstanding: mutable.PriorityQueue[MergeRecord[T]] = mutable.PriorityQueue()
   var value = default
 
-  override def merge(ts: Long, value: T => T)(implicit coordinator: CoordinatorInterface): Unit = {
+  override def merge(ts: Long, value: T => T)(implicit batchInfo: BatchInfo): Unit = {
     outstanding.enqueue(new MergeRecord(ts, value))
   }
 
-  override def get(ts: Long)(implicit coordinator: CoordinatorInterface): Option[T] = {
+  override def get(ts: Long)(implicit batchInfo: BatchInfo): Option[T] = {
     while (outstanding.nonEmpty && outstanding.head.ts <= ts) {
       value = outstanding.dequeue().merge(value)
     }
     Some(value)
   }
 
-  override def getPrepare(ts: Long)(implicit coordinator: CoordinatorInterface): Unit = {
+  override def getPrepare(ts: Long)(implicit batchInfo: BatchInfo): Unit = {
     // Nothing to be done
   }
 

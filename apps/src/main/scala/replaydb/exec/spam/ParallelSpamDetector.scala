@@ -82,5 +82,5 @@ object ParallelSpamDetector extends App {
   // TODO should support an aggregate / counter type that is write-only during
   // execution ( + commutative/associative) and then you can access at the end
   // -> the pause right now to roll-up all of the spamcounters is completely unnecessary
-  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue)(RunProgressCoordinator.getDriverCoordinator))
+  println("Final spam count: " + stats.spamCounter.get(Long.MaxValue))
 }

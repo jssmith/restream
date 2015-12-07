@@ -1,6 +1,6 @@
 package replaydb.runtimedev.distributedImpl
 
-import replaydb.runtimedev.{ReplayMap, CoordinatorInterface}
+import replaydb.runtimedev.{ReplayMap, BatchInfo}
 
 import scala.reflect.ClassTag
 import scala.collection.mutable
@@ -29,7 +29,7 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
 //  val preparedValues = new ConcurrentHashMap[(Long, K), Option[V]]()
   val preparedValues: mutable.Map[(Long, K), PrepValue] = mutable.Map()
 
-  override def get(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Option[V] = {
+  override def get(ts: Long, key: K)(implicit batchInfo: BatchInfo): Option[V] = {
     preparedValues.synchronized {
       while (!preparedValues.contains((ts, key))) {
         preparedValues.wait()
@@ -45,12 +45,12 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
 
   override def getRandom(ts: Long): Option[(K, V)] = ???
 
-  override def getPrepare(ts: Long, key: K)(implicit coordinator: CoordinatorInterface): Unit = {
-    commService.localPrepareState(collectionId, coordinator.phaseId, coordinator.batchEndTs, ts, key, (key: K) => key.hashCode())
+  override def getPrepare(ts: Long, key: K)(implicit batchInfo: BatchInfo): Unit = {
+    commService.localPrepareState(collectionId, batchInfo.phaseId, batchInfo.batchEndTs, ts, key, (key: K) => key.hashCode())
   }
 
-  override def merge(ts: Long, key: K, fn: V => V)(implicit coordinator: CoordinatorInterface): Unit = {
-    commService.submitWrite(collectionId, coordinator.phaseId, coordinator.batchEndTs, ts, key, fn, (key: K) => key.hashCode())
+  override def merge(ts: Long, key: K, fn: V => V)(implicit batchInfo: BatchInfo): Unit = {
+    commService.submitWrite(collectionId, batchInfo.phaseId, batchInfo.batchEndTs, ts, key, fn, (key: K) => key.hashCode())
   }
 
   def insertPreparedValue(ts: Long, key: K, value: Option[V]): Unit = {
