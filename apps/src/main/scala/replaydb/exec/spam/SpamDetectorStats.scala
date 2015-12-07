@@ -5,7 +5,6 @@ import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
 import replaydb.runtimedev.threadedImpl._
 import replaydb.util.time._
-import replaydb.event.Event
 
 import scala.collection.immutable
 

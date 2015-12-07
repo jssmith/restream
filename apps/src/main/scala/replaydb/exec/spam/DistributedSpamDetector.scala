@@ -1,6 +1,6 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.{ReplayCounter, ReplayMap, ReplayStateFactory, ReplayTimestampLocalMap}
+import replaydb.runtimedev._
 import replaydb.service.ClientGroup
 import replaydb.service.driver.{Hosts, InitReplayCommand, RunConfiguration}
 import replaydb.util.{EventRateEstimator, LoggerConfiguration}
@@ -10,20 +10,26 @@ import scala.reflect.ClassTag
 // TODO this needs a way to time how long things take to do performance checks, like the serial/parallel ones
 
 object DistributedSpamDetector extends App {
-  if (args.length != 4) {
+  if (args.length != 5) {
     println(
-      """Usage: DistributedSpamDetector baseFilename numPartitions batchSize hosts
-        |  Suggested values: numPartitions = 4, batchSize = 50000 hosts = hosts.txt
+      """Usage: DistributedSpamDetector spamDetector baseFilename numPartitions batchSize hosts
+        |  Example values:
+        |    spamDetector   = replaydb.exec.spam.SpamDetectorStats
+        |    baseFilename   = ~/data/events.out
+        |    numPartitions  = 4
+        |    batchSize      = 50000
+        |    hosts          = hosts.txt
       """.stripMargin)
     System.exit(1)
   }
 
   LoggerConfiguration.configureDriver()
 
-  val partitionFnBase = args(0)
-  val numPartitions = args(1).toInt
-  val batchSize = args(2).toInt
-  val hostsFile = args(3)
+  val spamDetector = Class.forName(args(0)).asInstanceOf[Class[HasRuntimeInterface]]
+  val partitionFnBase = args(1)
+  val numPartitions = args(2).toInt
+  val batchSize = args(3).toInt
+  val hostsFile = args(4)
 
   val hosts = Hosts.fromFile(hostsFile)
   val numHosts = hosts.length
@@ -33,15 +39,6 @@ object DistributedSpamDetector extends App {
   }
 
   val filenames = (0 until numPartitions).map(i => s"$partitionFnBase-$i").toArray
-
-//  // round robin assignment of files to hosts
-//  val hostFiles = new Array[ArrayBuffer[(Int,String)]](numHosts)
-//  for (i <- hostFiles.indices) {
-//    hostFiles(i) = ArrayBuffer[(Int,String)]()
-//  }
-//  for (i <- filenames.indices) {
-//    hostFiles(i % numHosts) += i -> filenames(i)
-//  }
 
   // estimate the event rate so that we can set a batch time range
   val r = EventRateEstimator.estimateRate(partitionFnBase, numPartitions)
@@ -64,7 +61,7 @@ object DistributedSpamDetector extends App {
 
   println("starting replay...")
   for (i <- filenames.indices) {
-    clients.issueCommand(i, new InitReplayCommand(i, filenames(i), classOf[SpamDetectorStats], i, runConfiguration))
+    clients.issueCommand(i, new InitReplayCommand(i, filenames(i), spamDetector, i, runConfiguration))
   }
   clients.closeWhenDone()
 }

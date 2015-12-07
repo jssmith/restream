@@ -154,6 +154,7 @@ class ReplayRuntimeImpl(val c: Context) {
     val ri =
       q"""
          new RuntimeInterface {
+           import replaydb.event.Event
            def numPhases: Int = $numPhases
            def update(phase: Int, e: Event)(implicit batchInfo: BatchInfo): Unit = {
              $me

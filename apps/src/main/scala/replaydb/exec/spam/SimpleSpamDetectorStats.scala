@@ -13,17 +13,20 @@ RULES:
 
  */
 
-class SimpleSpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) {
+class SimpleSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface {
   import replayStateFactory._
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
   val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
-  val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = getReplayTimestampLocalMap(0)
   val spamCounter: ReplayCounter = getReplayCounter
+  val nonfriendMessagesInLastInterval: ReplayMap[Long, Long] = getReplayMap(0)
+  val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = getReplayTimestampLocalMap(0)
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState with Threaded] = {
-    val states = List(friendships, friendSendRatio, messageSpamRatings, spamCounter)
+    val states = List(
+      friendships, friendSendRatio, spamCounter,
+      messageSpamRatings, nonfriendMessagesInLastInterval)
     for (s <- states) {
       if (!s.isInstanceOf[ReplayState with Threaded]) {
         throw new UnsupportedOperationException
@@ -50,7 +53,6 @@ class SimpleSpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.Re
           case Some((toFriends, toNonFriends)) =>
             if (toFriends + toNonFriends > 5) {
               if (toNonFriends > 2 * toFriends) {
-                //                  spamCounter.add(1, ts)
                 messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
               }
             }
@@ -66,7 +68,7 @@ class SimpleSpamDetectorStatsParallel(replayStateFactory: replaydb.runtimedev.Re
         }
     }
     bind {
-      e: PrintSpamCounter => println(s"spam count is ${spamCounter.get(e.ts)}")
+      e: PrintSpamCounter => println(s"\n\nSPAM COUNT is ${spamCounter.get(e.ts)}\n\n")
     }
   }
 }
