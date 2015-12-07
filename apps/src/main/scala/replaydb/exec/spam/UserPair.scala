@@ -6,6 +6,10 @@ class UserPair(val a: Long, val b: Long) {
     case _ => false
   }
   override def hashCode(): Int = {
-    a.hashCode() + 25741 * b.hashCode()
+    if (a < b) {
+      a.hashCode() + 25741 * b.hashCode()
+    } else {
+      b.hashCode() + 25741 * a.hashCode()
+    }
   }
 }
