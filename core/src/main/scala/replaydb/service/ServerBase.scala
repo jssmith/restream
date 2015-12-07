@@ -21,6 +21,9 @@ abstract class ServerBase(port: Int) {
   var f: Channel = _
   var closeRunnable: Runnable = _
 
+  networkStats.reset()
+  garbageCollectorStats.reset()
+
   def getHandler(): ChannelHandler
 
   def run(): Unit = {

@@ -42,7 +42,7 @@ class ClientServerSpec extends FlatSpec {
     }
     s.run()
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelUpstreamHandler= {
         new SimpleChannelUpstreamHandler() {
@@ -91,7 +91,7 @@ class ClientServerSpec extends FlatSpec {
     }
     s.run()
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelUpstreamHandler= {
         new SimpleChannelUpstreamHandler() {
@@ -145,7 +145,7 @@ class ClientServerSpec extends FlatSpec {
     }
     s.run()
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelUpstreamHandler= {
         new SimpleChannelUpstreamHandler() {
@@ -210,7 +210,7 @@ class ClientServerSpec extends FlatSpec {
     val s2 = getServer(port2)
     s2.run()
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelUpstreamHandler= {
         new SimpleChannelUpstreamHandler() {
@@ -276,7 +276,7 @@ class ClientServerSpec extends FlatSpec {
     })
     servers.foreach(_.run())
     logger.debug("server started")
-    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L)
+    val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
     val c = new ClientGroupBase(rc) {
       override def getHandler(): ChannelUpstreamHandler= {
         new SimpleChannelUpstreamHandler() {
