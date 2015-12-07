@@ -56,7 +56,7 @@ object DistributedSpamDetector extends App {
   }).getRuntimeInterface.numPhases
 
   val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = numPhases, hosts,
-    startTimestamp = startTime, batchTimeInterval = batchTimeInterval)
+    startTimestamp = startTime, batchTimeInterval = batchTimeInterval, approxBatchSize = batchSize)
 
   println("connecting...")
   val clients = new ClientGroup(runConfiguration)

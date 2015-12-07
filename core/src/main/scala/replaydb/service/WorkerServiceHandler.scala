@@ -6,6 +6,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.locks.ReentrantLock
 
 import org.jboss.netty.channel._
+import replaydb.runtimedev.threadedImpl.MultiReaderEventSource
 import replaydb.util.PerfLogger
 
 import com.typesafe.scalalogging.Logger
@@ -41,6 +42,8 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
 
         val partitionId = c.partitionId
         logger.info(s"launching threads... number of phases ${runConfig.numPhases}")
+        val readerThread = new MultiReaderEventSource(c.filename, runtime.numPhases,
+          bufferSize = (ProgressTracker.FirstPhaseBatchExtraAllowance + 3) * runConfig.approxBatchSize * 2)
         val threads =
           for (phaseId <- 0 until runtime.numPhases) yield {
             new Thread(s"replay-$partitionId-$phaseId") {
@@ -65,7 +68,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                     logger.debug(s"finished sending progress update")
                     progressSendLock.unlock()
                   }
-                  eventStorage.readEvents(new FileInputStream(c.filename), e => {
+                  readerThread.readEvents(e => {
                     if (e.ts >= batchEndTimestamp) {
                       logger.info(s"reached batch end on partition $partitionId phase $phaseId")
                       // Send out StateUpdateCommands
@@ -103,6 +106,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
               }
             }
           }
+        readerThread.start()
         threads.foreach(_.start())
 //        threads.foreach(_.join())
       }
