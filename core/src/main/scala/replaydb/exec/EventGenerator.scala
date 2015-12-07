@@ -1,6 +1,6 @@
 package replaydb.exec
 
-import java.io.{InputStream, BufferedOutputStream, FileOutputStream}
+import java.io.{File, InputStream, BufferedOutputStream, FileOutputStream}
 
 import org.apache.commons.math3.random.MersenneTwister
 import replaydb.io.SocialNetworkStorage
@@ -35,6 +35,15 @@ object EventGenerator extends App {
   val baseFilename = args(3)
   val numSplits = if (args.length == 5) { Integer.parseInt(args(4)) } else { 1 }
   val rnd = new MersenneTwister(903485435L)
+
+  val filePath = new File(baseFilename).getParentFile
+  if (!filePath.exists()) {
+    val res = filePath.mkdirs()
+    if (!res) {
+      throw new RuntimeException(s"failed to create directory at path $filePath")
+    }
+  }
+
   val eventSource = generator match {
     case Generators.Uniform => new UniformEventSource(startTime, numUsers, rnd)
     case Generators.Tunable => new TunableEventSource(startTime, numUsers, rnd, words)
