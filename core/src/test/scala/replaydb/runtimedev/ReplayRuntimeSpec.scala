@@ -1,11 +1,14 @@
 package replaydb.runtimedev
 
+import com.typesafe.scalalogging.Logger
 import org.scalatest.FlatSpec
+import org.slf4j.LoggerFactory
 import replaydb.event.{Event, MessageEvent, ProductUpdate, ProductView}
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev.serialImpl._
 
 class ReplayRuntimeSpec extends FlatSpec {
+  val logger = Logger(LoggerFactory.getLogger(classOf[ReplayRuntimeSpec]))
   "A ReplayRuntime" should "implement overall popularity" in {
     case class StopEvent(ts: Long) extends Event
     var endCt = 0L
@@ -24,12 +27,12 @@ class ReplayRuntimeSpec extends FlatSpec {
         }
         bind { pv: ProductView =>
           val ct = c.get(pv.ts)
-          printf("%f %b\n",
+          logger.info("%f %b\n".format(
             if (ct > 0) {
               0D
             } else {
               cSku.get(pv.sku, pv.ts).getOrElse(0L).toDouble / ct.toDouble
-            }, true)
+            }, true))
             // TODO restore this test
 //            printf("%f %b\n",
 //              if (ct > 0) {
@@ -169,12 +172,12 @@ class ReplayRuntimeSpec extends FlatSpec {
       def getRuntimeInterface = emit {
         bind { pv: ProductView =>
           val ct = c.get(pv.ts)
-          printf("%f %b\n",
+          logger.info("%f %b\n".format(
             if (ct > 0) {
               0D
             } else {
               cSku.get(pv.sku, pv.ts).getOrElse(0L).toDouble / ct.toDouble
-            }, true)
+            }, true))
             // TODO restore this test
 //            printf("%f %b\n",
 //              if (ct > 0) {
