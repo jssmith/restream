@@ -79,11 +79,15 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
   }
 
   def issueCommand(i: Int, c: Command): Unit = {
-    channelLocks(i).lock()
-    logger.debug(s"issuing command on partition $i: ${c.toString}")
-    cf(i).getChannel.write(c) //.sync()
-    logger.debug(s"finished issuing command on partition $i: ${c.toString}")
-    channelLocks(i).unlock()
+    executor.execute(new Runnable {
+      override def run(): Unit = {
+        channelLocks(i).lock()
+        logger.debug(s"issuing command on partition $i: ${c.toString}")
+        cf(i).getChannel.write(c) //.sync()
+        logger.debug(s"finished issuing command on partition $i: ${c.toString}")
+        channelLocks(i).unlock()
+      }
+    })
   }
 
   def closeWhenDone(isWorker: Boolean = false): Unit = {
