@@ -67,7 +67,6 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
   // Send a request to the machine which owns this key
   def localPrepareState[K, V](collectionId: Int, phaseId: Int, batchEndTs: Long,
                               ts: Long, key: K, partitionFn: K => Int): Unit = {
-    this.synchronized {
       val srcWorker = (partitionFn(key) & 0x7FFFFFFF) % numPartitions
       val queue = queuedReadPrepares(phaseId)(srcWorker).getOrElseUpdate(batchEndTs, ArrayBuffer())
       queue += StateRead(collectionId, ts, key)
@@ -76,25 +75,11 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
         queue.clear()
         commandsSent(phaseId)(srcWorker).put(batchEndTs, commandsSent(phaseId)(srcWorker).getOrElse(batchEndTs, 0) + 1)
       }
-    }
-  }
-
-  def sendStateUpdateCommand(cmd: StateUpdateCommand, destPartition: Int): Unit = {
-    this.synchronized {
-      if (destPartition != partitionId) {
-        logger.info(s"Phase $partitionId-${cmd.phaseId} sending update to partition $destPartition for " +
-          s"batch ${cmd.batchEndTs} (${cmd.writes.length} writes and ${cmd.readPrepares.length} readPrepares)")
-        issueCommandToWorker(destPartition, cmd)
-      } else {
-        handleStateUpdateCommand(cmd)
-      }
-    }
   }
 
   // send this write to its appropriate partition to be stored
   def submitWrite[K, V](collectionId: Int, phaseId: Int, batchEndTs: Long,
                         ts: Long, key: K, merge: V => V, partitionFn: K => Int): Unit = {
-    this.synchronized {
       val destWorker = (partitionFn(key) & 0x7FFFFFFF) % numPartitions
       val queue = queuedWrites(phaseId)(destWorker).getOrElseUpdate(batchEndTs, ArrayBuffer())
       queue += StateWrite(collectionId, ts, key, merge)
@@ -103,16 +88,13 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
         queue.clear()
         commandsSent(phaseId)(destWorker).put(batchEndTs, commandsSent(phaseId)(destWorker).getOrElse(batchEndTs, 0) + 1)
       }
-    }
   }
 
   def handleStateRequestResponse(resp: StateRequestResponse): Unit = {
-    this.synchronized {
       for (r <- resp.responses) {
         // TODO the typing here needs work...
         states(r.collectionId).insertPreparedValue(r.ts, r.key, r.value)
       }
-    }
   }
 
   def handleStateUpdateCommand(cmd: StateUpdateCommand): Unit = {
@@ -173,7 +155,6 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
 
   // Closes out a batch: sends out all of the outstanding writes and getPrepares
   def finalizeBatch(phaseId: Int, batchEndTs: Long): Unit = {
-    this.synchronized {
       logger.info(s"Phase $partitionId-$phaseId finalizing batch $batchEndTs")
       if (phaseId == numPhases - 1) {
         return // nothing to be done - final phase can't have any readPrepares or writes
@@ -190,7 +171,16 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
         queuedReadPrepares(phaseId)(i).remove(batchEndTs)
         commandsSent(phaseId)(i).remove(batchEndTs)
       }
-    }
+  }
+
+  def sendStateUpdateCommand(cmd: StateUpdateCommand, destPartition: Int): Unit = {
+      if (destPartition != partitionId) {
+        logger.info(s"Phase $partitionId-${cmd.phaseId} sending update to partition $destPartition for " +
+          s"batch ${cmd.batchEndTs} (${cmd.writes.length} writes and ${cmd.readPrepares.length} readPrepares)")
+        issueCommandToWorker(destPartition, cmd)
+      } else {
+        handleStateUpdateCommand(cmd)
+      }
   }
 
   def registerReplayState(collectionId: Int, rs: ReplayMapImpl[_, _]): Unit = {
