@@ -101,13 +101,13 @@ class ReplayRuntimeSpec extends FlatSpec {
 
     val a = new Analysis
     val ai = a.getRuntimeInterface()
-    updateWithEvent(ai, new MessageEvent(ts = 10L, messageId = 1L, senderUserId =  100L, recipientUserId = 200L, content = ""))
-    updateWithEvent(ai, new MessageEvent(ts = 20L, messageId = 2L, senderUserId =  100L, recipientUserId = 300L, content = ""))
-    updateWithEvent(ai, new MessageEvent(ts = 30L, messageId = 3L, senderUserId =  200L, recipientUserId = 300L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 10L, messageId = 1L, senderUserId =  100L, recipientUserId = 200L, senderIp = 0, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 20L, messageId = 2L, senderUserId =  100L, recipientUserId = 300L, senderIp = 0, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 30L, messageId = 3L, senderUserId =  200L, recipientUserId = 300L, senderIp = 0, content = ""))
     assert(a.lastPrinted === None)
     updateWithEvent(ai, new PrintUserEvent(ts = 35L, userId = 200L))
     assert(a.lastPrinted === None)
-    updateWithEvent(ai, new MessageEvent(ts = 40L, messageId = 4L, senderUserId =  200L, recipientUserId = 100L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 40L, messageId = 4L, senderUserId =  200L, recipientUserId = 100L, senderIp = 0, content = ""))
     updateWithEvent(ai, new PrintUserEvent(ts = 50, userId = 200L))
     assert(a.lastPrinted === Some(30))
   }
@@ -146,13 +146,13 @@ class ReplayRuntimeSpec extends FlatSpec {
 
     val a = new Analysis
     val ai = a.getRuntimeInterface()
-    updateWithEvent(ai, new MessageEvent(ts = 10L, messageId = 1L, senderUserId =  100L, recipientUserId = 200L, content = ""))
-    updateWithEvent(ai, new MessageEvent(ts = 20L, messageId = 2L, senderUserId =  100L, recipientUserId = 300L, content = ""))
-    updateWithEvent(ai, new MessageEvent(ts = 30L, messageId = 3L, senderUserId =  200L, recipientUserId = 300L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 10L, messageId = 1L, senderUserId =  100L, recipientUserId = 200L, senderIp = 0, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 20L, messageId = 2L, senderUserId =  100L, recipientUserId = 300L, senderIp = 0, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 30L, messageId = 3L, senderUserId =  200L, recipientUserId = 300L, senderIp = 0, content = ""))
     assert(a.lastPrinted === None)
     updateWithEvent(ai, new PrintUserEvent(ts = 35L, userId = 200L))
     assert(a.lastPrinted === Some(0D))
-    updateWithEvent(ai, new MessageEvent(ts = 40L, messageId = 4L, senderUserId =  200L, recipientUserId = 100L, content = ""))
+    updateWithEvent(ai, new MessageEvent(ts = 40L, messageId = 4L, senderUserId =  200L, recipientUserId = 100L, senderIp = 0, content = ""))
     updateWithEvent(ai, new PrintUserEvent(ts = 50, userId = 200L))
     assert(a.lastPrinted === Some(0.5D))
     updateWithEvent(ai, new PrintUserEvent(ts = 51, userId = 100L))

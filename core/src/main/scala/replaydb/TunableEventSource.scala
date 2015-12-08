@@ -22,6 +22,14 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator,
     (new EnumeratedIntegerDistribution(rnd, users, probabilities),
       HashMap() ++ (users.map(_.toLong) zip probabilities))
   }
+  private val (userIpAddresses, spammerIpAddresses) = {
+    val numIps = numUsers / 10
+    val numSpammerIps = Math.max(numIps, (numIps * spammerFraction * 5).toInt)
+    val ips = (1 to numIps).toArray
+    MathArrays.shuffle(ips, rnd)
+    val spammerIps = ips.take(numSpammerIps)
+    (ips, spammerIps)
+  }
 
   private val bf = BloomFilter.create(new Funnel[(Long,Long)] {
     override def funnel(from: (Long, Long), into: PrimitiveSink): Unit = {
@@ -44,6 +52,14 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator,
 
   private def nextUserUniform(): Long = {
     rnd.nextInt(numUsers) + 1
+  }
+
+  private def getIpAddress(senderUserId: Long, spammer: Boolean): Int = {
+    if (spammer) {
+      spammerIpAddresses((senderUserId % spammerIpAddresses.length).toInt)
+    } else {
+      userIpAddresses((senderUserId % userIpAddresses.length).toInt)
+    }
   }
 
   // 50% of spammer messages contain emails,
@@ -80,7 +96,7 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator,
           bf.put(userPair)
           new NewFriendshipEvent(t, userIdA, userIdB)
         } else {
-          new MessageEvent(t, nextMessageId(), userIdA, userIdB, getRandomMessage(false))
+          new MessageEvent(t, nextMessageId(), userIdA, userIdB, getIpAddress(userIdA, false), getRandomMessage(false))
         }
         f(e)
         i += 1
@@ -91,7 +107,7 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator,
           while (userIdA == userIdB) {
             userIdB = nextUserUniform()
           }
-          f(new MessageEvent(t, nextMessageId(), userIdA, userIdB, getRandomMessage(true)))
+          f(new MessageEvent(t, nextMessageId(), userIdA, userIdB, getIpAddress(userIdA, true), getRandomMessage(true)))
           t += rnd.nextInt(10000)
           i += 1
         }

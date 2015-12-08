@@ -5,5 +5,6 @@ case class MessageEvent (
   messageId: Long,
   senderUserId: Long,
   recipientUserId: Long,
+  senderIp: Int,
   content: String
 ) extends Event

@@ -26,7 +26,7 @@ class UniformEventSource (startTime: Long, numUsers: Long, rnd: RandomGenerator)
       val e = if (rnd.nextBoolean()) {
         new NewFriendshipEvent(t, userIdA, userIdB)
       } else {
-        new MessageEvent(t, nextMessageId(), userIdA, userIdB, "")
+        new MessageEvent(t, nextMessageId(), userIdA, userIdB, 0, "")
       }
       f(e)
       t += rnd.nextInt(100000)

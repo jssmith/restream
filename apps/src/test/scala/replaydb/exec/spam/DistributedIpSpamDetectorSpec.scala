@@ -9,10 +9,10 @@ import org.scalatest.FlatSpec
  * runMain replaydb.exec.EventGenerator tunable 100000 500000 /Users/johann/tmp/events-500k-split-2/events.out 2
  *
  */
-class DistributedSpamDetectorSpec extends FlatSpec with TestRunner {
+class DistributedIpSpamDetectorSpec extends FlatSpec with TestRunner {
 
   it should "run with a two-way split" in {
-    runSpamDetector(2, classOf[SpamDetectorStats], DataDesc.SHORT)
+    runSpamDetector(2, classOf[IpSpamDetectorStats], DataDesc.SHORT)
   }
 
 }
