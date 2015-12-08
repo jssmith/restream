@@ -9,7 +9,7 @@ trait TestRunner {
     val MEDIUM = "5m"
     val LONG = "50m"
   }
-  protected def runSpamDetector[T<:HasRuntimeInterface](numServers: Int, spamDetectorClass: Class[T], dataDesc: String) = {
+  protected def runDistributedSpamDetector[T<:HasRuntimeInterface](numServers: Int, spamDetectorClass: Class[T], dataDesc: String) = {
     val startPort = 5567
     val ports = startPort until (startPort + numServers)
     val servers = ports.map(new Server(_))
@@ -22,6 +22,12 @@ trait TestRunner {
     } finally {
       servers.foreach(_.close())
     }
+  }
+
+  protected def runSerialSpamDetector[T<:HasRuntimeInterface](spamDetectorClass: Class[T], dataDesc: String): Unit = {
+    SerialSpamDetector2.main(Array[String](spamDetectorClass.getName,
+      s"${System.getProperty("user.home")}/tmp/events-$dataDesc-split-1/events.out-0"
+    ))
   }
 
 }

@@ -17,7 +17,7 @@ RULES:
 
  */
 
-class IpSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface {
+class IpSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface with HasSpamCounter {
   import replayStateFactory._
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)

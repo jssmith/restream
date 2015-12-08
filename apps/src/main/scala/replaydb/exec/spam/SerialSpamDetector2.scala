@@ -1,8 +1,9 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.PrintSpamCounter
+import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.serialImpl.ReplayStateFactory
 import replaydb.runtimedev.threadedImpl.MultiReaderEventSource
+import replaydb.runtimedev.{HasRuntimeInterface, PrintSpamCounter}
 import replaydb.util.ProgressMeter
 
 /**
@@ -10,13 +11,22 @@ import replaydb.util.ProgressMeter
  */
 object SerialSpamDetector2 extends App {
 
-  if (args.length != 1) {
-    println("Usage: SerialSpamDetector2 filename")
+  if (args.length != 2) {
+    println(
+      """Usage: SerialSpamDetector2 spamDetector filename
+        |  Example values:
+        |    spamDetector   = replaydb.exec.spam.SpamDetectorStats
+        |    filename       = ~/data/events-split-1/events.out-0
+      """.stripMargin)
     System.exit(1)
   }
 
-  val inputFilename = args(0)
-  val stats = new SpamDetectorStats(new ReplayStateFactory)
+  val spamDetector = Class.forName(args(0)).asInstanceOf[Class[HasRuntimeInterface with HasSpamCounter]]
+  val inputFilename = args(1)
+  val eventStorage = new SocialNetworkStorage
+  val stats = spamDetector
+    .getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
+    .newInstance(new ReplayStateFactory)
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
   val pm = new ProgressMeter(printInterval = 1000000, () => { si.updateAllPhases(new PrintSpamCounter(lastTimestamp)); ""})

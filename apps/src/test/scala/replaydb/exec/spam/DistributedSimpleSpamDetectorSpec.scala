@@ -31,7 +31,7 @@ class DistributedSimpleSpamDetectorSpec extends FlatSpec with TestRunner {
 //  }
 //
   it should "run with an eight-way split" in {
-    runSpamDetector(8, classOf[SimpleSpamDetectorStats], DataDesc.SHORT)
+    runDistributedSpamDetector(8, classOf[SimpleSpamDetectorStats], DataDesc.SHORT)
   }
 
 //  it should "run with a twelve-way split" in {
