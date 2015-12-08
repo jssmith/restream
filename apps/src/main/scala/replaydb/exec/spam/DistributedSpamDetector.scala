@@ -66,7 +66,7 @@ object DistributedSpamDetector extends App {
 
   println("starting replay...")
   for (i <- hostFiles.indices) {
-    clients.issueCommand(i, new InitReplayCommand(i, hostFiles(i), spamDetector, i, runConfiguration))
+    clients.issueCommand(i, new InitReplayCommand(i, hostFiles(i), spamDetector, runConfiguration))
   }
   clients.closeWhenDone()
 }

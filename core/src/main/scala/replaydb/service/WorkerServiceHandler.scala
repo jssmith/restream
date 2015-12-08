@@ -23,7 +23,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         if (server.stateCommunicationService != null) {
           server.stateCommunicationService.close()
         }
-        server.stateCommunicationService = new StateCommunicationService(c.hostId, c.runConfiguration)
+        server.stateCommunicationService = new StateCommunicationService(c.workerId, c.runConfiguration)
         server.networkStats.reset()
         server.garbageCollectorStats.reset()
         val stateFactory = new ReplayStateFactory(server.stateCommunicationService)
@@ -47,7 +47,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
               bufferSize = (ProgressTracker.FirstPhaseBatchExtraAllowance + runtime.numPhases) * runConfig.approxBatchSize * 2)
             val partitionThreads = for (phaseId <- 0 until runtime.numPhases) yield {
               new Thread(s"replay-$workerId-$phaseId") {
-                val progressCoordinator = server.batchProgressCoordinator.getCoordinator(phaseId)
+                val progressCoordinator = server.batchProgressCoordinator.getCoordinator(partitionId, phaseId)
 
                 override def run(): Unit = {
                   val startThreadCpuTime = ManagementFactory.getThreadMXBean.getCurrentThreadCpuTime
