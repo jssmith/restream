@@ -5,6 +5,7 @@ import replaydb.service.ClientGroup
 import replaydb.service.driver.{Hosts, InitReplayCommand, RunConfiguration}
 import replaydb.util.{EventRateEstimator, LoggerConfiguration}
 
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
 // TODO this needs a way to time how long things take to do performance checks, like the serial/parallel ones
@@ -34,11 +35,15 @@ object DistributedSpamDetector extends App {
   val hosts = Hosts.fromFile(hostsFile)
   val numHosts = hosts.length
 
-  if (numHosts != numPartitions) {
-    throw new RuntimeException("Must have same number of hosts and partitions")
-  }
-
   val filenames = (0 until numPartitions).map(i => s"$partitionFnBase-$i").toArray
+  // round robin assignment of files to hosts
+  val hostFiles = new Array[ArrayBuffer[(Int,String)]](numHosts)
+  for (i <- hostFiles.indices) {
+    hostFiles(i) = ArrayBuffer[(Int,String)]()
+  }
+  for (i <- filenames.indices) {
+    hostFiles(i % numHosts) += i -> filenames(i)
+  }
 
   // estimate the event rate so that we can set a batch time range
   val r = EventRateEstimator.estimateRate(partitionFnBase, numPartitions)
@@ -60,8 +65,8 @@ object DistributedSpamDetector extends App {
   clients.connect(hosts)
 
   println("starting replay...")
-  for (i <- filenames.indices) {
-    clients.issueCommand(i, new InitReplayCommand(i, filenames(i), spamDetector, i, runConfiguration))
+  for (i <- hostFiles.indices) {
+    clients.issueCommand(i, new InitReplayCommand(i, hostFiles(i), spamDetector, i, runConfiguration))
   }
   clients.closeWhenDone()
 }
