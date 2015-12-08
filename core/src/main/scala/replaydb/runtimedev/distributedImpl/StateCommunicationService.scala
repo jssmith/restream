@@ -98,8 +98,11 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
   }
 
   def handleStateUpdateCommand(cmd: StateUpdateCommand): Unit = {
-    this.synchronized {
       logger.info(s"Phase $partitionId-${cmd.phaseId} received writes from ${cmd.originatingPartitionId} for batch ${cmd.batchEndTs}")
+      for (w <- cmd.writes) {
+        // TODO the typing here needs work...
+        states(w.collectionId).insertRemoteWrite(w.ts, w.key, w.asInstanceOf[StateWrite[Any]].merge)
+      }
       val readRequestsToProcess = outstandingInboundReads.synchronized {
         val buf = outstandingInboundReads(cmd.phaseId)(cmd.originatingPartitionId).getOrElseUpdate(cmd.batchEndTs, ArrayBuffer())
         buf += cmd
@@ -109,10 +112,6 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
         } else {
           None
         }
-      }
-      for (w <- cmd.writes) {
-        // TODO the typing here needs work...
-        states(w.collectionId).insertRemoteWrite(w.ts, w.key, w.asInstanceOf[StateWrite[Any]].merge)
       }
       if (readRequestsToProcess.isDefined) {
         logger.info(s"Phase $partitionId-${cmd.phaseId} processing read requests for ${readRequestsToProcess.get.size} partitions")
@@ -127,11 +126,9 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
           }).mkString(", "))
         }
       }
-    }
   }
 
   def processStateReadRequests(cmds: ArrayBuffer[StateUpdateCommand]): Unit = {
-    this.synchronized {
       for (cmd <- cmds) {
         val responses: ArrayBuffer[StateResponse] = ArrayBuffer()
         for (rp <- cmd.readPrepares) {
@@ -150,7 +147,6 @@ class StateCommunicationService(partitionId: Int, runConfiguration: RunConfigura
           rIdx += MaxMessagesPerCommand
         } while (rIdx < responses.length)
       }
-    }
   }
 
   // Closes out a batch: sends out all of the outstanding writes and getPrepares
