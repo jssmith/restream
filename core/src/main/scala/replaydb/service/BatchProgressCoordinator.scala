@@ -17,7 +17,9 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long, pa
   }
 
   def update(phaseId: Int, maxTimestamp: Long): Unit = {
-    x(phaseId).update(maxTimestamp)
+    x.synchronized {
+      x(phaseId).values.foreach(_.update(maxTimestamp))
+    }
   }
 
   class PhaseLimit(phaseId: Int) extends ThreadCoordinator(partitionId, phaseId) {
@@ -48,12 +50,17 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long, pa
     def batchId: Int = throw new UnsupportedOperationException
   }
 
-  val x = mutable.HashMap[Int, PhaseLimit]()
+  val x = mutable.HashMap[Int, mutable.HashMap[Int, PhaseLimit]]()
 
-  def getCoordinator(phaseId: Int): ThreadCoordinator = {
-    if (!x.contains(phaseId)) {
-      x += phaseId -> new PhaseLimit(phaseId)
+  def getCoordinator(partitionId: Int, phaseId: Int): ThreadCoordinator = {
+    x.synchronized {
+      if (!x.contains(phaseId)) {
+        x += phaseId -> mutable.HashMap()
+      }
+      if (!x(phaseId).contains(partitionId)) {
+        x(phaseId) += partitionId -> new PhaseLimit(phaseId)
+      }
+      x(phaseId)(partitionId)
     }
-    x(phaseId)
   }
 }

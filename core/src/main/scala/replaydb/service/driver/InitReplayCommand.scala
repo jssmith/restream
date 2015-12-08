@@ -2,11 +2,12 @@ package replaydb.service.driver
 
 import replaydb.runtimedev.HasRuntimeInterface
 
-class InitReplayCommand[T <: HasRuntimeInterface](
-                             val partitionId: Int,
-                             val filename: String,
-                             program: Class[T],
-                             val hostId: Int,
-                             val runConfiguration: RunConfiguration) extends Command {
+import scala.collection.mutable.ArrayBuffer
+
+class InitReplayCommand[T <: HasRuntimeInterface](val workerId: Int,
+                                                  val partitionMaps: ArrayBuffer[(Int, String)],
+                                                  program: Class[T],
+                                                  val runConfiguration: RunConfiguration)
+  extends Command {
   val programClass = program.getCanonicalName
 }

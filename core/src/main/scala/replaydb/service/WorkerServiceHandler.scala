@@ -23,7 +23,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         if (server.stateCommunicationService != null) {
           server.stateCommunicationService.close()
         }
-        server.stateCommunicationService = new StateCommunicationService(c.hostId, c.runConfiguration)
+        server.stateCommunicationService = new StateCommunicationService(c.workerId, c.partitionMaps.size, c.runConfiguration)
         server.networkStats.reset()
         server.garbageCollectorStats.reset()
         val stateFactory = new ReplayStateFactory(server.stateCommunicationService)
@@ -31,78 +31,82 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         val runConfig = c.runConfiguration
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
-        server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval, c.partitionId)
-        server.startLatch = new CountDownLatch(runConfig.numPhases)
-        server.finishLatch = new CountDownLatch(runConfig.numPartitions)
+        server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval, c.workerId)
+
+        // TODO these two probably need to change
+        server.startLatch = new CountDownLatch(runConfig.numPhases * c.partitionMaps.size)
+        server.finishLatch = new CountDownLatch(runConfig.hosts.length) // number of workers
 
         val progressSendLock = new ReentrantLock()
 
-        val partitionId = c.partitionId
+        val workerId = c.workerId
         logger.info(s"launching threads... number of phases ${runConfig.numPhases}")
-        val readerThread = new MultiReaderEventSource(c.filename, runtime.numPhases,
-          bufferSize = (ProgressTracker.FirstPhaseBatchExtraAllowance + 3) * runConfig.approxBatchSize * 2)
         val threads =
-          for (phaseId <- 0 until runtime.numPhases) yield {
-            new Thread(s"replay-$partitionId-$phaseId") {
-              val progressCoordinator = server.batchProgressCoordinator.getCoordinator(phaseId)
-              override def run(): Unit = {
-                // TODO
-                //  - separate reader thread
-                val startThreadCpuTime = ManagementFactory.getThreadMXBean.getCurrentThreadCpuTime
-                try {
-                  server.startLatch.countDown()
-                  logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
-                  var batchEndTimestamp = c.runConfiguration.startTimestamp
-                  var lastTimestamp = Long.MinValue
-                  var ct = 0
-                  def sendProgress(done: Boolean = false): Unit = {
-                    val progressUpdateCommand = new ProgressUpdateCommand(partitionId, phaseId, ct, batchEndTimestamp, done)
-                    logger.debug(s"preparing progress update $progressUpdateCommand)")
-                    progressSendLock.lock()
-                    logger.debug(s"sending progress update $progressUpdateCommand)")
-                    msg.getChannel.write(progressUpdateCommand) //.sync()
-                    logger.debug(s"finished sending progress update")
-                    progressSendLock.unlock()
-                  }
-                  readerThread.readEvents(e => {
-                    if (e.ts >= batchEndTimestamp) {
-                      logger.info(s"reached batch end on partition $partitionId phase $phaseId")
-                      // Send out StateUpdateCommands
-                      server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
-                      sendProgress()
-                      batchEndTimestamp += runConfig.batchTimeInterval
-                      logger.info(s"advancing endtime $batchEndTimestamp on partition $partitionId phase $phaseId")
-                      progressCoordinator.awaitAdvance(batchEndTimestamp)
+          (for ((partitionId, filename) <- c.partitionMaps) yield {
+            val readerThread = new MultiReaderEventSource(filename, runtime.numPhases,
+              bufferSize = (ProgressTracker.FirstPhaseBatchExtraAllowance + runtime.numPhases) * runConfig.approxBatchSize * 2)
+            val partitionThreads = for (phaseId <- 0 until runtime.numPhases) yield {
+              new Thread(s"replay-$partitionId-$phaseId") {
+                val progressCoordinator = server.batchProgressCoordinator.getCoordinator(partitionId, phaseId)
+
+                override def run(): Unit = {
+                  val startThreadCpuTime = ManagementFactory.getThreadMXBean.getCurrentThreadCpuTime
+                  try {
+                    server.startLatch.countDown()
+                    logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
+                    var batchEndTimestamp = c.runConfiguration.startTimestamp
+                    var lastTimestamp = Long.MinValue
+                    var ct = 0
+                    def sendProgress(done: Boolean = false): Unit = {
+                      val progressUpdateCommand = new ProgressUpdateCommand(partitionId, phaseId, ct, batchEndTimestamp, done)
+                      logger.debug(s"preparing progress update $progressUpdateCommand)")
+                      progressSendLock.lock()
+                      logger.debug(s"sending progress update $progressUpdateCommand)")
+                      msg.getChannel.write(progressUpdateCommand) //.sync()
+                      logger.debug(s"finished sending progress update")
+                      progressSendLock.unlock()
                     }
-                    lastTimestamp = e.ts
-                    runtime.update(e)(progressCoordinator)
-                    ct += 1
-                  })
-                  // TODO ETK need a better way to extract info than this - two notes on that
-                  // 1. We need a way to access the state from the Stats object in general, some way
-                  //    to get info from our collections at the end of the run
-                  // 2. In addition to that, we should implement something like a Spark accumulator
-                  //    that only accepts cumulative/associative operations but operates very efficiently
-                  //    and can only be read at the end of the run
-                  runtime.update(PrintSpamCounter(batchEndTimestamp - 1))(progressCoordinator)
-                  server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
-                  logger.info(s"finished phase $phaseId on partition $partitionId")
-                  // Send progress for all phases, but only set done flag when the last phase is done
-                  sendProgress(phaseId == runtime.numPhases-1)
-                } catch {
-                  case e: Throwable => logger.error("server execution error", e)
-                } finally {
-                  // Print out performance statistics
-                  val threadId = Thread.currentThread().getId
-                  val threadMxBean = ManagementFactory.getThreadMXBean
-                  val threadCpuTime = threadMxBean.getCurrentThreadCpuTime
-                  val elapsedThreadCpuTime = threadCpuTime - startThreadCpuTime
-                  PerfLogger.log(s"thread $threadId (phase $phaseId) finished with elapsed cpu time ${elapsedThreadCpuTime/1000000} ms")
+                    readerThread.readEvents(e => {
+                      if (e.ts >= batchEndTimestamp) {
+                        logger.info(s"reached batch end on partition $partitionId phase $phaseId")
+                        // Send out StateUpdateCommands
+                        server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
+                        sendProgress()
+                        batchEndTimestamp += runConfig.batchTimeInterval
+                        logger.info(s"advancing endtime $batchEndTimestamp on partition $partitionId phase $phaseId")
+                        progressCoordinator.awaitAdvance(batchEndTimestamp)
+                      }
+                      lastTimestamp = e.ts
+                      runtime.update(e)(progressCoordinator)
+                      ct += 1
+                    })
+                    // TODO ETK need a better way to extract info than this - two notes on that
+                    // 1. We need a way to access the state from the Stats object in general, some way
+                    //    to get info from our collections at the end of the run
+                    // 2. In addition to that, we should implement something like a Spark accumulator
+                    //    that only accepts cumulative/associative operations but operates very efficiently
+                    //    and can only be read at the end of the run
+                    runtime.update(PrintSpamCounter(batchEndTimestamp - 1))(progressCoordinator)
+                    server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
+                    logger.info(s"finished phase $phaseId on partition $partitionId")
+                    // Send progress for all phases, but only set done flag when the last phase is done
+                    sendProgress(phaseId == runtime.numPhases - 1)
+                  } catch {
+                    case e: Throwable => logger.error("server execution error", e)
+                  } finally {
+                    // Print out performance statistics
+                    val threadId = Thread.currentThread().getId
+                    val threadMxBean = ManagementFactory.getThreadMXBean
+                    val threadCpuTime = threadMxBean.getCurrentThreadCpuTime
+                    val elapsedThreadCpuTime = threadCpuTime - startThreadCpuTime
+                    PerfLogger.log(s"thread $threadId (phase $phaseId) finished with elapsed cpu time ${elapsedThreadCpuTime / 1000000} ms")
+                  }
                 }
               }
             }
-          }
-        readerThread.start()
+            readerThread.start()
+            partitionThreads
+          }).reduce(_ ++ _)
         threads.foreach(_.start())
       }
 
