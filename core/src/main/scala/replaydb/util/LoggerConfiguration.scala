@@ -15,8 +15,8 @@ object LoggerConfiguration {
           Logger.getRootLogger.setLevel(Level.DEBUG)
           Logger.getRootLogger.addAppender(new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN)))
           Logger.getLogger("org.jboss.netty").setLevel(Level.INFO)
-          //    Logger.getLogger("replaydb.service.KryoCommandEncoder").setLevel(Level.INFO)
-          //    Logger.getLogger("replaydb.service.KryoCommandDecoder").setLevel(Level.INFO)
+          Logger.getLogger("replaydb.service.KryoCommandEncoder").setLevel(Level.INFO)
+          Logger.getLogger("replaydb.service.KryoCommandDecoder").setLevel(Level.INFO)
         } else {
           System.err.println("using log4j.properties")
         }
