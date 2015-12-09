@@ -13,7 +13,8 @@ RULES:
 
  */
 
-class SimpleSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface with HasSpamCounter {
+class SimpleSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface
+  with HasSpamCounter with HasReplayStates[ReplayState with Threaded] {
   import replayStateFactory._
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)

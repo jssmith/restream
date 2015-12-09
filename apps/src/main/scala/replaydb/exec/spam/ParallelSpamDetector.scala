@@ -1,28 +1,36 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.PrintSpamCounter
-import replaydb.runtimedev.threadedImpl.{ReplayStateFactory, MultiReaderEventSource, RunProgressCoordinator}
-import replaydb.util.{ProgressMeter, MemoryStats}
+import replaydb.runtimedev.threadedImpl._
+import replaydb.runtimedev.{HasReplayStates, ReplayState, HasRuntimeInterface, PrintSpamCounter}
 import replaydb.util
+import replaydb.util.{MemoryStats, ProgressMeter}
 
 object ParallelSpamDetector extends App {
 
-  if (args.length != 4) {
+  if (args.length != 5) {
     println(
-      """Usage: ParallelSpamDetector baseFilename numPartitions batchSize gcInterval
-        |  Suggested values: numPartitions = 4, batchSize = 500, gcInterval = 50000
+      """Usage: ParallelSpamDetector spamDetector baseFilename numPartitions batchSize gcInterval
+        |  Example values:
+        |    spamDetector   = replaydb.exec.spam.SpamDetectorStats
+        |    baseFilename   = ~/data/events.out
+        |    numPartitions  = 4
+        |    batchSize      = 500
+        |    gcInterval     = 50000
       """.stripMargin)
+
     System.exit(1)
   }
 
-  val partitionFnBase = args(0)
-  val numPartitions = args(1).toInt
-  val batchSize = args(2).toInt
-  val gcInterval = args(3).toInt
+  val spamDetector = Class.forName(args(0)).asInstanceOf[Class[HasRuntimeInterface with HasSpamCounter with HasReplayStates[ReplayState with Threaded]]]
+  val partitionFnBase = args(1)
+  val numPartitions = args(2).toInt
+  val batchSize = args(3).toInt
+  val gcInterval = args(4).toInt
 
   val startTime = util.Date.df.parse("2015-01-01 00:00:00.000").getTime
-
-  val stats = new SpamDetectorStats(new ReplayStateFactory)
+  val stats = spamDetector
+    .getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
+    .newInstance(new ReplayStateFactory)
   val si = stats.getRuntimeInterface
   val numPhases = si.numPhases
 
