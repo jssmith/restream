@@ -3,7 +3,8 @@ package replaydb.runtimedev.distributedImpl
 import com.typesafe.scalalogging.Logger
 import org.jboss.netty.channel._
 import org.slf4j.LoggerFactory
-import replaydb.service.driver.{RunConfiguration, Command}
+import replaydb.runtimedev.RuntimeStats
+import replaydb.service.driver.{KryoCommands, RunConfiguration, Command}
 import replaydb.service.ClientGroupBase
 import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateResponse, StateRead, StateWrite}
 import replaydb.util.PerfLogger
@@ -14,7 +15,7 @@ import scala.collection.mutable.ArrayBuffer
 // TODO ETK - I *think* this is cleaning up all unnecessary state (i.e. GC'ing itself)
 //            but want to think more about it and make sure that's true
 
-class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfiguration: RunConfiguration) {
+class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfiguration: RunConfiguration, stats: RuntimeStats) {
 
   val MaxMessagesPerCommand = 50000
 
@@ -22,7 +23,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
   val numPhases = runConfiguration.numPhases
   val numPartitions = runConfiguration.numPartitions
   val numWorkers = runConfiguration.hosts.length
-  val client = new ClientGroupBase(runConfiguration) {
+  val client = new ClientGroupBase(runConfiguration, stats) {
     override def getHandler(): SimpleChannelUpstreamHandler = new SimpleChannelUpstreamHandler {
       override def messageReceived(ctx: ChannelHandlerContext, me: MessageEvent): Unit = {
         me.getMessage.asInstanceOf[Command] match {

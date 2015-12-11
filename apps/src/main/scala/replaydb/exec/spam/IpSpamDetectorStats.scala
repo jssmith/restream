@@ -4,6 +4,8 @@ import replaydb.event.{MessageEvent, NewFriendshipEvent}
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
 import replaydb.runtimedev.threadedImpl._
+import replaydb.service.KryoCommandDecoder
+import replaydb.service.driver.KryoCommands
 
 
 /*
@@ -17,7 +19,7 @@ RULES:
 
  */
 
-class IpSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface with HasSpamCounter {
+class IpSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends RuntimeStats with HasSpamCounter {
   import replayStateFactory._
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
@@ -25,6 +27,8 @@ class IpSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFac
   val ipSendRatio: ReplayMap[Int, (Long, Long)] = getReplayMap((0L,0L))
   val spamCounter: ReplayCounter = getReplayCounter
   val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = getReplayTimestampLocalMap(0)
+
+  registerClass(classOf[UserPair])
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState with Threaded] = {

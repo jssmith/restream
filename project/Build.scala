@@ -44,7 +44,8 @@ object ReplayDBBuild extends Build {
         "log4j" % "log4j" % "1.2.17",
         "org.apache.commons" % "commons-math3" % "3.5",
         "com.google.guava" % "guava" % "18.0",
-        "org.scalatest" %% "scalatest" % "2.2.5"
+        "org.scalatest" %% "scalatest" % "2.2.5",
+        "org.reflections" % "reflections" % "0.9.10"
       )
     )
   )

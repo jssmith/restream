@@ -1,7 +1,9 @@
 package replaydb.exec.spam
 
-import replaydb.runtimedev.HasRuntimeInterface
+import replaydb.runtimedev._
 import replaydb.service.Server
+
+import scala.reflect.ClassTag
 
 trait TestRunner {
   object DataDesc {
@@ -12,7 +14,16 @@ trait TestRunner {
   protected def runDistributedSpamDetector[T<:HasRuntimeInterface](numServers: Int, spamDetectorClass: Class[T], dataDesc: String) = {
     val startPort = 5567
     val ports = startPort until (startPort + numServers)
-    val servers = ports.map(new Server(_))
+
+    val constructor = spamDetectorClass.getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
+    val factory = new replaydb.runtimedev.ReplayStateFactory {
+      override def getReplayMap[K, V: ClassTag](default: => V): ReplayMap[K, V] = null
+      override def getReplayCounter: ReplayCounter = null
+      override def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = null
+    }
+    val program = constructor.newInstance(factory)
+
+    val servers = ports.map(new Server(_, program.asInstanceOf[RuntimeStats]))
     servers.foreach(_.run())
     try {
       DistributedSpamDetector.main(Array[String](spamDetectorClass.getName,

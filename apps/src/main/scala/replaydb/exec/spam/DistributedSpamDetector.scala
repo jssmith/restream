@@ -2,7 +2,7 @@ package replaydb.exec.spam
 
 import replaydb.runtimedev._
 import replaydb.service.ClientGroup
-import replaydb.service.driver.{Hosts, InitReplayCommand, RunConfiguration}
+import replaydb.service.driver.{KryoCommands, Hosts, InitReplayCommand, RunConfiguration}
 import replaydb.util.{EventRateEstimator, LoggerConfiguration}
 
 import scala.collection.mutable.ArrayBuffer
@@ -51,17 +51,17 @@ object DistributedSpamDetector extends App {
   val batchTimeInterval = (batchSize * r.eventIntervalMs).toLong
   println(s"rate estimate $r")
 
-  val numPhases = new SpamDetectorStats(new ReplayStateFactory {
+  val sds = new SpamDetectorStats(new ReplayStateFactory {
     override def getReplayMap[K, V: ClassTag](default: => V): ReplayMap[K, V] = null
     override def getReplayCounter: ReplayCounter = null
     override def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = null
-  }).getRuntimeInterface.numPhases
+  })
 
-  val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = numPhases, hosts,
-    startTimestamp = startTime, batchTimeInterval = batchTimeInterval, approxBatchSize = batchSize)
+  val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = sds.getRuntimeInterface.numPhases,
+    hosts, startTimestamp = startTime, batchTimeInterval = batchTimeInterval, approxBatchSize = batchSize)
 
   println("connecting...")
-  val clients = new ClientGroup(runConfiguration)
+  val clients = new ClientGroup(runConfiguration, sds)
   clients.connect(hosts)
 
   println("starting replay...")

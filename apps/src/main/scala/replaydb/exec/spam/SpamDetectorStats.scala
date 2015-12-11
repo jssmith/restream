@@ -5,10 +5,6 @@ import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
 import replaydb.runtimedev.threadedImpl._
 import replaydb.util.time._
-
-import scala.collection.immutable
-
-
 /*
 RULES:
 
@@ -21,7 +17,7 @@ RULES:
 
  */
 
-class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface with HasSpamCounter {
+class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends RuntimeStats with HasSpamCounter {
   import replayStateFactory._
 
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
@@ -52,15 +48,37 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
     states.asInstanceOf[Seq[ReplayState with Threaded]]
   }
 
+  val toOne = (_: Int) => 1
+  val incrBy10 = (x: Int) => x + 10
+  val incrFirst = (tuple: (Long, Long)) => (tuple._1 + 1, tuple._2)
+  val incrSecond = (tuple: (Long, Long)) => (tuple._1, tuple._2 + 1)
+  val incrBoth = (tuple: (Long, Long)) => (tuple._1 + 1, tuple._2 + 1)
+  val decrBoth = (tuple: (Long, Long)) => (tuple._1 - 1, tuple._2 - 1)
+  val decrFirst = (tuple: (Long, Long)) => (tuple._1 - 1, tuple._2)
+  val decrSecond = (tuple: (Long, Long)) => (tuple._1, tuple._2 - 1)
+  val takeMax = (newVal: Long) => (old: Long) => Math.max(old, newVal)
+  val takeMin = (newVal: Long) => (old: Long) => Math.min(old, newVal)
+
+  registerClass(toOne.getClass)
+  registerClass(incrFirst.getClass)
+  registerClass(incrSecond.getClass)
+  registerClass(incrBy10.getClass)
+  registerClass(incrBoth.getClass)
+  registerClass(decrBoth.getClass)
+  registerClass(decrFirst.getClass)
+  registerClass(decrSecond.getClass)
+  registerClass(takeMax(0).getClass)
+  registerClass(takeMin(0).getClass)
+
   def getRuntimeInterface: RuntimeInterface = emit {
     bind { e: NewFriendshipEvent =>
-      friendships.merge(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
+      friendships.merge(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = toOne)
     }
     // RULE 1 STATE
     bind { me: MessageEvent =>
       friendships.get(ts = me.ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
-        case Some(_) => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
-        case None => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
+        case Some(_) => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, incrFirst)
+        case None => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, incrSecond)
       }
     }
     // RULE 1 EVALUATION
@@ -71,7 +89,21 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
             if (toFriends + toNonFriends > 5) {
               if (toNonFriends > 2 * toFriends) {
                 //                  spamCounter.add(1, ts)
-                messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
+                messageSpamRatings.merge(me.ts, me.messageId, incrBy10)
+              }
+            }
+          case None =>
+        }
+    }
+    // RULE 2 STATE
+    bind {
+      me: MessageEvent =>
+        friendSendRatio.get(ts = me.ts, key = me.senderUserId) match {
+          case Some((toFriends, toNonFriends)) =>
+            if (toFriends + toNonFriends > 5) {
+              if (toNonFriends > 2 * toFriends) {
+                //                  spamCounter.add(1, ts)
+                messageSpamRatings.merge(me.ts, me.messageId, incrBy10)
               }
             }
           case None =>
@@ -118,13 +150,11 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
       me: MessageEvent =>
         val ts = me.ts
         if (containsEmail(me.content)) {
-          messageContainingEmailFraction.merge(ts, me.senderUserId, (ratio) => (ratio._1 + 1, ratio._2 + 1))
-          messageContainingEmailFraction.merge(ts + MessageContainingEmailInterval,
-            me.senderUserId, (ratio) => (ratio._1 - 1, ratio._2 - 1))
+          messageContainingEmailFraction.merge(ts, me.senderUserId, incrBoth)
+          messageContainingEmailFraction.merge(ts + MessageContainingEmailInterval, me.senderUserId, decrBoth)
         } else {
-          messageContainingEmailFraction.merge(ts, me.senderUserId, (ratio) => (ratio._1, ratio._2 + 1))
-          messageContainingEmailFraction.merge(ts + MessageContainingEmailInterval,
-            me.senderUserId, (ratio) => (ratio._1, ratio._2 - 1))
+          messageContainingEmailFraction.merge(ts, me.senderUserId, incrSecond)
+          messageContainingEmailFraction.merge(ts + MessageContainingEmailInterval, me.senderUserId, decrSecond)
         }
     }
     // RULE 3 EVALUATION
@@ -133,7 +163,7 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
         messageContainingEmailFraction.get(me.ts, me.senderUserId) match {
           case Some((email: Long, all: Long)) =>
             if ((email + 0.0) / all > MessageContainingEmailFractionThreshold) {
-              messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
+              messageSpamRatings.merge(me.ts, me.messageId, incrBy10)
             }
           case None =>
         }
@@ -141,10 +171,10 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
     // RULE 4 STATE
     bind {
       me: MessageEvent =>
-        userFirstMessageTS.merge(me.ts, me.senderUserId, Math.min(_, me.ts)) // kind of wasteful...
-        messagesFractionLast7DaysInLast24Hours.merge(me.ts, me.senderUserId, old => (old._1 + 1, old._2 + 1))
-        messagesFractionLast7DaysInLast24Hours.merge(me.ts + 1.days, me.senderUserId, old => (old._1 - 1, old._2))
-        messagesFractionLast7DaysInLast24Hours.merge(me.ts + 7.days, me.senderUserId, old => (old._1, old._2 - 1))
+        userFirstMessageTS.merge(me.ts, me.senderUserId, takeMin(me.ts)) // kind of wasteful...
+        messagesFractionLast7DaysInLast24Hours.merge(me.ts, me.senderUserId, incrBoth)
+        messagesFractionLast7DaysInLast24Hours.merge(me.ts + 1.days, me.senderUserId, decrFirst)
+        messagesFractionLast7DaysInLast24Hours.merge(me.ts + 7.days, me.senderUserId, decrSecond)
     }
     // RULE 4 EVALUATE
     bind {
@@ -157,7 +187,7 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
           messagesFractionLast7DaysInLast24Hours.get(me.ts, me.senderUserId) match {
             case Some((last24Hours, last7Days)) =>
               if ((last24Hours + 0.0) / last7Days > MessagesLast7DaysSentLast24HoursFraction) {
-                messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
+                messageSpamRatings.merge(me.ts, me.messageId, incrBy10)
               }
             case None =>
           }
@@ -166,7 +196,7 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
     // RULE 5 STATE 1
     bind {
       me: MessageEvent =>
-        userMostRecentReceivedMessage.merge(me.ts, (me.recipientUserId, me.senderUserId), Math.max(_, me.ts))
+        userMostRecentReceivedMessage.merge(me.ts, (me.recipientUserId, me.senderUserId), takeMax(me.ts))
     }
     // RULE 5 STATE 2
     bind {
@@ -176,9 +206,9 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
           case None => false
         }
         if (isResponse) {
-          messageSentInResponseFraction.merge(me.ts, me.senderUserId, frac => (frac._1 + 1, frac._2 + 1))
+          messageSentInResponseFraction.merge(me.ts, me.senderUserId, incrBoth)
         } else {
-          messageSentInResponseFraction.merge(me.ts, me.senderUserId, frac => (frac._1, frac._2 + 1))
+          messageSentInResponseFraction.merge(me.ts, me.senderUserId, incrSecond)
         }
     }
     // RULE 5 EVALUATION
@@ -187,7 +217,7 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
         messageSentInResponseFraction.get(me.ts, me.senderUserId) match {
           case Some((resp, all)) =>
             if ((resp + 0.0) / all < MessageSentInResponseFractionThreshold) {
-              messageSpamRatings.merge(me.ts, me.messageId, _ + 10)
+              messageSpamRatings.merge(me.ts, me.messageId, incrBy10)
             }
           case None =>
         }

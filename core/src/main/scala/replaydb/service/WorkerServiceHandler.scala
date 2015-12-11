@@ -7,11 +7,15 @@ import java.util.concurrent.locks.ReentrantLock
 import com.typesafe.scalalogging.Logger
 import org.jboss.netty.channel._
 import org.slf4j.LoggerFactory
+import replaydb.runtimedev._
+import replaydb.runtimedev.distributedImpl.ReplayStateFactory
+import replaydb.runtimedev.distributedImpl.ReplayStateFactory
 import replaydb.runtimedev.distributedImpl._
 import replaydb.runtimedev.threadedImpl.MultiReaderEventSource
-import replaydb.runtimedev.{HasRuntimeInterface, PrintSpamCounter}
 import replaydb.service.driver._
 import replaydb.util.PerfLogger
+
+import scala.reflect.ClassTag
 
 class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler {
   val logger = Logger(LoggerFactory.getLogger(classOf[WorkerServiceHandler]))
@@ -23,12 +27,20 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         if (server.stateCommunicationService != null) {
           server.stateCommunicationService.close()
         }
-        server.stateCommunicationService = new StateCommunicationService(c.workerId, c.partitionMaps.size, c.runConfiguration)
+
+        val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
+        val runConfig = c.runConfiguration
+
+        val factory = new replaydb.runtimedev.ReplayStateFactory {
+          override def getReplayMap[K, V: ClassTag](default: => V): ReplayMap[K, V] = null
+          override def getReplayCounter: ReplayCounter = null
+          override def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = null
+        }
+
+        server.stateCommunicationService = new StateCommunicationService(c.workerId, c.partitionMaps.size, c.runConfiguration, constructor.newInstance(factory).asInstanceOf[RuntimeStats])
         server.networkStats.reset()
         server.garbageCollectorStats.reset()
         val stateFactory = new ReplayStateFactory(server.stateCommunicationService)
-        val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
-        val runConfig = c.runConfiguration
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
         server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval, c.workerId)

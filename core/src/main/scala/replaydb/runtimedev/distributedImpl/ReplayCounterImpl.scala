@@ -10,7 +10,7 @@ class ReplayCounterImpl(collectionId: Int, commService: StateCommunicationServic
   val internalMap = new ReplayMapImpl[Int, Long](0L, collectionId, commService)
 
   def add(value: Long, ts: Long)(implicit batchInfo: BatchInfo): Unit = {
-    internalMap.merge(ts, collectionId, _ + value)
+    internalMap.merge(ts, collectionId, ReplayCounterImpl.mergeFunction(value))
   }
 
   def get(ts: Long)(implicit batchInfo: BatchInfo): Long = {
@@ -23,4 +23,8 @@ class ReplayCounterImpl(collectionId: Int, commService: StateCommunicationServic
   def getPrepare(ts: Long)(implicit batchInfo: BatchInfo): Unit = {
     internalMap.getPrepare(ts, collectionId)
   }
+}
+
+object ReplayCounterImpl {
+  val mergeFunction = (value: Long) => (old: Long) => old + value
 }

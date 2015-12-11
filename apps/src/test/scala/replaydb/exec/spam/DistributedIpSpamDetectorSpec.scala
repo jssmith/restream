@@ -11,8 +11,8 @@ import org.scalatest.FlatSpec
  */
 class DistributedIpSpamDetectorSpec extends FlatSpec with TestRunner {
 
-  it should "run with a two-way split" in {
-    runDistributedSpamDetector(2, classOf[IpSpamDetectorStats], DataDesc.SHORT)
-  }
+//  it should "run with a two-way split" in {
+//    runDistributedSpamDetector(2, classOf[IpSpamDetectorStats], DataDesc.SHORT)
+//  }
 
 }

@@ -11,12 +11,13 @@ import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.handler.logging.LoggingHandler
 import org.jboss.netty.logging.{Slf4JLoggerFactory, InternalLoggerFactory, InternalLogLevel}
 import org.slf4j.LoggerFactory
+import replaydb.runtimedev.RuntimeStats
 import replaydb.service.driver._
 import replaydb.util.{PerfLogger, NetworkStats}
 
 import scala.collection.mutable.ArrayBuffer
 
-abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
+abstract class ClientGroupBase(runConfiguration: RunConfiguration, stats: RuntimeStats) {
   InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory)
   val logger = Logger(LoggerFactory.getLogger(classOf[ClientGroupBase]))
   val networkStats = new NetworkStats()
@@ -32,11 +33,15 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
   b.setPipelineFactory(new ChannelPipelineFactory {
     override def getPipeline: ChannelPipeline = {
       val p = org.jboss.netty.channel.Channels.pipeline()
+      val encoder = new KryoCommandEncoder(networkStats)
+      val decoder = new KryoCommandDecoder(networkStats)
+      encoder.registerTypes(stats.getKryoTypes)
+      decoder.registerTypes(stats.getKryoTypes)
       p.addLast("Logger", new LoggingHandler(InternalLogLevel.DEBUG))
-      p.addLast("KryoEncoder", new KryoCommandEncoder(networkStats))
+      p.addLast("KryoEncoder", encoder)
 
       // Decode commands received from clients
-      p.addLast("KryoDecoder", new KryoCommandDecoder(networkStats))
+      p.addLast("KryoDecoder", decoder)
       p.addLast("Handler", getHandler())
       p
     }
