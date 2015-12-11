@@ -99,7 +99,7 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
         logger.debug("driver finished awaiting close in closeWhenDone")
         new CloseCommand()
       }
-      PerfLogger.log(s"client network stats $networkStats")
+      PerfLogger.logNetwork(s"client network stats $networkStats")
       // Netty complains if we `sync` within an IO thread
       val t = new Thread() {
         override def run(): Unit = {

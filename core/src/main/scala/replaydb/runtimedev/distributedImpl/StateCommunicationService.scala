@@ -130,7 +130,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
       // Can GC after the second to last phase since the last phase doesn't read or write anything
       // (last phase's reads are carried out by the second to last phase)
       if (cmd.phaseId == numPhases - 2) {
-        PerfLogger.log("Custom GC stats: (total merged values in collection, total unmerged values, number of ReplayValues, GC'd values)"
+        PerfLogger.logGc("Custom GC stats: (total merged values in collection, total unmerged values, number of ReplayValues, GC'd values)"
           + (for ((id, s) <- states) yield {
           s"State ID $id: ${s.gcOlderThan(cmd.batchEndTs)}"
         }).mkString(", "))

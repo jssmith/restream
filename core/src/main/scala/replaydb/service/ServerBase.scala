@@ -11,13 +11,15 @@ import org.jboss.netty.handler.logging.LoggingHandler
 import org.jboss.netty.logging.{Slf4JLoggerFactory, InternalLoggerFactory, InternalLogLevel}
 import org.slf4j.LoggerFactory
 import replaydb.service.driver.Command
-import replaydb.util.{GarbageCollectorStats, PerfLogger, NetworkStats}
+import replaydb.util.{TimingThreadFactory, GarbageCollectorStats, PerfLogger, NetworkStats}
 
 abstract class ServerBase(port: Int) {
   InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory)
   val logger = Logger(LoggerFactory.getLogger(classOf[ServerBase]))
   val networkStats = new NetworkStats()
   val garbageCollectorStats = new GarbageCollectorStats()
+  val bossExecutorFactory = new TimingThreadFactory()
+  val workerExecutorFactory = new TimingThreadFactory()
   var f: Channel = _
   var closeRunnable: Runnable = _
 
@@ -28,7 +30,9 @@ abstract class ServerBase(port: Int) {
 
   def run(): Unit = {
     logger.info(s"starting server on port $port")
-    val b = new ServerBootstrap(new NioServerSocketChannelFactory(Executors.newCachedThreadPool(), Executors.newCachedThreadPool()))
+    val b = new ServerBootstrap(new NioServerSocketChannelFactory(
+      Executors.newCachedThreadPool(bossExecutorFactory),
+      Executors.newCachedThreadPool(workerExecutorFactory)))
     b.setPipelineFactory(new ChannelPipelineFactory {
       override def getPipeline: ChannelPipeline = {
         val p = org.jboss.netty.channel.Channels.pipeline()
@@ -52,9 +56,15 @@ abstract class ServerBase(port: Int) {
         } finally {
           b.releaseExternalResources()
         }
-        PerfLogger.log(s"Garbage collection stats: $garbageCollectorStats")
+        logPerformance()
       }
     }
+  }
+
+  def logPerformance(): Unit = {
+    PerfLogger.logGc(s"Garbage collection stats: $garbageCollectorStats")
+    PerfLogger.logCPU(s"boss thread pool time: ${bossExecutorFactory.getSummary() / 1000000} ms")
+    PerfLogger.logCPU(s"boss worker pool time: ${workerExecutorFactory.getSummary() / 1000000} ms")
   }
 
   def close(): Unit = {

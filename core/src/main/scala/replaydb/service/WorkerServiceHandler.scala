@@ -99,7 +99,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                     val threadMxBean = ManagementFactory.getThreadMXBean
                     val threadCpuTime = threadMxBean.getCurrentThreadCpuTime
                     val elapsedThreadCpuTime = threadCpuTime - startThreadCpuTime
-                    PerfLogger.log(s"thread $threadId (phase $phaseId) finished with elapsed cpu time ${elapsedThreadCpuTime / 1000000} ms")
+                    PerfLogger.logCPU(s"thread $threadId (phase $phaseId) finished with elapsed cpu time ${elapsedThreadCpuTime / 1000000} ms")
                   }
                 }
               }
@@ -138,8 +138,8 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
 
       case _ : CloseCommand => {
         logger.info("received driver close command")
-        PerfLogger.log(s"server network stats ${server.networkStats}")
-        PerfLogger.log(s"garbage collector stats ${server.garbageCollectorStats}")
+        PerfLogger.logCPU(s"server network stats ${server.networkStats}")
+        PerfLogger.logCPU(s"garbage collector stats ${server.garbageCollectorStats}")
         server.stateCommunicationService.close()
         server.finishLatch.countDown()
         server.finishLatch.await()
@@ -147,6 +147,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         server.stateCommunicationService = null
         server.batchProgressCoordinator = null
         server.startLatch = null
+        server.logPerformance()
       }
     }
   }
