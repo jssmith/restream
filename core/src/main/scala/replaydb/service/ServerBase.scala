@@ -64,7 +64,7 @@ abstract class ServerBase(port: Int) {
   def logPerformance(): Unit = {
     PerfLogger.logGc(s"Garbage collection stats: $garbageCollectorStats")
     PerfLogger.logCPU(s"boss thread pool time: ${bossExecutorFactory.getSummary() / 1000000} ms")
-    PerfLogger.logCPU(s"boss worker pool time: ${workerExecutorFactory.getSummary() / 1000000} ms")
+    PerfLogger.logCPU(s"worker thread pool time: ${workerExecutorFactory.getSummary() / 1000000} ms")
   }
 
   def close(): Unit = {
