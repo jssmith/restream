@@ -147,7 +147,7 @@ class ReplayRuntimeImpl(val c: Context) {
       cq"$i => $me".asInstanceOf[CaseDef]
     }).toList
     if (outstandingPrepares.nonEmpty) {
-      throw new RuntimeException("Outstanding prepares remaining!")
+      throw new RuntimeException(s"Outstanding prepares remaining! $outstandingPrepares")
     }
     val me = Match(q"phase", phaseCases)
 
@@ -163,7 +163,7 @@ class ReplayRuntimeImpl(val c: Context) {
        """
 
     val res = c.Expr[RuntimeInterface](c.untypecheck(ri))
-//    println(res)
+    println(res)
     res
   }
 }

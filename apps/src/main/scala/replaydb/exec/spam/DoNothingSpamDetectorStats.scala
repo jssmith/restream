@@ -1,6 +1,6 @@
 package replaydb.exec.spam
 
-import replaydb.event.{Event}
+import replaydb.event.{MessageEvent, Event}
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
 import replaydb.runtimedev.threadedImpl._
@@ -21,7 +21,7 @@ class DoNothingSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayS
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState with Threaded] = {
-    val states = List(spamCounter)
+    val states = List()
     for (s <- states) {
       if (!s.isInstanceOf[ReplayState with Threaded]) {
         throw new UnsupportedOperationException
@@ -31,10 +31,8 @@ class DoNothingSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayS
   }
 
   def getRuntimeInterface: RuntimeInterface = emit {
-    bind { e: Event => }
-
     bind {
-      e: PrintSpamCounter => println(s"\n\nSPAM COUNT is ${spamCounter.get(e.ts)}\n\n")
+      me: MessageEvent =>
     }
   }
 }
