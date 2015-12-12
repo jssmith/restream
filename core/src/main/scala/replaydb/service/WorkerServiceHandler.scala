@@ -50,7 +50,6 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                 val progressCoordinator = server.batchProgressCoordinator.getCoordinator(partitionId, phaseId)
 
                 override def run(): Unit = {
-                  val startThreadCpuTime = ManagementFactory.getThreadMXBean.getCurrentThreadCpuTime
                   try {
                     server.startLatch.countDown()
                     logger.info(s"starting replay on partition $partitionId (phase $phaseId)")
@@ -98,7 +97,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                     val threadId = Thread.currentThread().getId
                     val threadMxBean = ManagementFactory.getThreadMXBean
                     val threadCpuTime = threadMxBean.getCurrentThreadCpuTime
-                    val elapsedThreadCpuTime = threadCpuTime - startThreadCpuTime
+                    val elapsedThreadCpuTime = threadCpuTime
                     PerfLogger.logCPU(s"thread $threadId (phase $phaseId) finished with elapsed cpu time ${elapsedThreadCpuTime / 1000000} ms")
                   }
                 }

@@ -1,9 +1,11 @@
 package replaydb.runtimedev.threadedImpl
 
 import java.io.FileInputStream
+import java.lang.management.ManagementFactory
 
 import replaydb.event.Event
 import replaydb.io.SocialNetworkStorage
+import replaydb.util.PerfLogger
 
 class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) extends Thread(s"read-$fn") {
   private val buffer = new Array[Event](bufferSize)
@@ -26,35 +28,42 @@ class MultiReaderEventSource(fn: String, numReaders: Int, bufferSize: Int) exten
   }
 
   override def run(): Unit = {
-    val eventStorage = new SocialNetworkStorage
-    val updateDelta = 100
-    var localPos = pos
-    var posUpdate = localPos + updateDelta
+    try {
+      val eventStorage = new SocialNetworkStorage
+      val updateDelta = 100
+      var localPos = pos
+      var posUpdate = localPos + updateDelta
 
-    var limit = positions.min + bufferSize
-    eventStorage.readEvents(new FileInputStream(fn), e => {
-      if (localPos >= limit) {
-        positions.synchronized {
-          while ({ limit = positions.min + bufferSize; localPos >= limit }) {
-//            println(s"main thread blocked pos=$pos limit=$limit")
-            positions.wait()
+      var limit = positions.min + bufferSize
+      eventStorage.readEvents(new FileInputStream(fn), e => {
+        if (localPos >= limit) {
+          positions.synchronized {
+            while ( {
+              limit = positions.min + bufferSize; localPos >= limit
+            }) {
+              //            println(s"main thread blocked pos=$pos limit=$limit")
+              positions.wait()
+            }
           }
         }
-      }
-      buffer((localPos % bufferSize).toInt) = e
-      localPos += 1
-      if (localPos == posUpdate) {
-        this.synchronized {
-          pos = localPos
-          this.notifyAll()
+        buffer((localPos % bufferSize).toInt) = e
+        localPos += 1
+        if (localPos == posUpdate) {
+          this.synchronized {
+            pos = localPos
+            this.notifyAll()
+          }
+          posUpdate += updateDelta
         }
-        posUpdate += updateDelta
+      })
+      this.synchronized {
+        pos = localPos
+        done = true
+        this.notifyAll()
       }
-    })
-    this.synchronized {
-      pos = localPos
-      done = true
-      this.notifyAll()
+    } finally {
+      val threadCpuTime = ManagementFactory.getThreadMXBean.getCurrentThreadCpuTime
+      PerfLogger.logCPU(s"reader thread time ${threadCpuTime / 1000000} ms")
     }
   }
 
