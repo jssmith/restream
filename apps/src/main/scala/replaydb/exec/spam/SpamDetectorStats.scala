@@ -25,7 +25,7 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
   with HasSpamCounter with HasReplayStates[ReplayState with Threaded] {
   import replayStateFactory._
 
-  val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
+  val friendships: ReplayMap[UserPair, Boolean] = getReplayMap(false)
   val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
 //  val spamCounter: ReplayCounter = getReplayCounter
   val spamCounter: ReplayCounter = getReplayCounter
@@ -55,13 +55,13 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
 
   def getRuntimeInterface: RuntimeInterface = emit {
     bind { e: NewFriendshipEvent =>
-      friendships.merge(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => 1)
+      friendships.merge(ts = e.ts, key = new UserPair(e.userIdA, e.userIdB), fn = _ => true)
     }
     // RULE 1 STATE
     bind { me: MessageEvent =>
       friendships.get(ts = me.ts, key = new UserPair(me.senderUserId, me.recipientUserId)) match {
-        case Some(_) => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
-        case None => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
+        case Some(true) => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends + 1, nonFriends)})
+        case _ => friendSendRatio.merge(ts = me.ts, key = me.senderUserId, {case (friends, nonFriends) => (friends, nonFriends + 1)})
       }
     }
     // RULE 1 EVALUATION

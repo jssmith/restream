@@ -18,7 +18,7 @@ class ProgressTracker(runConfiguration: RunConfiguration) {
     //allowedPositions.map(_.min).zipWithIndex.map{ case (ts, phase) => (phase + 1, ts) }.toMap
     allowedPositions.map(_.min).zipWithIndex.map(_.swap).toMap
   }
-  var lastSummary = summarize()
+  var lastSummary: Map[Int, Long] = null
   def update(partitionId: Int, phaseId: Int, latestTimestamp: Long): Option[Map[Int,Long]] = {
     if (phaseId == numPhases-1) {
       allowedPositions(0)(partitionId) = latestTimestamp + firstPhaseBatchAllowance * batchTimeInterval
@@ -27,7 +27,7 @@ class ProgressTracker(runConfiguration: RunConfiguration) {
     }
     val summary = summarize()
     for ((k, v) <- summary) {
-      if (lastSummary(k) != v) {
+      if (lastSummary == null || lastSummary(k) != v) {
         lastSummary = summary
         return Some(summary)
       }
@@ -39,5 +39,5 @@ class ProgressTracker(runConfiguration: RunConfiguration) {
 object ProgressTracker {
   // Number of batches the first phase is allowed to run ahead as compared
   // to the last phase
-  val FirstPhaseBatchExtraAllowance = 3
+  val FirstPhaseBatchExtraAllowance = 10
 }

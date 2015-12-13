@@ -51,7 +51,8 @@ object DistributedSpamDetector extends App {
   val batchTimeInterval = (batchSize * r.eventIntervalMs).toLong
   println(s"rate estimate $r")
 
-  val numPhases = new SpamDetectorStats(new ReplayStateFactory {
+  val numPhases = spamDetector.getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
+    .newInstance(new ReplayStateFactory {
     override def getReplayMap[K, V: ClassTag](default: => V): ReplayMap[K, V] = null
     override def getReplayCounter: ReplayCounter = null
     override def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = null
