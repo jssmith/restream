@@ -1,7 +1,8 @@
 package replaydb.exec.spam.runAnalysis
 
-case class LoggedRunConfiguration(numHosts: Int, numPartitions: Int, iteration: Int) {
+case class LoggedRunConfiguration(numHosts: Int, numPartitions: Int,
+                                  iteration: Int, detector: String) {
   def getCSV: String = {
-    s"$numHosts,$numPartitions"
+    s"$detector,$numHosts,$numPartitions"
   }
 }

@@ -37,23 +37,24 @@ object ProcessStats extends App {
   }
 
   def getRunconfig(timingFile: File): LoggedRunConfiguration = {
-    val rcRe = """(\d+)-(\d+)-(\d+).timing""".r
+    val rcRe = """(\d+)-(\d+)-(\d+)-([a-zA-Z\.]+).timing""".r
     timingFile.getName match {
-      case rcRe(numHosts, numPartitions, iteration) =>
-        new LoggedRunConfiguration(numHosts.toInt, numPartitions.toInt, iteration.toInt)
+      case rcRe(numHosts, numPartitions, iteration, detector) =>
+        new LoggedRunConfiguration(numHosts.toInt, numPartitions.toInt,
+          iteration.toInt, detector)
     }
   }
 
   val outputFile = new File(statsDirectory, "performance.csv")
   val pw = new PrintWriter(new BufferedWriter(new FileWriter(outputFile)))
-  pw.print("hosts,partitions,overall_ms,")
+  pw.print("detector,hosts,partitions,overall_ms,")
   pw.println("reader_thread_ms,phase_threads_ms,io_boss_ms,io_worker_ms,kryo_send_ms,kryo_recv_ms,kryo_send_bytes,kryo_recv_bytes")
   try {
     for (tf <- timingFiles) {
       val rc = getRunconfig(tf)
       val completionMs = getTime(tf)
       //    println(s"have timing file $tf ($rc) with time ${getTime(tf)}")
-      val wl = new WorkerLogs(new File(statsDirectory,  s"${rc.numHosts}-${rc.numPartitions}-${rc.iteration}-log"), rc)
+      val wl = new WorkerLogs(new File(statsDirectory,  s"${rc.numHosts}-${rc.numPartitions}-${rc.iteration}-${rc.detector}-log"), rc)
       try {
         wl.checkErrors()
         pw.println(s"${rc.getCSV},$completionMs,${wl.summarizePerf().getCsv}")
