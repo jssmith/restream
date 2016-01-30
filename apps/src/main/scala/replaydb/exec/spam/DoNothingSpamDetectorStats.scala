@@ -18,7 +18,7 @@ class DoNothingSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayS
 //  import replayStateFactory._
 
   val spamCounter: ReplayCounter = new ReplayCounter {
-    override def get(ts: Long)(implicit batchInfo: BatchInfo): Long = 163L
+    override def get(ts: Long)(implicit batchInfo: BatchInfo): Long = 0L
 
     override def getPrepare(ts: Long)(implicit batchInfo: BatchInfo): Unit = { }
 

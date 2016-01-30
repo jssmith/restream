@@ -3,7 +3,7 @@ package replaydb.exec.spam
 import replaydb.runtimedev._
 import replaydb.service.ClientGroup
 import replaydb.service.driver.{Hosts, InitReplayCommand, RunConfiguration}
-import replaydb.util.{EventRateEstimator, LoggerConfiguration}
+import replaydb.util.{ProgressMeter, EventRateEstimator, LoggerConfiguration}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
@@ -61,6 +61,7 @@ object DistributedSpamDetector extends App {
   val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = numPhases, hosts,
     startTimestamp = startTime, batchTimeInterval = batchTimeInterval, approxBatchSize = batchSize)
 
+  val t = new ProgressMeter()
   println("connecting...")
   val clients = new ClientGroup(runConfiguration)
   clients.connect(hosts)
@@ -70,4 +71,5 @@ object DistributedSpamDetector extends App {
     clients.issueCommand(i, new InitReplayCommand(i, hostFiles(i), spamDetector, runConfiguration))
   }
   clients.closeWhenDone()
+  t.finished()
 }
