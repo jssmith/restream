@@ -69,4 +69,13 @@ object ReplayDBBuild extends Build {
       )
     )
   ) dependsOn (core)
+
+  lazy val ec2 = Project("ec2", file("ec2"),
+    settings = buildSettings ++ Seq(
+      name := "replaydb-ec2",
+      libraryDependencies ++= Seq(
+        "com.amazonaws" % "aws-java-sdk" % "1.10.50"
+      )
+    )
+  )
 }
