@@ -1,6 +1,7 @@
 #!/bin/bash
-
+#
 # Kill all running Java programs
+#
 
 for host in `cat ~/conf/workers.txt`; do 
   echo "Killall on $host"

@@ -1,6 +1,7 @@
 #!/bin/bash
-
+#
 # Launch the driver program
+#
 
 SPAM_DETECTOR=$1
 SIZE_SPEC=$2

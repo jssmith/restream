@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# Distributed launch. Starts the workers.
+#
 
 NUM=$1
 echo "Launching $NUM services"
