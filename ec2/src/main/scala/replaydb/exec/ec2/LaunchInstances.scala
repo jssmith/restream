@@ -26,13 +26,24 @@ object LaunchInstances extends App {
       |#!/bin/bash
       |
       |yum update -y
-      |#yum install -y git
       |
       |aws s3 cp s3://replaydb/jdk-8u72-linux-x64.gz /tmp
+      |#wget -O /tmp/jdk-8u72-linux-x64.gz --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/8u72-b13/jdk-8u72-linux-x64.tar.gz
       |cd /opt
       |tar -zxf /tmp/jdk-8u72-linux-x64.gz
       |ln -s jdk1.8.0_72 java
       |rm /tmp/jdk-8u72-linux-x64.gz
+      |update-alternatives --install /usr/bin/java java /opt/jdk1.8.0_72/jre/bin/java 20000
+      |
+      |yum install -y zsh emacs
+      |wget -O /tmp/zsh.zip https://dl.dropboxusercontent.com/u/6350499/zsh.zip
+      |unzip -d /home/ec2-user /tmp/zsh.zip
+      |rm /tmp/zsh.zip
+      |
+      |# Add Erik's public ssh key
+      |wget -O /tmp/replaydb.pub https://dl.dropboxusercontent.com/u/6350499/replaydb.pub
+      |cat /tmp/replaydb.pub >> /home/ec2-user/.ssh/authorized_keys
+      |rm /tmp/replaydb.pub
       |
     """.stripMargin
   val masterInitScript = initScript +
@@ -40,7 +51,17 @@ object LaunchInstances extends App {
       |
       |yum install -y git
       |git clone https://github.com/jssmith/replaydb /home/ec2-user/replaydb
+      |chown -R ec2-user /home/ec2-user/replaydb
       |
+      |curl https://bintray.com/sbt/rpm/rpm | tee /etc/yum.repos.d/bintray-sbt-rpm.repo
+      |yum install sbt
+      |
+      |mkdir conf
+    """.stripMargin
+  val workerInitScript = initScript +
+    """
+      |mkdir replaydb-worker
+      |mkdir log
     """.stripMargin
 
   val workerInstanceType = "c4.large"
@@ -75,7 +96,7 @@ object LaunchInstances extends App {
   if (newWorkerNames.nonEmpty) {
     println(s"Launching ${newWorkerNames.length} new instances at: ${newWorkerNames.mkString(", ")}")
     Utils.launchInstances(workerInstanceType, keyName, securityGroupId, instanceProfileName, placementGroupName,
-      newWorkerNames.toList, initScript)
+      newWorkerNames.toList, workerInitScript)
   } else {
     println(s"Already found ${workerNames.length} worker instances; not launching any new ones.")
   }
