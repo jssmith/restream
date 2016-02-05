@@ -1,0 +1,171 @@
+# This file contains command line scripts run at various points during 2015.
+# Some of these commands can run today, others will need modification. They
+# are checked in as a reference for future data collection runs. Additional
+# commands and configuration will be necessary to set up these runs.
+
+
+for host in `cat conf/newhosts.txt`; do scp jdk-8u66-linux-x64.gz $host: ; done
+for host in `cat conf/newhosts.txt`; do ssh $host "bash -l -c 'tar zxvf jdk-8u66-linux-x64.gz'" ; done
+for host in `cat ~/conf/newhosts.txt`; do ssh $host "bash -l -c 'mkdir replaydb-worker; mkdir log'" ; done
+
+# generate data
+for host in `cat ~/conf/workers.txt`; do ssh $host "bash -l -c '/home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-8/events.out 8'" & done
+
+for host in `cat ~/conf/workers.txt`; do ssh $host "bash -l -c '/home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-4/events.out 4'" & done
+
+for host in `cat ~/conf/workers.txt`; do ssh $host "bash -l -c '/home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-32/events.out 32'" & done
+
+/home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-1/events.out 1
+
+for i in `seq 1 10`; do
+  for n in 4 8 16 24 32; do
+    dkill.sh ; dlaunch.sh $n
+    ddrive.sh replaydb.exec.spam.SimpleSpamDetectorStats 50m 4
+  done
+done
+
+for i in `seq 1 10`; do
+  for n in 1 2; do
+    dkill.sh ; dlaunch.sh $n
+    ddrive.sh replaydb.exec.spam.SimpleSpamDetectorStats 50m 4
+  done
+done
+
+
+time java -Xmx3000m   -cp /home/ec2-user/replaydb/apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar   replaydb.exec.spam.SerialSpamDetector   /home/ec2-user/data/events-50m-split-1/events.out-0
+
+
+time java -Xmx3000m   -cp /home/ec2-user/replaydb/apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar   replaydb.exec.spam.SerialSpamDetector2   /home/ec2-user/data/events-50m-split-1/events.out-0
+
+
+
+time /home/ec2-user/jdk1.8.0_66/bin/java -Xmx24G -XX:+UseConcMarkSweepGC -cp /home/ec2-user/replaydb/apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar  replaydb.exec.spam.ParallelSpamDetector replaydb.exec.spam.SimpleSpamDetectorStats  /home/ec2-user/data/events-5m-split-4/events.out 4 500 50000
+
+time /home/ec2-user/jdk1.8.0_66/bin/java -Xmx24G -XX:+UseConcMarkSweepGC -cp /home/ec2-user/replaydb/apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar  replaydb.exec.spam.ParallelSpamDetector replaydb.exec.spam.IpSpamDetectorStats  /home/ec2-user/data/events-5m-split-4/events.out 4 500 50000
+
+
+
+for n in 16 8 4 2 1; do
+time /home/ec2-user/jdk1.8.0_66/bin/java -Xmx24G -XX:+UseConcMarkSweepGC -cp /home/ec2-user/replaydb/apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar  replaydb.exec.spam.ParallelSpamDetector replaydb.exec.spam.SpamDetectorStats  /home/ec2-user/data/events-5m-split-$n/events.out $n 500 50000  > $n.txt 2>>$n.timing
+done
+
+for n in 4 8 2 16 1 24 32; do     
+  pdrive.sh replaydb.exec.spam.SimpleSpamDetectorStats 50m $n > $n.txt 2>>$n.timing
+done
+
+for n in 16 8 4 2 1; do
+  pdrive.sh replaydb.exec.spam.SimpleSpamDetectorStats 50m $n > $n.txt 2>>$n.timing
+done
+
+for n in 24 32; do /home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-$n/events.out $n& done
+
+
+for n in 1 2; do /home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-$n/events.out $n& done
+
+for n in 2; do /home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-$n/events.out $n& done
+
+
+for n in 24 32; do
+  pdrive.sh replaydb.exec.spam.SimpleSpamDetectorStats 50m $n > $n.txt 2>>$n.timing
+done
+
+
+for host in `cat ~/conf/workers.txt`; do ssh $host "bash -l -c 'cat log/*.err'" ; done
+
+
+
+# setup commands for newly added hosts
+# new hosts in conf/newhosts.txt
+for host in `cat conf/newhosts.txt`; do scp jdk-8u66-linux-x64.gz $host: ; done
+for host in `cat conf/newhosts.txt`; do ssh $host "bash -l -c 'tar zxvf jdk-8u66-linux-x64.gz'" ; done
+for host in `cat ~/conf/newhosts.txt`; do ssh $host "bash -l -c 'mkdir replaydb-worker; mkdir log'" ; done
+
+# generate data
+for host in `cat ~/conf/workers.txt`; do ssh $host "bash -l -c '/home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-24/events.out 24'" & done
+
+for n in 1 2 4 8 16; do /home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-$n/events.out $n&
+done
+
+
+for n in 1 2 3 4 6 8 12 16 24; do /home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 50000000 /home/ec2-user/data/events-50m-split-$n/events.out $n&
+done
+
+
+# More runs - 12/12/2015
+
+# lots of data generation
+for host in `cat ~/conf/workers.txt`; do
+  for n in 1 2 3 4 6 8 12 16 24 32; do
+    ssh $host "bash -l -c '/home/ec2-user/jdk1.8.0_66/bin/java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 5000000 /home/ec2-user/data/events-5m-split-$n/events.out $n'" &
+  done
+done
+
+
+# parameter sweep on number of hosts and number of jvms
+for iteration in `seq 1 10`; do
+  for nhosts in 1 2 4 8; do
+    cp /home/ec2-user/conf/workers-$nhosts.txt /home/ec2-user/conf/workers.txt
+    for jvmsperhost in 1 2 3 4; do
+      partitions=$((nhosts*jvmsperhost))
+      for detector in replaydb.exec.spam.IpSpamDetectorStats replaydb.exec.spam.SpamDetectorStats; do
+        dkill.sh; dlaunch.sh $partitions
+        echo "lanched $partitions partitions on $nhosts hosts"
+        sleep 2;
+        fnbase="$nhosts-$partitions-$iteration-$detector"
+        ddrive.sh $detector 5m $partitions > $fnbase.txt 2>> $fnbase.timing
+        mkdir $fnbase-log
+        for host in `cat ~/conf/workers.txt`; do
+          scp $host:log/* $fnbase-log
+        done
+      done
+    done
+  done
+done
+
+
+for iteration in `seq 1 10`; do
+  for nhosts in 1 2 4 8; do
+    cp /home/ec2-user/conf/workers-$nhosts.txt /home/ec2-user/conf/workers.txt
+    for jvmsperhost in 1 2 3 4; do
+      partitions=$((nhosts*jvmsperhost))
+      for detector in replaydb.exec.spam.SimpleSpamDetectorStats; do
+        dkill.sh; dlaunch.sh $partitions
+        echo "lanched $partitions partitions on $nhosts hosts"
+        sleep 2;
+        fnbase="$nhosts-$partitions-$iteration-$detector"
+        ddrive.sh $detector 5m $partitions > $fnbase.txt 2>> $fnbase.timing
+        mkdir $fnbase-log
+        for host in `cat ~/conf/workers.txt`; do
+          scp $host:log/* $fnbase-log
+        done
+      done
+    done
+  done
+done
+
+
+for iteration in `seq 1 2 3`; do
+  for nhosts in 1 2 4 8; do
+    cp /home/ec2-user/conf/workers-$nhosts.txt /home/ec2-user/conf/workers.txt
+    for jvmsperhost in 2 3 4; do
+      partitions=$((nhosts*jvmsperhost))
+      dkill.sh; dlaunch.sh $partitions
+      echo "lanched $partitions partitions on $nhosts hosts"
+      sleep 2;
+      fnbase="$nhosts-$partitions-$iteration"
+      ddrive.sh replaydb.exec.spam.DoNothingSpamDetectorStats 5m $partitions > $fnbase.txt 2>> $fnbase.timing
+      mkdir $fnbase-log
+      for host in `cat ~/conf/workers.txt`; do
+        scp $host:log/* $fnbase-log
+      done
+    done
+  done
+done
+
+
+time java -Xmx3000m   -cp /home/ec2-user/replaydb/apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar   replaydb.exec.spam.SerialSpamDetector2 replaydb.exec.spam.SimpleSpamDetectorStats /home/ec2-user/data/events-5m-split-1/events.out-0 
+
+for n in 4 8 2 16 1 24 32; do     
+  pdrive.sh replaydb.exec.spam.SimpleSpamDetectorStats 5m $n > $n.txt 2>>$n.timing
+done
+

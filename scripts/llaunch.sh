@@ -1,4 +1,6 @@
 #!/bin/bash
+#
+# Local launch. Invoked by dlaunch.sh
 
 port=$1
 logfile="/home/ec2-user/log/$port"

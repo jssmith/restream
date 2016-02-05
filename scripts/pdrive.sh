@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# Launch the parallel spam detector (single host multi-threaded version)
+#
 
 SPAM_DETECTOR=$1
 SIZE_SPEC=$2
