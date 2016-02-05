@@ -13,7 +13,7 @@ object ShowInstances extends App {
   val showRunningOnly = args.length > 0 && args(0) == "true"
   val credentials = new ProfileCredentialsProvider()
   val ec2client = new AmazonEC2Client(credentials)
-  ec2client.setEndpoint("ec2.us-west-1.amazonaws.com")
+  ec2client.setEndpoint(Utils.regionUrl)
   val instances: DescribeInstancesResult = ec2client.describeInstances()
   for (x <- instances.getReservations) {
     val instances = x.getInstances
@@ -27,6 +27,7 @@ object ShowInstances extends App {
       }
       println(s"Name                                 : $name")
       println(s"State                                : ${i.getState}")
+      println(s"Public / Private IP                  : ${i.getPublicIpAddress} / ${i.getPrivateIpAddress}")
       println("----------------")
     }
   }
