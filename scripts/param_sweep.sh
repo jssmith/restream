@@ -8,18 +8,20 @@
 #
 
 if [[ $# -ne 4 ]]; then
-  echo "Usage: ./lgendata.sh size_spec num_events num_users split_nums"
-  echo "e.g.: ./lgendata.sh 50m 50000000 100000 \"1 2 4 8 16 32\""
+  echo "Usage: ./param_sweep.sh iterations host_counts jvms_per_host detectors"
+  echo "       where all args except iterations should be a space-separated"
+  echo "       list of values to sweep over"
+  echo " e.g.: ./param_sweep.sh 10 \"1 2 4 8\" \"1 2 3 4\" \"replaydb.exec.spam.SimpleSpamDetectorStats replaydb.exec.spam.SimpleSpamDetectorStats\""
   exit
 fi
 
-$MEM_SIZE=6000m
-$USE_DEBUG=true
+MEM_SIZE=6000m
+USE_DEBUG=true
 
-$iterations=$1
-$host_counts=$2
-$jvms_per_host=$3
-$detectors=$4
+iterations=$1
+host_counts=$2
+jvms_per_host=$3
+detectors=$4
 
 for iteration in `seq 1 $iterations`; do
   for nhosts in $host_counts; do
@@ -27,7 +29,7 @@ for iteration in `seq 1 $iterations`; do
     for jvmsperhost in $jvms_per_host; do
       partitions=$((nhosts*jvmsperhost))
       for detector in $detectors; do
-        dkill.sh; dlaunch.sh $partitions $MEM_SIZE $USE_DEBUG
+        ./dkill.sh; ./dlaunch.sh $partitions $MEM_SIZE $USE_DEBUG
         echo "lanched $partitions partitions on $nhosts hosts"
         sleep 2;
         fnbase="$nhosts-$partitions-$iteration-$detector"

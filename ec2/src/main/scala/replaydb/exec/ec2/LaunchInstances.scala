@@ -33,6 +33,7 @@ object LaunchInstances extends App {
       |tar -zxf /tmp/jdk-8u72-linux-x64.gz
       |ln -s jdk1.8.0_72 java
       |rm /tmp/jdk-8u72-linux-x64.gz
+      |cd /home/ec2-user
       |update-alternatives --install /usr/bin/java java /opt/jdk1.8.0_72/jre/bin/java 20000
       |
       |yum install -y zsh emacs
@@ -54,14 +55,17 @@ object LaunchInstances extends App {
       |chown -R ec2-user /home/ec2-user/replaydb
       |
       |curl https://bintray.com/sbt/rpm/rpm | tee /etc/yum.repos.d/bintray-sbt-rpm.repo
-      |yum install sbt
+      |yum install -y sbt
       |
-      |mkdir conf
+      |mkdir /home/ec2-user/conf
+      |chown ec2-user /home/ec2-user/conf
     """.stripMargin
   val workerInitScript = initScript +
     """
-      |mkdir replaydb-worker
-      |mkdir log
+      |mkdir /home/ec2-user/replaydb-worker
+      |mkdir /home/ec2-user/log
+      |chown ec2-user /home/ec2-user/replaydb-worker
+      |chown ec2-user /home/ec2-user/log
     """.stripMargin
 
   val workerInstanceType = "c4.large"

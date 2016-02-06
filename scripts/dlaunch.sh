@@ -8,8 +8,8 @@
 NUM=$1
 echo "Launching $NUM services"
 
-$mem_size=$2
-$use_debug=$3
+mem_size=$2
+use_debug=$3
 
 if [[ $# -ne 3 ]]; then
   echo "Usage: ./dlaunch.sh num_workers memory_size enable_debug"
