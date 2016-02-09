@@ -7,4 +7,5 @@ case class RunConfiguration(numPartitions: Int,
                             hosts: Array[HostConfiguration],
                             startTimestamp: Long,
                             batchTimeInterval: Long,
-                            approxBatchSize: Int)
+                            approxBatchSize: Int,
+                            partitioned: Boolean)

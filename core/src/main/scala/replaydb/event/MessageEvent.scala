@@ -7,4 +7,6 @@ case class MessageEvent (
   recipientUserId: Long,
   senderIp: Int,
   content: String
-) extends Event
+) extends Event with HasPartitionKey {
+  override def partitionKey: Long = senderUserId
+}

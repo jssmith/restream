@@ -10,6 +10,7 @@ import replaydb.util.PerfLogger
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
 
 // TODO ETK - I *think* this is cleaning up all unnecessary state (i.e. GC'ing itself)
 //            but want to think more about it and make sure that's true
@@ -17,6 +18,11 @@ import scala.collection.mutable.ArrayBuffer
 class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfiguration: RunConfiguration) {
 
   val MaxMessagesPerCommand = 50000
+
+  var readRequestsSatisfiedLocally = 0
+  var readRequestsSatisfiedRemotely = 0
+  var writesSentLocally = 0
+  var writesSentRemotely = 0
 
   val logger = Logger(LoggerFactory.getLogger(classOf[StateCommunicationService]))
   val numPhases = runConfiguration.numPhases
@@ -72,9 +78,19 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
 
   // Send a request to the machine which owns this key
   def localPrepareState[K, V](collectionId: Int, phaseId: Int, batchEndTs: Long,
-                              ts: Long, key: K, partitionFn: K => Int): Unit = {
-    val srcWorker = (partitionFn(key) & 0x7FFFFFFF) % numWorkers
+                              ts: Long, key: K, partitionFn: K => List[Int]): Unit = {
+    val srcWorkers = partitionFn(key).map((i: Int) => (i & 0x7FFFFFFF) % numWorkers)
+    // If it's available locally, grab from local, else grab from a random partition
+    val srcWorker = srcWorkers.find(_ == workerId) match {
+      case Some(id) => id
+      case None => srcWorkers(Random.nextInt(srcWorkers.size))
+    }
     this.synchronized {
+      if (srcWorker == workerId) {
+        readRequestsSatisfiedLocally += 1
+      } else {
+        readRequestsSatisfiedRemotely += 1
+      }
       val queue = queuedReadPrepares(phaseId)(srcWorker).getOrElseUpdate(batchEndTs, ArrayBuffer())
       queue += StateRead(collectionId, ts, key)
       if (queue.size >= MaxMessagesPerCommand) {
@@ -87,15 +103,22 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
 
   // send this write to its appropriate partition to be stored
   def submitWrite[K, V](collectionId: Int, phaseId: Int, batchEndTs: Long,
-                        ts: Long, key: K, merge: V => V, partitionFn: K => Int): Unit = {
-    val destWorker = (partitionFn(key) & 0x7FFFFFFF) % numWorkers
+                        ts: Long, key: K, merge: V => V, partitionFn: K => List[Int]): Unit = {
+    val destWorkers = partitionFn(key).map((i: Int) => (i & 0x7FFFFFFF) % numWorkers).distinct
     this.synchronized {
-      val queue = queuedWrites(phaseId)(destWorker).getOrElseUpdate(batchEndTs, ArrayBuffer())
-      queue += StateWrite(collectionId, ts, key, merge)
-      if (queue.size >= MaxMessagesPerCommand) {
-        sendStateUpdateCommand(StateUpdateCommand(workerId, phaseId, batchEndTs, -1, queue.toArray, Array()), destWorker)
-        queue.clear()
-        commandsSent(phaseId)(destWorker).put(batchEndTs, commandsSent(phaseId)(destWorker).getOrElse(batchEndTs, 0) + 1)
+      for (destWorker <- destWorkers) {
+        if (destWorker == workerId) {
+          writesSentLocally += 1
+        } else {
+          writesSentRemotely += 1
+        }
+        val queue = queuedWrites(phaseId)(destWorker).getOrElseUpdate(batchEndTs, ArrayBuffer())
+        queue += StateWrite(collectionId, ts, key, merge)
+        if (queue.size >= MaxMessagesPerCommand) {
+          sendStateUpdateCommand(StateUpdateCommand(workerId, phaseId, batchEndTs, -1, queue.toArray, Array()), destWorker)
+          queue.clear()
+          commandsSent(phaseId)(destWorker).put(batchEndTs, commandsSent(phaseId)(destWorker).getOrElse(batchEndTs, 0) + 1)
+        }
       }
     }
   }
@@ -202,6 +225,11 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
       throw new IllegalStateException("Can't have two collections with the same ID")
     }
     states += collectionId -> rs.asInstanceOf[ReplayMapImpl[Any, Any]]
+  }
+
+  def getReadWriteTrafficString: String = {
+    s"Local Reads: $readRequestsSatisfiedLocally / Remote Reads $readRequestsSatisfiedRemotely // " +
+      s"Local Writes $writesSentLocally / Remote Writes $writesSentRemotely"
   }
 
 }

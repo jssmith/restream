@@ -163,7 +163,7 @@ class ReplayRuntimeImpl(val c: Context) {
        """
 
     val res = c.Expr[RuntimeInterface](c.untypecheck(ri))
-    println(res)
+    // println(res)
     res
   }
 }

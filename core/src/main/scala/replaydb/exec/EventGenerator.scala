@@ -18,10 +18,10 @@ object EventGenerator extends App {
     val Tunable = Value("tunable")
   }
 
-  if (args.length < 4 || args.length > 5) {
+  if (args.length < 4 || args.length > 6) {
     println(
-      """Usage: EventGenerator ( uniform | tunable ) numUsers numEvents baseFilename [ numSplits ]
-        |  example EventGenerator tunable 100000 5000000 /tmp/events-split-4/events.out 4
+      """Usage: EventGenerator ( uniform | tunable ) numUsers numEvents baseFilename [ numSplits=1 ] [ partitioned=false ]
+        |  example EventGenerator tunable 100000 5000000 /tmp/events-split-4/events.out 4 true
       """.stripMargin)
     System.exit(1)
   }
@@ -33,7 +33,8 @@ object EventGenerator extends App {
   val numEvents = Integer.parseInt(args(2))
   val startTime = util.Date.df.parse("2015-01-01 00:00:00.000").getTime
   val baseFilename = args(3)
-  val numSplits = if (args.length == 5) { Integer.parseInt(args(4)) } else { 1 }
+  val numSplits = if (args.length >= 5) { Integer.parseInt(args(4)) } else { 1 }
+  val partitioned = if (args.length == 6) { args(5).toBoolean } else { false }
   val rnd = new MersenneTwister(903485435L)
 
   val filePath = new File(baseFilename).getParentFile
@@ -53,7 +54,11 @@ object EventGenerator extends App {
     case Generators.Uniform => 1000000
     case Generators.Tunable => 1000000
   })
-  val w = eventStorage.getSplitEventWriter(baseFilename, numSplits)
+  val w = if (partitioned) {
+    eventStorage.getPartitionedSplitEventWriter(baseFilename, numSplits)
+  } else {
+    eventStorage.getSplitEventWriter(baseFilename, numSplits)
+  }
   try {
     eventSource.genEvents(numEvents, e => {
       w.write(e)

@@ -9,8 +9,8 @@ class ReplayStateFactory(commService: StateCommunicationService) extends replayd
 
   var nextStateId = 0
 
-  def getReplayMap[K, V : ClassTag](default: => V): ReplayMap[K, V] = {
-    val newMap = new ReplayMapImpl[K, V](default, nextStateId, commService)
+  def getReplayMap[K, V : ClassTag](default: => V, partitionFn: K => List[Int] = null): ReplayMap[K, V] = {
+    val newMap = new ReplayMapImpl[K, V](default, nextStateId, commService, partitionFn)
     commService.registerReplayState(nextStateId, newMap)
     nextStateId += 1
     newMap

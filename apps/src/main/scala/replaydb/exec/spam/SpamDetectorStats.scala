@@ -25,7 +25,8 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
   with HasSpamCounter with HasReplayStates[ReplayState with Threaded] {
   import replayStateFactory._
 
-  val friendships: ReplayMap[UserPair, Boolean] = getReplayMap(false)
+  val friendships: ReplayMap[UserPair, Boolean] =
+    getReplayMap(false, (up: UserPair) => List(up.a.hashCode, up.b.hashCode))
   val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
 //  val spamCounter: ReplayCounter = getReplayCounter
   val spamCounter: ReplayCounter = getReplayCounter
@@ -36,7 +37,8 @@ class SpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFacto
   val messageContainingEmailFraction: ReplayMap[Long, (Long, Long)] = getReplayMap((0L, 0L))
   val messagesFractionLast7DaysInLast24Hours: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
   val userFirstMessageTS: ReplayMap[Long, Long] = getReplayMap(Long.MaxValue)
-  val userMostRecentReceivedMessage: ReplayMap[(Long, Long), Long] = getReplayMap(Long.MinValue)
+  val userMostRecentReceivedMessage: ReplayMap[(Long, Long), Long] =
+    getReplayMap(Long.MinValue, (uids: (Long, Long)) => List(uids._1.hashCode))
   val messageSentInResponseFraction: ReplayMap[Long, (Long, Long)] = getReplayMap((0L, 0L))
   val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = getReplayTimestampLocalMap(0)
 

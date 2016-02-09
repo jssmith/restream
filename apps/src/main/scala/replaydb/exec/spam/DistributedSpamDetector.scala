@@ -11,15 +11,16 @@ import scala.reflect.ClassTag
 // TODO this needs a way to time how long things take to do performance checks, like the serial/parallel ones
 
 object DistributedSpamDetector extends App {
-  if (args.length != 5) {
+  if (args.length < 5 || args.length > 6) {
     println(
-      """Usage: DistributedSpamDetector spamDetector baseFilename numPartitions batchSize hosts
+      """Usage: DistributedSpamDetector spamDetector baseFilename numPartitions batchSize hosts [ partitioned=false ]
         |  Example values:
         |    spamDetector   = replaydb.exec.spam.SpamDetectorStats
         |    baseFilename   = ~/data/events.out
         |    numPartitions  = 4
         |    batchSize      = 50000
         |    hosts          = hosts.txt
+        |    partitioned    = true
       """.stripMargin)
     System.exit(1)
   }
@@ -31,6 +32,7 @@ object DistributedSpamDetector extends App {
   val numPartitions = args(2).toInt
   val batchSize = args(3).toInt
   val hostsFile = args(4)
+  val partitioned = if (args.length == 6) args(5).toBoolean else false
 
   val hosts = Hosts.fromFile(hostsFile)
   val numHosts = hosts.length
@@ -53,13 +55,13 @@ object DistributedSpamDetector extends App {
 
   val numPhases = spamDetector.getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
     .newInstance(new ReplayStateFactory {
-    override def getReplayMap[K, V: ClassTag](default: => V): ReplayMap[K, V] = null
+    override def getReplayMap[K, V: ClassTag](default: => V, partitionFn: K => List[Int] = null): ReplayMap[K, V] = null
     override def getReplayCounter: ReplayCounter = null
     override def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = null
   }).getRuntimeInterface.numPhases
 
   val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = numPhases, hosts,
-    startTimestamp = startTime, batchTimeInterval = batchTimeInterval, approxBatchSize = batchSize)
+    startTimestamp = startTime, batchTimeInterval = batchTimeInterval, approxBatchSize = batchSize, partitioned = partitioned)
 
   val t = new ProgressMeter()
   println("connecting...")

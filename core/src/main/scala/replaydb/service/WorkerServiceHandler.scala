@@ -26,9 +26,13 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         server.stateCommunicationService = new StateCommunicationService(c.workerId, c.partitionMaps.size, c.runConfiguration)
         server.networkStats.reset()
         server.garbageCollectorStats.reset()
-        val stateFactory = new ReplayStateFactory(server.stateCommunicationService)
         val constructor = Class.forName(c.programClass).getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
         val runConfig = c.runConfiguration
+        val stateFactory = if (runConfig.partitioned) {
+          new ReplayStateFactory(server.stateCommunicationService)
+        } else {
+          new ReplayStateFactoryRandomPartition(server.stateCommunicationService)
+        }
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
         server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval, c.workerId)
@@ -139,6 +143,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         logger.info("received driver close command")
         PerfLogger.logCPU(s"server network stats ${server.networkStats}")
         PerfLogger.logCPU(s"garbage collector stats ${server.garbageCollectorStats}")
+        PerfLogger.logNetwork(s"Network Read/Write Traffic: ${server.stateCommunicationService.getReadWriteTrafficString}")
         server.stateCommunicationService.close()
         server.finishLatch.countDown()
         server.finishLatch.await()

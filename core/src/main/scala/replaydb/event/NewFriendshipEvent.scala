@@ -4,4 +4,6 @@ case class NewFriendshipEvent (
   ts: Long,
   userIdA: Long,
   userIdB: Long
-) extends Event
+) extends Event with HasPartitionKey {
+  override def partitionKey: Long = userIdA
+}
