@@ -8,4 +8,5 @@ case class RunConfiguration(numPartitions: Int,
                             startTimestamp: Long,
                             batchTimeInterval: Long,
                             approxBatchSize: Int,
-                            partitioned: Boolean)
+                            partitioned: Boolean,
+                            waitAtBatchBoundary: Boolean)

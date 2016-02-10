@@ -1,6 +1,10 @@
 # sbt
 target
 
+# ReplayDB specific
+logs*
+hosts.txt
+
 # Emacs:
 *~
 \#*\#

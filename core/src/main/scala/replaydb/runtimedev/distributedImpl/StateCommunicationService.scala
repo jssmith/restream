@@ -24,6 +24,8 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
   var writesSentLocally = 0
   var writesSentRemotely = 0
 
+  val waitAtBatchBoundary = runConfiguration.waitAtBatchBoundary
+
   val logger = Logger(LoggerFactory.getLogger(classOf[StateCommunicationService]))
   val numPhases = runConfiguration.numPhases
   val numPartitions = runConfiguration.numPartitions
@@ -62,6 +64,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
   val queuedWrites: Array[Array[mutable.Map[Long, ArrayBuffer[StateWrite[_]]]]] = Array.ofDim(numPhases, numWorkers)
   // stores read prepares that are going out to their respective paritions
   val queuedReadPrepares: Array[Array[mutable.Map[Long, ArrayBuffer[StateRead]]]] = Array.ofDim(numPhases, numWorkers)
+  val queuedReadPrepareCount: Array[Array[mutable.Map[Long, Int]]] = Array.ofDim(numPhases, numWorkers)
 
   val commandsSent: Array[Array[mutable.Map[Long, Int]]] = Array.ofDim(numPhases, numWorkers)
   val partitionsFinished: Array[mutable.Map[Long, Int]] = Array.ofDim(numPhases)
@@ -71,6 +74,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
     commandsSent(i)(j) = mutable.Map()
     queuedWrites(i)(j) = mutable.Map()
     queuedReadPrepares(i)(j) = mutable.Map()
+    queuedReadPrepareCount(i)(j) = mutable.Map()
     if (j == 0) {
       partitionsFinished(i) = mutable.Map()
     }
@@ -92,6 +96,10 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
         readRequestsSatisfiedRemotely += 1
       }
       val queue = queuedReadPrepares(phaseId)(srcWorker).getOrElseUpdate(batchEndTs, ArrayBuffer())
+      if (waitAtBatchBoundary) {
+        queuedReadPrepareCount(phaseId+1)(workerId).put(batchEndTs,
+          queuedReadPrepareCount(phaseId+1)(workerId).getOrElse(batchEndTs, 0) + 1)
+      }
       queue += StateRead(collectionId, ts, key)
       if (queue.size >= MaxMessagesPerCommand) {
         sendStateUpdateCommand(StateUpdateCommand(workerId, phaseId, batchEndTs, -1, Array(), queue.toArray), srcWorker)
@@ -124,6 +132,15 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
   }
 
   def handleStateRequestResponse(resp: StateRequestResponse): Unit = {
+    if (waitAtBatchBoundary) {
+      this.synchronized {
+        val remainingCount = queuedReadPrepareCount(resp.phaseId+1)(workerId)(resp.batchEndTs) - resp.responses.length
+        queuedReadPrepareCount(resp.phaseId+1)(workerId).put(resp.batchEndTs, remainingCount)
+        if (remainingCount == 0) {
+          notifyAll()
+        }
+      }
+    }
     for (r <- resp.responses) {
       // TODO the typing here needs work...
       states(r.collectionId).insertPreparedValue(r.ts, r.key, r.value)
@@ -179,6 +196,17 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
         }
         rIdx += MaxMessagesPerCommand
       } while (rIdx < responses.length)
+    }
+  }
+
+  def awaitReadsReady(phaseId: Int, batchEndTs: Long): Unit = {
+    if (waitAtBatchBoundary) {
+      this.synchronized {
+        while (queuedReadPrepareCount(phaseId)(workerId)(batchEndTs) != 0) {
+          wait()
+        }
+        queuedReadPrepareCount(phaseId)(workerId).remove(batchEndTs)
+      }
     }
   }
 

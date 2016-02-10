@@ -13,13 +13,14 @@ import scala.reflect.ClassTag
 object DistributedSpamDetector extends App {
   if (args.length < 5 || args.length > 6) {
     println(
-      """Usage: DistributedSpamDetector spamDetector baseFilename numPartitions batchSize hosts [ partitioned=false ]
+      """Usage: DistributedSpamDetector spamDetector baseFilename numPartitions batchSize hosts [ waitAtBatchBoundary=false ] [ partitioned=false ]
         |  Example values:
         |    spamDetector   = replaydb.exec.spam.SpamDetectorStats
         |    baseFilename   = ~/data/events.out
         |    numPartitions  = 4
         |    batchSize      = 50000
         |    hosts          = hosts.txt
+        |    waitAtBatchBoundary = false
         |    partitioned    = true
       """.stripMargin)
     System.exit(1)
@@ -32,7 +33,8 @@ object DistributedSpamDetector extends App {
   val numPartitions = args(2).toInt
   val batchSize = args(3).toInt
   val hostsFile = args(4)
-  val partitioned = if (args.length == 6) args(5).toBoolean else false
+  val waitAtBatchBoundary = if (args.length > 6) args(5).toBoolean else false
+  val partitioned = if (args.length == 7) args(6).toBoolean else false
 
   val hosts = Hosts.fromFile(hostsFile)
   val numHosts = hosts.length
@@ -61,7 +63,8 @@ object DistributedSpamDetector extends App {
   }).getRuntimeInterface.numPhases
 
   val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = numPhases, hosts,
-    startTimestamp = startTime, batchTimeInterval = batchTimeInterval, approxBatchSize = batchSize, partitioned = partitioned)
+    startTimestamp = startTime, batchTimeInterval = batchTimeInterval, approxBatchSize = batchSize,
+    partitioned = partitioned, waitAtBatchBoundary = waitAtBatchBoundary)
 
   val t = new ProgressMeter()
   println("connecting...")
