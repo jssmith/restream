@@ -1,16 +1,22 @@
 package replaydb.exec.spam
 
-import replaydb.event.{MessageEvent, Event}
+import replaydb.event.MessageEvent
 import replaydb.runtimedev.ReplayRuntime._
 import replaydb.runtimedev._
 import replaydb.runtimedev.threadedImpl._
 
 
-
-class DoNothingSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface
+/**
+ * Counts the number of messages sent by each user
+ *
+ * @param replayStateFactory
+ */
+class MessageCountSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStateFactory) extends HasRuntimeInterface
   with HasSpamCounter with HasReplayStates[ReplayState with Threaded] {
+  import replayStateFactory._
 
-  // TODO should be able to clean up here...
+  val messageSendCounts: ReplayMap[Long, Int] = getReplayMap(0)
+
   val spamCounter: ReplayCounter = new ReplayCounter {
     override def get(ts: Long)(implicit batchInfo: BatchInfo): Long = 0L
 
@@ -21,7 +27,7 @@ class DoNothingSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayS
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState with Threaded] = {
-    val states = List(spamCounter)
+    val states = List(messageSendCounts, spamCounter)
     for (s <- states) {
       if (!s.isInstanceOf[ReplayState with Threaded]) {
         throw new UnsupportedOperationException
@@ -32,7 +38,7 @@ class DoNothingSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayS
 
   def getRuntimeInterface: RuntimeInterface = emit {
     bind {
-      me: MessageEvent =>
+      me: MessageEvent => messageSendCounts.merge(ts = me.ts, key = me.senderUserId, ct => ct + 1)
     }
   }
 }
