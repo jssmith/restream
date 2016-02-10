@@ -17,7 +17,7 @@ if [[ $# -ne 3 ]]; then
   exit
 fi
 
-PORT_START=5567
+PORT_START=5566
 PORT_END=`expr $PORT_START + $NUM - 1`
 
 readarray WORKERS < /home/ec2-user/conf/workers.txt

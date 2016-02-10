@@ -65,6 +65,9 @@ object LaunchInstances extends App {
       |  ln -s /media/ephemeral1 /home/ec2-user/data1
       |fi
       |
+      |mkdir /home/ec2-user/replaydb-worker
+      |chown ec2-user /home/ec2-user/replaydb-worker
+      |
     """.stripMargin
   val masterInitScript = initScript +
     """
@@ -81,9 +84,7 @@ object LaunchInstances extends App {
     """.stripMargin
   val workerInitScript = initScript +
     """
-      |mkdir /home/ec2-user/replaydb-worker
       |mkdir /home/ec2-user/log
-      |chown ec2-user /home/ec2-user/replaydb-worker
       |chown ec2-user /home/ec2-user/log
     """.stripMargin
 
