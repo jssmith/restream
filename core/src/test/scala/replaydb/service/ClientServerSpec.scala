@@ -43,7 +43,7 @@ class ClientServerSpec extends FlatSpec {
     try {
       s.run()
       logger.debug("server started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
+      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
@@ -101,7 +101,7 @@ class ClientServerSpec extends FlatSpec {
     try {
       s.run()
       logger.debug("server started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
+      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
@@ -164,7 +164,7 @@ class ClientServerSpec extends FlatSpec {
     try {
       s.run()
       logger.debug("server started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
+      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
@@ -231,7 +231,7 @@ class ClientServerSpec extends FlatSpec {
       s1.run()
       s2.run()
       logger.debug("servers started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
+      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
@@ -300,7 +300,7 @@ class ClientServerSpec extends FlatSpec {
     try {
       servers.foreach(_.run())
       logger.debug("server started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000)
+      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
