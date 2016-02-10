@@ -10,16 +10,17 @@ import scala.collection.mutable
  */
 object LaunchInstances extends App {
 
-  if (args.length < 2) {
+  if (args.length < 3) {
     println(
-      """Usage: LaunchInstances numWorkers prefix [launchMaster = false]
+      """Usage: LaunchInstances numWorkers prefix workerInstanceType [launchMaster = false]
       """.stripMargin)
     System.exit(1)
   }
 
   val numWorkers = args(0).toInt
   val prefix = args(1)
-  val launchMaster = if (args.length > 2) args(2).toBoolean else false
+  val workerInstanceType = args(2)
+  val launchMaster = if (args.length > 3) args(3).toBoolean else false
 
   val initScript =
     """
@@ -46,6 +47,24 @@ object LaunchInstances extends App {
       |cat /tmp/replaydb.pub >> /home/ec2-user/.ssh/authorized_keys
       |rm /tmp/replaydb.pub
       |
+      |if [ -e /dev/xvdb ]; then
+      |  if ! mountpoint -q /media/ephemeral0; then
+      |    mkdir /media/ephemeral0
+      |    mount /dev/xvdb /media/ephemeral0
+      |  fi
+      |  chown -R ec2-user /media/ephemeral0
+      |  ln -s /media/ephemeral0 /home/ec2-user/data0
+      |fi
+      |
+      |if [ -e /dev/xvdc ]; then
+      |  if ! mountpoint -q /media/ephemeral1; then
+      |    mkdir /media/ephemeral1
+      |    mount /dev/xvdc /media/ephemeral1
+      |  fi
+      |  chown -R ec2-user /media/ephemeral1
+      |  ln -s /media/ephemeral1 /home/ec2-user/data1
+      |fi
+      |
     """.stripMargin
   val masterInitScript = initScript +
     """
@@ -68,8 +87,7 @@ object LaunchInstances extends App {
       |chown ec2-user /home/ec2-user/log
     """.stripMargin
 
-  val workerInstanceType = "c4.large"
-  val masterInstanceType = "c4.large"
+  val masterInstanceType = "c3.large"
   val keyName = "replaydb"
   //val securityGroupId = "sg-97252df2" // Erik's account
   val securityGroupId = "sg-4ed9072b" // Johann
@@ -82,7 +100,7 @@ object LaunchInstances extends App {
     println(s"Existing master instance not found; launching now at $masterName")
     Utils.launchInstances(masterInstanceType, keyName, securityGroupId, instanceProfileName, placementGroupName,
       List(masterName), masterInitScript)
-  } else {
+  } else if (launchMaster) {
     println("Existing master instance found; not launching a new one.")
   }
 

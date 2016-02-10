@@ -53,23 +53,25 @@ object Utils {
 
     val rir = new RunInstancesRequest()
     rir.
-      withImageId("ami-d5ea86b5").
+      //withImageId("ami-d5ea86b5").  // Normal Amazon Linux
+      withImageId("ami-5599ef35").  // Image with 2 SSD volumes attached
       withInstanceType(instanceType).
       withMinCount(names.length).
       withMaxCount(names.length).
       withKeyName(keyName).
       withSecurityGroupIds(securityGroupId).
-      withEbsOptimized(true).
-      withBlockDeviceMappings(
-      new BlockDeviceMapping().
-        withDeviceName("/dev/xvda").
-        withEbs(new EbsBlockDevice().
-          withIops(300).
-          withVolumeSize(24).
-          withDeleteOnTermination(true).
-          withVolumeType("io1")
-        )
-    ).
+      // EBS-optimized and larger EBS size not necessary since data doesn't live there anymore
+//      withEbsOptimized(true).
+//      withBlockDeviceMappings(
+//      new BlockDeviceMapping().
+//        withDeviceName("/dev/xvda").
+//        withEbs(new EbsBlockDevice().
+//          withIops(300).
+//          withVolumeSize(24).
+//          withDeleteOnTermination(true).
+//          withVolumeType("io1")
+//        ),
+//    ).
       withUserData(toBase64(initScript)).
       withIamInstanceProfile(
         new IamInstanceProfileSpecification().
