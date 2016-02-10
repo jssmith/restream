@@ -52,19 +52,21 @@ trait KryoEventStorage  {
     }
   }
 
-  def getSplitEventWriter(fnBase: String, n: Int) = new EventWriter {
+  def getSplitEventWriter(fnBase: String, n: Int, keepOnly: Int) = new EventWriter {
     val outputs =
-      ((0 until n) map (n => s"$fnBase-$n") map (
-        fn => getEventWriter(new FileOutputStream(fn)))).toArray
+      (0 until n).map(n => s"$fnBase-$n").zipWithIndex.map(_ match {case (fn: String, idx: Int) =>
+        if (keepOnly < 0 || idx == keepOnly) getEventWriter(new FileOutputStream(fn)) else null}).toArray
     var index = 0
 
     override def write(e: Event): Unit = {
-      outputs(index).write(e)
+      if (keepOnly < 0 || index == keepOnly) {
+        outputs(index).write(e)
+      }
       index = (index + 1) % n
     }
 
     override def close(): Unit = {
-      for (output <- outputs) {
+      for (output <- outputs if output != null) {
         try {
           output.close()
         } catch {
@@ -75,19 +77,22 @@ trait KryoEventStorage  {
   }
 
   // NOTE: *Only* works for Events which mix in HasPartitionKey
-  def getPartitionedSplitEventWriter(fnBase: String, n: Int) = new EventWriter {
+  def getPartitionedSplitEventWriter(fnBase: String, n: Int, keepOnly: Int) = new EventWriter {
     val outputs =
-      ((0 until n) map (n => s"$fnBase-$n") map (
-        fn => getEventWriter(new FileOutputStream(fn)))).toArray
+      (0 until n).map(n => s"$fnBase-$n").zipWithIndex.map(_ match {case (fn: String, idx: Int) =>
+        if (keepOnly < 0 || idx == keepOnly) getEventWriter(new FileOutputStream(fn)) else null}).toArray
     var index = 0
 
     override def write(e: Event): Unit = {
       val event = e.asInstanceOf[HasPartitionKey]
-      outputs((event.partitionKey.hashCode & 0x7FFFFFFF) % n).write(e)
+      val index = (event.partitionKey.hashCode & 0x7FFFFFFF) % n
+      if (keepOnly < 0 || index == keepOnly) {
+        outputs(index).write(e)
+      }
     }
 
     override def close(): Unit = {
-      for (output <- outputs) {
+      for (output <- outputs if output != null) {
         try {
           output.close()
         } catch {
