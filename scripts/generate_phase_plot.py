@@ -8,7 +8,7 @@ import heapq
 
 #
 # Script to generate a plot of batch start/end times
-# Currently just displays the output, but gnuplot can also generated e.g. svg / eps
+# Currently just displays the output, but gnuplot can also generate e.g. svg / eps
 # Usage: ./generate_phase_plot.py path_to_part0.perf path_to_part1.perf ...
 #
 
@@ -37,7 +37,6 @@ for fname in sys.argv[1:]:
     start_ts = min(start_ts, min(map(lambda l: int(l[3]), lines)))
     if lowest_batch_timestamp is None:
         two_smallest = heapq.nsmallest(2, set(map(lambda l: int(l[2]), lines)))
-        print str(two_smallest)
         lowest_batch_timestamp = two_smallest[0]
         batch_interval = two_smallest[1] - lowest_batch_timestamp
 
