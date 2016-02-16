@@ -13,6 +13,10 @@ import replaydb.service.driver._
 class ClientServerSpec extends FlatSpec {
   val logger = Logger(LoggerFactory.getLogger(classOf[ClientServerSpec]))
 
+  def getRunConfiguration(hosts: Array[HostConfiguration]) = {
+    new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false, false)
+  }
+
   "A single client and sever" should "exchange messages" in {
     logger.debug("single message tests")
     val localhost = "127.0.0.1"
@@ -43,7 +47,7 @@ class ClientServerSpec extends FlatSpec {
     try {
       s.run()
       logger.debug("server started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
+      val rc = getRunConfiguration(hosts)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
@@ -101,7 +105,7 @@ class ClientServerSpec extends FlatSpec {
     try {
       s.run()
       logger.debug("server started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
+      val rc = getRunConfiguration(hosts)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
@@ -164,7 +168,7 @@ class ClientServerSpec extends FlatSpec {
     try {
       s.run()
       logger.debug("server started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
+      val rc = getRunConfiguration(hosts)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
@@ -231,7 +235,7 @@ class ClientServerSpec extends FlatSpec {
       s1.run()
       s2.run()
       logger.debug("servers started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
+      val rc = getRunConfiguration(hosts)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
@@ -300,7 +304,7 @@ class ClientServerSpec extends FlatSpec {
     try {
       servers.foreach(_.run())
       logger.debug("server started")
-      val rc = new RunConfiguration(1, 2, hosts, 0L, 100L, 100000, false)
+      val rc = getRunConfiguration(hosts)
       val c = new ClientGroupBase(rc) {
         override def getHandler(): ChannelUpstreamHandler= {
           new SimpleChannelUpstreamHandler() {
