@@ -17,12 +17,17 @@ if [[ $# -ne 3 ]]; then
   exit
 fi
 
-PORT_START=5566
-PORT_END=`expr $PORT_START + $NUM - 1`
-
 readarray WORKERS < /home/ec2-user/conf/workers.txt
 
 NUM_WORKERS=${#WORKERS[@]}
+
+PORT_START=5566
+
+while [ $((PORT_START%NUM_WORKERS)) -ne 0 ]; do
+  PORT_START=$((PORT_START+1))
+done
+
+PORT_END=`expr $PORT_START + $NUM - 1`
 
 rm /home/ec2-user/conf/latesthosts.txt
 

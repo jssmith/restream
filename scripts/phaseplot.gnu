@@ -8,7 +8,12 @@ set xrange [0:*]
 set xlabel 'Time Since Start (ms)'
 set ylabel 'ReplayDB (partitionId-phaseId)'
 
-set terminal x11 persist
+if (term_type eq "png") {
+  set terminal pngcairo size 2000,500
+  set output "phaseplot.png"
+} else {
+  set terminal x11 persist
+}
 
 line_weight = 10
 ns_to_ms = 1000000

@@ -8,12 +8,18 @@ import heapq
 #
 # Script to generate a plot of phase progress (event time) vs. real time
 # Currently just displays the output, but gnuplot can also generate e.g. svg / eps
-# Usage: ./generate_completion_plot.py path_to_part0.perf path_to_part1.perf ...
+# Usage: ./generate_completion_plot.py --tTERM_TYPE path_to_part0.perf path_to_part1.perf ...
 #
 
 if len(sys.argv) < 2:
     print 'Usage: ./generate_completion_plot.py path_to_part0.perf path_to_part1.perf ... '
+    print ' e.g.: ./generate_completion_plot.py --tpng path_to_part0.perf path_to_part1.perf ... '
+    print '       (TERM_TYPE defaults to x11)'
     quit()
+
+gnuplot_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'completionplot.gnu')
+
+term_type = next((x[3:] for x in sys.argv[1:] if x.startswith('--t')), 'x11')
 
 start_ts = sys.maxint
 num_partitions = 0
@@ -54,7 +60,8 @@ for fname in sys.argv[1:]:
             for realtime, eventtime in phase:
                 f.write('{} {} {}\n'.format(realtime, eventtime, colors[phase_num]))  # phase_num + 1))
 
-subprocess.call(['gnuplot', '-e', 'start_ts={}; num_phases={}; num_partitions={}'.format(start_ts, num_phases, num_partitions), 'completionplot.gnu'])
+subprocess.call(['gnuplot', '-e', 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"'
+                .format(start_ts, num_phases, num_partitions), gnuplot_script])
 
 # for part_idx in xrange(0, num_partitions):
 #     for phase_idx in xrange(0, num_phases):

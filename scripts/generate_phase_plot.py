@@ -9,12 +9,16 @@ import heapq
 #
 # Script to generate a plot of batch start/end times
 # Currently just displays the output, but gnuplot can also generate e.g. svg / eps
-# Usage: ./generate_phase_plot.py path_to_part0.perf path_to_part1.perf ...
+# Usage: ./generate_phase_plot.py --tTERM_TYPE path_to_part0.perf path_to_part1.perf ...
 #
 
 if len(sys.argv) < 2:
-    print 'Usage: ./generate_phase_plot.py path_to_part0.perf path_to_part1.perf ... '
+    print 'Usage: ./generate_phase_plot.py --tTERM_TYPE path_to_part0.perf path_to_part1.perf ... '
+    print ' e.g.: ./generate_phase_plot.py --tpng path_to_part0.perf path_to_part1.perf ... '
+    print '       (TERM_TYPE defaults to x11)'
     quit()
+
+gnuplot_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'phaseplot.gnu')
 
 start_ts = sys.maxint
 num_partitions = 0
@@ -22,7 +26,9 @@ num_partitions = 0
 lowest_batch_timestamp = None
 batch_interval = None
 
-for fname in sys.argv[1:]:
+term_type = next((x[3:] for x in sys.argv[1:] if x.startswith('--t')), 'x11')
+
+for fname in filter(lambda arg: not arg.startswith('--t'), sys.argv[1:]):
     with open(fname, 'r') as f:
         lines = f.readlines()
 
@@ -62,12 +68,13 @@ for ytic in xrange(-1, num_partitions*(num_phases+1)):
         continue
     replay_ytics.append('"{}" {}'.format('{}-{}'.format(int(floor(ytic/(num_phases+1))), ytic % (num_phases+1)), ytic))
 
-with open('phaseplot.gnu', 'r') as f:
+with open(gnuplot_script, 'r') as f:
     old = f.read()
     with open('/tmp/phaseplot.tmp.gnu', 'w') as f_new:
         f_new.write(old.replace('_REPLAY_YTICS_', '({})'.format(', '.join(replay_ytics))))
         
-subprocess.call(['gnuplot', '-e', 'start_ts={}; num_phases={}; num_partitions={}'.format(start_ts, num_phases, num_partitions), '/tmp/phaseplot.tmp.gnu'])
+subprocess.call(['gnuplot', '-e', 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"'
+                .format(start_ts, num_phases, num_partitions, term_type), '/tmp/phaseplot.tmp.gnu'])
 
 for idx in xrange(0, num_partitions):
     os.unlink('/tmp/partition{}.dat'.format(idx))

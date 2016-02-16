@@ -11,7 +11,7 @@ import scala.reflect.ClassTag
 // TODO this needs a way to time how long things take to do performance checks, like the serial/parallel ones
 
 object DistributedSpamDetector extends App {
-  if (args.length < 5 || args.length > 6) {
+  if (args.length < 5 || args.length > 7) {
     println(
       """Usage: DistributedSpamDetector spamDetector baseFilename numPartitions batchSize hosts [ waitAtBatchBoundary=false ] [ partitioned=false ]
         |  Example values:

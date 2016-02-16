@@ -5,7 +5,12 @@ unset key
 set xlabel 'Time Since Start (ms)'
 set ylabel 'Event Time / Progress Through Log (s)'
 
-set terminal x11 persist
+if (term_type eq "png") {
+  set terminal pngcairo size 2000,500
+  set output "phaseplot.png"
+} else {
+  set terminal x11 persist
+}
 
 line_weight = 1
 point_size = 1
