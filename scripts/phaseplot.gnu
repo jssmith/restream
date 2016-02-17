@@ -2,7 +2,7 @@
 set grid x y
 unset key
 
-set yrange [-1:((num_phases+1)*num_partitions)] reverse
+set yrange [-1:((num_phases+3)*num_partitions)] reverse
 set ytics _REPLAY_YTICS_
 set xrange [0:*]
 set xlabel 'Time Since Start (ms)'
@@ -40,10 +40,10 @@ batch_boundary_phase_cnt = words(batch_boundary_phases)
 
 plot \
   for [i=0:(num_partitions-1)] filename(i) \
-    using ($2-start_ts):($1+(num_phases+1)*i):($3-$2):(0.0):5 \
+    using ($2-start_ts):($1+(num_phases+3)*i):($3-$2):(0.0):5 \
     with vectors arrowstyle variable, \
   for [i=0:(num_partitions-1)] filename(i) \
-    using (($2-start_ts)+($3-$2)/2):($1+(num_phases+1)*i):4 with labels, \
+    using (($2-start_ts)+($3-$2)/2):($1+(num_phases+3)*i):4 with labels, \
   for [i=0:(batch_boundary_cols*batch_boundary_phase_cnt-1)] batch_filename(i) \
     using (column((i%batch_boundary_cols)+2)-start_ts):1 \
     with lines ls (i/batch_boundary_cols+1) lc (i%batch_boundary_cols)

@@ -19,7 +19,7 @@ if (term_type eq "png") {
 line_weight = 1
 point_size = 1
 point_type = 5
-point_interval = 1
+point_interval = 1000
 
 ms_to_s = 1000
 

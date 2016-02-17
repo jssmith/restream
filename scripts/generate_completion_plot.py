@@ -65,7 +65,7 @@ for fname in args:
                 f.write('{} {} {}\n'.format(realtime, eventtime, colors[phase_num]))  # phase_num + 1))
 
 subprocess.call(['gnuplot', '-e', 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"'
-                .format(start_ts, num_phases, num_partitions), gnuplot_script])
+                .format(start_ts, num_phases, num_partitions, term_type), gnuplot_script])
 
 for part_idx in xrange(0, num_partitions):
     for phase_idx in xrange(0, num_phases):

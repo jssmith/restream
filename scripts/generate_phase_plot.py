@@ -48,30 +48,31 @@ for fname in args:
     with open(fname, 'r') as f:
         lines = f.readlines()
 
-    lines = [l[:-1].split(' ')[6:] for l in lines if 'START' in l or 'END' in l]
+    batch_lines = [l[:-1].split(' ')[6:] for l in lines if 'START' in l or 'END' in l]
+    gc_lines = [l[:-1].split(' ')[7:] for l in lines if 'end_of_minor_GC' in l or 'end_of_major_GC' in l]
+    # batch_lines = (partitionId, phaseId, batchEndTs(millis), currentTimeMillis, START|END)
+    # gc_lines = (gcType, gcEvent, gcReason, gcStartMillis, gcEndMillis, currentTimeMillis)
 
-    # lines = (partitionId, phaseId, batchEndTs(millis), currentTime(nanos), START|END)
-
-    partition_num = int(lines[0][0])
+    partition_num = int(batch_lines[0][0])
     num_partitions = max(num_partitions, partition_num + 1)
-    num_phases = max(map(lambda l: int(l[1]), lines)) + 1
+    num_phases = max(map(lambda l: int(l[1]), batch_lines)) + 1
 
     batch_count = {}
     for p in desired_phases:
         batch_count[p] = 0
         batch_boundaries[p][partition_num] = list()
 
-    start_ts = min(start_ts, min(map(lambda l: int(l[3]), lines)))
+    start_ts = min(start_ts, min(map(lambda l: int(l[3]), batch_lines)))
     if lowest_batch_timestamp is None:
-        two_smallest = heapq.nsmallest(2, set(map(lambda l: int(l[2]), lines)))
+        two_smallest = heapq.nsmallest(2, set(map(lambda l: int(l[2]), batch_lines)))
         lowest_batch_timestamp = two_smallest[0]
         batch_interval = two_smallest[1] - lowest_batch_timestamp
 
     phases = list()
-    for i in xrange(0, num_phases):
+    for i in xrange(0, num_phases+2):  # last 2 are minor/major GC
         phases.append((list(), list(), list()))  # START, END, batchEndTimestamp
 
-    for line in lines:
+    for line in batch_lines:
         phase_num = int(line[1])
         phases[phase_num][0 if line[4] == 'START' else 1].append(int(line[3]))
         if line[4] == 'START':
@@ -80,6 +81,13 @@ for fname in args:
             if (batch_count[phase_num] % batch_boundary_interval) == 0:
                 batch_boundaries[phase_num][partition_num].append(line[3])
             batch_count[phase_num] += 1
+
+    for line in gc_lines:
+        p = phases[-1 if line[1] == 'end_of_major_GC' else -2]
+        duration_ms = int(line[4]) - int(line[3])
+        p[0].append(int(line[5]) - duration_ms)
+        p[1].append(int(line[5]))
+        p[2].append(lowest_batch_timestamp)  # TODO hacky, makes the label on each gc 0
 
     with open('/tmp/partition{}.dat'.format(partition_num), 'w') as f:
         for phase_num, phase in enumerate(phases):
@@ -92,14 +100,18 @@ for phase_num, partitioned_batches in batch_boundaries.iteritems():
     with open('/tmp/batches{}.dat'.format(phase_num), 'w') as f:
         f.write('-1 {}\n'.format(' '.join(partitioned_batches[0])))
         for part_num, batches in partitioned_batches.iteritems():
-            f.write('{} {}\n'.format(part_num * (num_phases+1) + phase_num, ' '.join(batches)))
-        f.write('{} {}\n'.format(num_partitions * (num_phases+1), ' '.join(partitioned_batches[num_partitions-1])))
+            f.write('{} {}\n'.format(part_num * (num_phases+3) + phase_num, ' '.join(batches)))
+        f.write('{} {}\n'.format(num_partitions * (num_phases+3), ' '.join(partitioned_batches[num_partitions-1])))
 
 replay_ytics = list()
-for ytic in xrange(-1, num_partitions*(num_phases+1)):
-    if ytic == -1 or ytic == num_partitions*(num_phases+1) or ytic % (num_phases+1) == num_phases:
+for ytic in xrange(-1, num_partitions*(num_phases+3)):
+    if ytic == -1 or ytic == num_partitions*(num_phases+3) or ytic % (num_phases+3) == num_phases+2:
         continue
-    replay_ytics.append('"{}" {}'.format('{}-{}'.format(int(floor(ytic/(num_phases+1))), ytic % (num_phases+1)), ytic))
+    if ytic % (num_phases+3) >= num_phases:
+        label = 'minor gc' if ytic % (num_phases+3) == num_phases else 'major gc'
+    else:
+        label = '{}-{}'.format(int(floor(ytic/(num_phases+3))), ytic % (num_phases+3))
+    replay_ytics.append('"{}" {}'.format(label, ytic))
 
 with open(gnuplot_script, 'r') as f:
     old = f.read()
