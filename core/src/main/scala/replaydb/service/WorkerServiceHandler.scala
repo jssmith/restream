@@ -18,6 +18,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
 
   override def messageReceived(ctx: ChannelHandlerContext, msg: MessageEvent): Unit = {
     logger.debug(s"received message $msg")
+    val startTime = System.currentTimeMillis
     msg.getMessage.asInstanceOf[Command] match {
       case c : InitReplayCommand[_] => {
         if (server.stateCommunicationService != null) {
@@ -166,6 +167,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         server.logPerformance()
       }
     }
+    PerfLogger.logNetwork(s"END_HANDLER $startTime ${System.currentTimeMillis}")
   }
 
    override def exceptionCaught(ctx: ChannelHandlerContext, event: ExceptionEvent): Unit = {

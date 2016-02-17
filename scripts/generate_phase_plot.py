@@ -32,7 +32,10 @@ start_ts = sys.maxint
 num_partitions = 0
 
 lowest_batch_timestamp = None
+highest_batch_timestamp = None
+min_size_for_label = None
 batch_interval = None
+no_label_batch_num = None
 
 batch_boundaries = {}  # phase_num -> (part_num -> list(batch_end_ts))
 batch_boundary_interval = options.batch_boundary_interval
@@ -48,10 +51,12 @@ for fname in args:
     with open(fname, 'r') as f:
         lines = f.readlines()
 
-    batch_lines = [l[:-1].split(' ')[6:] for l in lines if 'START' in l or 'END' in l]
+    batch_lines = [l[:-1].split(' ')[6:] for l in lines if 'replaydb.perf.batchtiming' in l and ('START' in l or 'END' in l)]
     gc_lines = [l[:-1].split(' ')[7:] for l in lines if 'end_of_minor_GC' in l or 'end_of_major_GC' in l]
+    netty_lines = [l[:-1].split(' ')[10:] for l in lines if 'END_HANDLER' in l]
     # batch_lines = (partitionId, phaseId, batchEndTs(millis), currentTimeMillis, START|END)
     # gc_lines = (gcType, gcEvent, gcReason, gcStartMillis, gcEndMillis, currentTimeMillis)
+    # netty_lines = ( handleTimeStart, handleTimeFinish )
 
     partition_num = int(batch_lines[0][0])
     num_partitions = max(num_partitions, partition_num + 1)
@@ -67,50 +72,66 @@ for fname in args:
         two_smallest = heapq.nsmallest(2, set(map(lambda l: int(l[2]), batch_lines)))
         lowest_batch_timestamp = two_smallest[0]
         batch_interval = two_smallest[1] - lowest_batch_timestamp
+        no_label_batch_num = lowest_batch_timestamp - batch_interval
+        real_timestamps = map(lambda l: int(l[3]), batch_lines)
+        min_size_for_label = (max(real_timestamps) - min(real_timestamps)) / 100
 
     phases = list()
-    for i in xrange(0, num_phases+2):  # last 2 are minor/major GC
+    for i in xrange(0, num_phases+3):  # last 3 are minor/major GC, netty IO
         phases.append((list(), list(), list()))  # START, END, batchEndTimestamp
 
     for line in batch_lines:
         phase_num = int(line[1])
         phases[phase_num][0 if line[4] == 'START' else 1].append(int(line[3]))
-        if line[4] == 'START':
-            phases[phase_num][2].append(int(line[2]))
-        elif line[4] == 'END' and phase_num in desired_phases:
-            if (batch_count[phase_num] % batch_boundary_interval) == 0:
-                batch_boundaries[phase_num][partition_num].append(line[3])
-            batch_count[phase_num] += 1
+        if line[4] == 'END':
+            if (phases[phase_num][1][-1] - phases[phase_num][0][-1]) < min_size_for_label:
+                phases[phase_num][2].append(no_label_batch_num)
+            else:
+                phases[phase_num][2].append(int(line[2]))
+            if phase_num in desired_phases:
+                if (batch_count[phase_num] % batch_boundary_interval) == 0:
+                    batch_boundaries[phase_num][partition_num].append(line[3])
+                batch_count[phase_num] += 1
 
     for line in gc_lines:
-        p = phases[-1 if line[1] == 'end_of_major_GC' else -2]
+        p = phases[-2 if line[1] == 'end_of_major_GC' else -3]
         duration_ms = int(line[4]) - int(line[3])
         p[0].append(int(line[5]) - duration_ms)
         p[1].append(int(line[5]))
-        p[2].append(lowest_batch_timestamp - batch_interval)
+        p[2].append(no_label_batch_num)
+
+    for line in netty_lines:
+        phases[-1][0].append(int(line[0]))
+        phases[-1][1].append(int(line[1]))
+        phases[-1][2].append(no_label_batch_num)
 
     with open('/tmp/partition{}.dat'.format(partition_num), 'w') as f:
         for phase_num, phase in enumerate(phases):
             color_idx = 0
             for start, end, batch_ts in zip(phase[0], phase[1], phase[2]):
-                f.write('{} {} {} {} {}\n'.format(phase_num, start, end, int((batch_ts-lowest_batch_timestamp)/batch_interval), color_idx % 6 + 1))
+                color = 12 if phase_num == num_phases + 2 else color_idx % 6 + 1
+                f.write('{} {} {} {} {}\n'.format(phase_num, start, end, int((batch_ts-lowest_batch_timestamp)/batch_interval), color))
                 color_idx += 1
 
 for phase_num, partitioned_batches in batch_boundaries.iteritems():
     with open('/tmp/batches{}.dat'.format(phase_num), 'w') as f:
         f.write('-1 {}\n'.format(' '.join(partitioned_batches[0])))
         for part_num, batches in partitioned_batches.iteritems():
-            f.write('{} {}\n'.format(part_num * (num_phases+3) + phase_num, ' '.join(batches)))
-        f.write('{} {}\n'.format(num_partitions * (num_phases+3), ' '.join(partitioned_batches[num_partitions-1])))
+            f.write('{} {}\n'.format(part_num * (num_phases+4) + phase_num, ' '.join(batches)))
+        f.write('{} {}\n'.format(num_partitions * (num_phases+4), ' '.join(partitioned_batches[num_partitions-1])))
 
 replay_ytics = list()
-for ytic in xrange(-1, num_partitions*(num_phases+3)):
-    if ytic == -1 or ytic == num_partitions*(num_phases+3) or ytic % (num_phases+3) == num_phases+2:
+for ytic in xrange(-1, num_partitions*(num_phases+4)):
+    if ytic == -1 or ytic == num_partitions*(num_phases+4) or ytic % (num_phases+4) == num_phases+3:
         continue
-    if ytic % (num_phases+3) >= num_phases:
-        label = 'minor gc' if ytic % (num_phases+3) == num_phases else 'major gc'
+    if ytic % (num_phases+4) == num_phases:
+        label = 'minor gc'
+    elif ytic % (num_phases+4) == num_phases+1:
+        label = 'major gc'
+    elif ytic % (num_phases+4) == num_phases+2:
+        label = 'netty'
     else:
-        label = '{}-{}'.format(int(floor(ytic/(num_phases+3))), ytic % (num_phases+3))
+        label = '{}-{}'.format(int(floor(ytic/(num_phases+4))), ytic % (num_phases+4))
     replay_ytics.append('"{}" {}'.format(label, ytic))
 
 with open(gnuplot_script, 'r') as f:

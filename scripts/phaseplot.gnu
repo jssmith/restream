@@ -2,7 +2,7 @@
 set grid x y
 unset key
 
-set yrange [-1:((num_phases+3)*num_partitions)] reverse
+set yrange [((num_phases+4)*num_partitions):-1]
 set ytics _REPLAY_YTICS_
 set xrange [0:*]
 set xlabel 'Time Since Start (ms)'
@@ -27,11 +27,14 @@ set style arrow 3 nohead filled lw (line_weight) lc rgb "#FF33FF"
 set style arrow 4 nohead filled lw (line_weight) lc rgb "#FFFF33"
 set style arrow 5 nohead filled lw (line_weight) lc rgb "#5555FF"
 set style arrow 6 nohead filled lw (line_weight) lc rgb "#33FF33"
+set style arrow 12 nohead filled lw (line_weight) lc rgb "#DD3333FF"
 
-set style line 1 lw 1 lt 1
-set style line 2 lw 3 lt 0
-set style line 3 lw 2 lt 1
-set style line 4 lw 5 lt 0
+set style line 1 lw 1 dt 1
+set style line 2 lw 1 dt 2
+set style line 3 lw 1 dt 3
+set style line 4 lw 1 dt 4
+set style line 5 lw 1 dt 5
+set style line 6 lw 1 dt 6
 
 filename(n) = sprintf('/tmp/partition%d.dat', n)
 batch_filename(n) = sprintf('/tmp/batches%d.dat', n / batch_boundary_cols)
@@ -40,10 +43,10 @@ batch_boundary_phase_cnt = words(batch_boundary_phases)
 
 plot \
   for [i=0:(num_partitions-1)] filename(i) \
-    using ($2-start_ts):($1+(num_phases+3)*i):($3-$2):(0.0):5 \
+    using ($2-start_ts):($1+(num_phases+4)*i):($3-$2):(0.0):5 \
     with vectors arrowstyle variable, \
   for [i=0:(num_partitions-1)] filename(i) \
-    using (($2-start_ts)+($3-$2)/2):($1+(num_phases+3)*i):($4==-1 ? "" : $4) with labels, \
+    using (($2-start_ts)+($3-$2)/2):($1+(num_phases+4)*i):($4==-1 ? "" : $4) with labels, \
   for [i=0:(batch_boundary_cols*batch_boundary_phase_cnt-1)] batch_filename(i) \
     using (column((i%batch_boundary_cols)+2)-start_ts):1 \
     with lines ls (i/batch_boundary_cols+1) lc (i%batch_boundary_cols)
