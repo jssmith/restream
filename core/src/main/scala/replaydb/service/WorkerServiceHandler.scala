@@ -71,10 +71,10 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                     }
                     val progressLogInterval = runConfig.batchTimeInterval / 10
                     var nextProgressTimestamp = batchEndTimestamp + progressLogInterval
-                    PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.nanoTime} START")
+                    PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.currentTimeMillis} START")
                     readerThread.readEvents(e => {
                       if (e.ts >= nextProgressTimestamp) {
-                        PerfLogger.logBatchTiming(s"$partitionId $phaseId ${e.ts} ${System.nanoTime} PROGRESS")
+                        PerfLogger.logBatchTiming(s"$partitionId $phaseId ${e.ts} ${System.currentTimeMillis} PROGRESS")
                         nextProgressTimestamp += progressLogInterval
                       }
                       if (e.ts >= batchEndTimestamp) {
@@ -82,19 +82,19 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
                         // Send out StateUpdateCommands
                         server.stateCommunicationService.finalizeBatch(phaseId, batchEndTimestamp)
                         sendProgress()
-                        PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.nanoTime} END")
+                        PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.currentTimeMillis} END")
                         batchEndTimestamp += runConfig.batchTimeInterval
                         logger.info(s"advancing endtime $batchEndTimestamp on partition $partitionId phase $phaseId")
                         progressCoordinator.awaitAdvance(batchEndTimestamp)
-                        PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.nanoTime} BEGIN_READ_WAIT")
+                        PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.currentTimeMillis} BEGIN_READ_WAIT")
                         server.stateCommunicationService.awaitReadsReady(phaseId, batchEndTimestamp)
-                        PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.nanoTime} START")
+                        PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.currentTimeMillis} START")
                       }
                       lastTimestamp = e.ts
                       runtime.update(e)(progressCoordinator)
                       ct += 1
                     })
-                    PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.nanoTime} END")
+                    PerfLogger.logBatchTiming(s"$partitionId $phaseId $batchEndTimestamp ${System.currentTimeMillis} END")
                     // TODO ETK need a better way to extract info than this - two notes on that
                     // 1. We need a way to access the state from the Stats object in general, some way
                     //    to get info from our collections at the end of the run
