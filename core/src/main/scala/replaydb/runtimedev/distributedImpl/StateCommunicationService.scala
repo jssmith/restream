@@ -134,7 +134,8 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
   def handleStateRequestResponse(resp: StateRequestResponse): Unit = {
     if (waitAtBatchBoundary) {
       this.synchronized {
-        val remainingCount = queuedReadPrepareCount(resp.phaseId+1)(workerId)(resp.batchEndTs) - resp.responses.length
+        val remainingCount =
+          queuedReadPrepareCount(resp.phaseId+1)(workerId).getOrElse(resp.batchEndTs, 0) - resp.responses.length
         queuedReadPrepareCount(resp.phaseId+1)(workerId).put(resp.batchEndTs, remainingCount)
         if (remainingCount == 0) {
           notifyAll()
@@ -202,7 +203,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
   def awaitReadsReady(phaseId: Int, batchEndTs: Long): Unit = {
     if (waitAtBatchBoundary) {
       this.synchronized {
-        while (queuedReadPrepareCount(phaseId)(workerId)(batchEndTs) != 0) {
+        while (queuedReadPrepareCount(phaseId)(workerId).getOrElse(batchEndTs, 0) != 0) {
           wait()
         }
         queuedReadPrepareCount(phaseId)(workerId).remove(batchEndTs)
