@@ -4,12 +4,16 @@ unset key
 
 set yrange [((num_phases+4)*num_partitions):-1]
 set ytics _REPLAY_YTICS_
-set xrange [0:*]
+if (xrange_max eq "*") {
+  set xrange [(xrange_min):*]
+} else {
+  set xrange [(xrange_min):(xrange_max)]
+}
 set xlabel 'Time Since Start (ms)'
 set ylabel 'ReplayDB (partitionId-phaseId)'
 
 if (term_type eq "png") {
-  set terminal pngcairo size 2000,500
+  set terminal pngcairo size (output_width),(output_height)
   set output "phaseplot.png"
 } else {
   if (term_type eq "wxt") {

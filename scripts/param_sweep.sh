@@ -35,7 +35,7 @@ for iteration in `seq 1 $iterations`; do
         echo "lanched $partitions partitions on $nhosts hosts"
         sleep 2;
         fnbase="$nhosts-$partitions-$iteration-$detector"
-        $HOME/replaydb/scripts/ddrive.sh $detector $size_spec $partitions false false > $fnbase.txt 2>> $fnbase.timing
+        $HOME/replaydb/scripts/ddrive.sh $detector $size_spec $partitions true false > $fnbase.txt 2>> $fnbase.timing
         mkdir $fnbase-log
         for host in `cat ~/conf/workers.txt`; do
           scp $host:log/* $fnbase-log

@@ -21,6 +21,14 @@ parser.add_option('-i', '--batch-boundary-interval', type='int', dest='batch_bou
                   help='Batch boundary interval: Skip this many batches between each batch ending line (def 1)')
 parser.add_option('-p', '--batch-boundary-phases', type='string', dest='batch_boundary_phases', default='0',
                   help='Batch boundary phases: A space-separated list of phases to plot batch boundaries for (def 0)')
+parser.add_option('-x', '--xrange-max', type='int', dest='xrange_max', default=-1,
+                  help='xrange maximum: Define the upper limit for the x-range of the plot, in ms. Negative for automatic scaling (def -1)')
+parser.add_option('-m', '--xrange-min', type='int', dest='xrange_min', default=0,
+                  help='xrange minimum: Define the lower limit for the x-range of the plot, in ms (def 0)')
+parser.add_option('-w', '--output-width', type='int', dest='output_width', default=2000,
+                  help='output width: Width of the output (if using png terminal type) (def 2000)')
+parser.add_option('-o', '--output-height', type='int', dest='output_height', default=800,
+                  help='output height: Height of the output (if using png terminal type) (def 800)')
 (options, args) = parser.parse_args()
 
 if (len(args)) < 1:
@@ -41,6 +49,8 @@ batch_boundaries = {}  # phase_num -> (part_num -> list(batch_end_ts))
 batch_boundary_interval = options.batch_boundary_interval
 
 desired_phases = map(int, options.batch_boundary_phases.split(' '))
+xrange_max = '*' if options.xrange_max < 0 else options.xrange_max
+xrange_min = options.xrange_min
 
 term_type = options.terminal
 
@@ -74,7 +84,7 @@ for fname in args:
         batch_interval = two_smallest[1] - lowest_batch_timestamp
         no_label_batch_num = lowest_batch_timestamp - batch_interval
         real_timestamps = map(lambda l: int(l[3]), batch_lines)
-        min_size_for_label = (max(real_timestamps) - min(real_timestamps)) / 100
+        min_size_for_label = (max(real_timestamps) - min(real_timestamps)) / 1000
 
     phases = list()
     for i in xrange(0, num_phases+3):  # last 3 are minor/major GC, netty IO
@@ -140,8 +150,8 @@ with open(gnuplot_script, 'r') as f:
         f_new.write(old.replace('_REPLAY_YTICS_', '({})'.format(', '.join(replay_ytics))))
         
 subprocess.call(['gnuplot', '-e',
-                 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"; batch_boundary_cols={}; batch_boundary_phases="{}"'
-                .format(start_ts, num_phases, num_partitions, term_type,
+                 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"; xrange_min={}; xrange_max="{}"; output_width={}; output_height={}; batch_boundary_cols={}; batch_boundary_phases="{}"'
+                .format(start_ts, num_phases, num_partitions, term_type, xrange_min, xrange_max, options.output_width, options.output_height,
                         len(batch_boundaries[desired_phases[0]][0]), ' '.join(map(str, desired_phases))),
                  '/tmp/phaseplot.tmp.gnu'])
 

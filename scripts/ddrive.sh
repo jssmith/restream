@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # Launch the driver program
-# Usage: ./ddrive.sh spam_detector size_spec num_partitions [ partitioned=false ]
-#  e.g.: ./ddrive.sh replaydb.exec.spam.SpamDetectorStats 50m 4 true
+# Usage: ./ddrive.sh spam_detector size_spec num_partitions [ waitAtBatchBoundary=true ] [ partitioned=false ]
+#  e.g.: ./ddrive.sh replaydb.exec.spam.SpamDetectorStats 50m 4 true true
 #
 
 

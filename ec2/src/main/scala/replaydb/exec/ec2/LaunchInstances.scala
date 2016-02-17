@@ -88,7 +88,8 @@ object LaunchInstances extends App {
       |chown ec2-user /home/ec2-user/log
     """.stripMargin
 
-  val masterInstanceType = "c3.large"
+//  val masterInstanceType = "c3.large"
+  val masterInstanceType = workerInstanceType // Can't have two different types of instances in the same placement group
   val keyName = "replaydb"
   //val securityGroupId = "sg-97252df2" // Erik's account
   val securityGroupId = "sg-4ed9072b" // Johann
