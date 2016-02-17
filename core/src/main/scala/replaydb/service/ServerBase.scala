@@ -25,6 +25,7 @@ abstract class ServerBase(port: Int) {
 
   networkStats.reset()
   garbageCollectorStats.reset()
+  garbageCollectorStats.registerNotifications(PerfLogger.logGc)
 
   def getHandler(): ChannelHandler
 
