@@ -9,6 +9,10 @@ class ReplayCounterImpl(collectionId: Int, commService: StateCommunicationServic
   // ReplayCounters will end up located in different places
   val internalMap = new ReplayMapImpl[Int, Long](0L, collectionId, commService)
 
+  def increment(ts: Long)(implicit batchInfo: BatchInfo): Unit = {
+    internalMap.merge(ts, collectionId, ReplayCounter.increment)
+  }
+
   def add(value: Long, ts: Long)(implicit batchInfo: BatchInfo): Unit = {
     internalMap.merge(ts, collectionId, _ + value)
   }

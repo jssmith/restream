@@ -6,6 +6,10 @@ class ReplayCounterImpl extends ReplayCounter with Serial {
 
   val replayVal = new ReplayValueImpl[Long](0)
 
+  override def increment(ts: Long)(implicit batchInfo: BatchInfo): Unit = {
+    replayVal.merge(ts, ReplayCounter.increment)(batchInfo)
+  }
+
   override def add(value: Long, ts: Long)(implicit batchInfo: BatchInfo): Unit = {
     replayVal.merge(ts, _ + value)(batchInfo)
   }

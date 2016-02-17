@@ -18,6 +18,8 @@ class MessageCountSpamDetectorStats(replayStateFactory: replaydb.runtimedev.Repl
   val messageSendCounts: ReplayMap[Long, Int] = getReplayMap(0)
 
   val spamCounter: ReplayCounter = new ReplayCounter {
+    override def increment(ts: Long)(implicit batchInfo: BatchInfo): Unit = { }
+
     override def get(ts: Long)(implicit batchInfo: BatchInfo): Long = 0L
 
     override def getPrepare(ts: Long)(implicit batchInfo: BatchInfo): Unit = { }

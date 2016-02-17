@@ -1,7 +1,8 @@
 package replaydb.runtimedev.threadedImpl
 
+import java.util.Comparator
+
 import replaydb.runtimedev.{BatchInfo, ReplayValue}
-import replaydb.runtimedev.threadedImpl.ReplayValueImpl.MergeRecord
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -33,7 +34,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
   private var validDataEnd = 0
   def size = validDataEnd - validDataStart
 
-  private val updates = new mutable.PriorityQueue[MergeRecord[T]]()
+  private val updates = new mutable.PriorityQueue[(Long, T => T)]()(Ordering.by[(Long, T => T), Long](_._1))
   private var lastRead = Long.MinValue
   private var lastGC = Long.MinValue
   private var oldestNonGCWrite = Long.MinValue
@@ -53,7 +54,7 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
         // if we're older than another write following the last GC, update ourselves as oldest
         Math.min(oldestNonGCWrite, ts)
       }
-      updates.enqueue(new MergeRecord[T](ts = ts, merge = merge))
+      updates.enqueue((ts, merge))
     }
   }
 
@@ -100,8 +101,8 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
   // but does *guarantee* that the returned value is located at
   // values(validDataEnd - 1)
   private def mergeUpdates(ts: Long): Option[T] = {
-    val toMerge = ArrayBuffer[MergeRecord[T]]()
-    while (updates.nonEmpty && updates.head.ts <= ts) {
+    val toMerge = ArrayBuffer[(Long, (T => T))]()
+    while (updates.nonEmpty && updates.head._1 <= ts) {
       toMerge += updates.dequeue()
     }
     ReplayValueImpl.mergeAvg.add(toMerge.size)
@@ -110,8 +111,8 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
       resizeValueArrayIfNecessary(toMerge.length)
       var lastValue: T = if (size > 0) values(validDataEnd - 1) else default
       toMerge.foreach { mr =>
-        lastValue = mr.merge(lastValue)
-        timestamps(validDataEnd) = mr.ts
+        lastValue = mr._2(lastValue)
+        timestamps(validDataEnd) = mr._1
         values(validDataEnd) = lastValue
         validDataEnd += 1
       }
@@ -192,11 +193,6 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
 }
 
 object ReplayValueImpl {
-  case class MergeRecord[T](ts: Long, merge: T => T) extends Ordered[MergeRecord[T]] {
-    override def compare(that: MergeRecord[T]): Int = {
-      that.ts.compareTo(ts)
-    }
-  }
 
   val mergeAvg = new ThreadAvg("ValueMerge")
   val missAvg = new ThreadAvg("ValueMiss")

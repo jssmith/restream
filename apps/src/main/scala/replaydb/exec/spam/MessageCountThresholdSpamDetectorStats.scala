@@ -30,14 +30,16 @@ class MessageCountThresholdSpamDetectorStats(replayStateFactory: replaydb.runtim
     states.asInstanceOf[Seq[ReplayState with Threaded]]
   }
 
+  def incrementInt(i: Int): Int = i + 1
+
   def getRuntimeInterface: RuntimeInterface = emit {
     bind {
-      me: MessageEvent => messageSendCounts.merge(ts = me.ts, key = me.senderUserId, ct => ct + 1)
+      me: MessageEvent => messageSendCounts.merge(ts = me.ts, key = me.senderUserId, incrementInt)
     }
     bind {
       me: MessageEvent =>
         messageSendCounts.get(ts = me.ts, key = me.senderUserId) match {
-          case Some(9) => spamCounter.add(1, me.ts)
+          case Some(9) => spamCounter.increment(me.ts)
           case _ =>
         }
     }

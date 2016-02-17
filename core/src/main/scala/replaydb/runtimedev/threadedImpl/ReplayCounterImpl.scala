@@ -6,6 +6,10 @@ class ReplayCounterImpl extends ReplayCounter with Threaded {
 
   val replayValue = new ReplayValueImpl[Long](0L)
 
+  override def increment(ts: Long)(implicit batchInfo: BatchInfo): Unit = {
+    replayValue.merge(ts, ReplayCounter.increment)(batchInfo)
+  }
+
   override def add(value: Long, ts: Long)(implicit batchInfo: BatchInfo): Unit = {
     replayValue.merge(ts, _ + value)(batchInfo)
   }

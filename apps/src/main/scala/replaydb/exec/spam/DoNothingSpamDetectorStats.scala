@@ -12,6 +12,8 @@ class DoNothingSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayS
 
   // TODO should be able to clean up here...
   val spamCounter: ReplayCounter = new ReplayCounter {
+    override def increment(ts: Long)(implicit batchInfo: BatchInfo): Unit = { }
+
     override def get(ts: Long)(implicit batchInfo: BatchInfo): Long = 0L
 
     override def getPrepare(ts: Long)(implicit batchInfo: BatchInfo): Unit = { }
