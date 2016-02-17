@@ -87,7 +87,7 @@ for fname in args:
         duration_ms = int(line[4]) - int(line[3])
         p[0].append(int(line[5]) - duration_ms)
         p[1].append(int(line[5]))
-        p[2].append(lowest_batch_timestamp)  # TODO hacky, makes the label on each gc 0
+        p[2].append(lowest_batch_timestamp - batch_interval)
 
     with open('/tmp/partition{}.dat'.format(partition_num), 'w') as f:
         for phase_num, phase in enumerate(phases):

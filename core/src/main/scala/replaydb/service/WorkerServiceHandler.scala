@@ -153,7 +153,7 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
 
       case _ : CloseCommand => {
         logger.info("received driver close command")
-        PerfLogger.logCPU(s"server network stats ${server.networkStats}")
+        PerfLogger.logNetwork(s"server network stats ${server.networkStats}")
         PerfLogger.logCPU(s"garbage collector stats ${server.garbageCollectorStats}")
         PerfLogger.logNetwork(s"Network Read/Write Traffic: ${server.stateCommunicationService.getReadWriteTrafficString}")
         server.stateCommunicationService.close()

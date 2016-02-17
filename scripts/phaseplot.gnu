@@ -43,7 +43,7 @@ plot \
     using ($2-start_ts):($1+(num_phases+3)*i):($3-$2):(0.0):5 \
     with vectors arrowstyle variable, \
   for [i=0:(num_partitions-1)] filename(i) \
-    using (($2-start_ts)+($3-$2)/2):($1+(num_phases+3)*i):4 with labels, \
+    using (($2-start_ts)+($3-$2)/2):($1+(num_phases+3)*i):($4==-1 ? "" : $4) with labels, \
   for [i=0:(batch_boundary_cols*batch_boundary_phase_cnt-1)] batch_filename(i) \
     using (column((i%batch_boundary_cols)+2)-start_ts):1 \
     with lines ls (i/batch_boundary_cols+1) lc (i%batch_boundary_cols)
