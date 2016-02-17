@@ -30,7 +30,8 @@ class GarbageCollectorStats {
             val gcCause = gcInfo.getGcCause.replace(" ","_")
             val gcStartTime = gcInfo.getGcInfo.getStartTime
             val gcEndTime = gcInfo.getGcInfo.getEndTime
-            logFn(s"$gcName $gcAction $gcCause $gcStartTime $gcEndTime")
+            val currentTime = System.currentTimeMillis()
+            logFn(s"$gcName $gcAction $gcCause $gcStartTime $gcEndTime $currentTime")
           }
         }, null, null)
     }
