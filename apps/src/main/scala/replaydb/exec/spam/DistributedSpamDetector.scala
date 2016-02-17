@@ -33,7 +33,7 @@ object DistributedSpamDetector extends App {
   val numPartitions = args(2).toInt
   val batchSize = args(3).toInt
   val hostsFile = args(4)
-  val waitAtBatchBoundary = if (args.length > 6) args(5).toBoolean else false
+  val waitAtBatchBoundary = if (args.length >= 6) args(5).toBoolean else false
   val partitioned = if (args.length == 7) args(6).toBoolean else false
 
   val hosts = Hosts.fromFile(hostsFile)
