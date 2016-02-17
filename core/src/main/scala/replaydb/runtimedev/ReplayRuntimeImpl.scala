@@ -113,7 +113,7 @@ class ReplayRuntimeImpl(val c: Context) {
                     case TermName("get") | TermName("getRandom") =>
                       outstandingPrepares.getOrElseUpdate(params.head.tpt.tpe, ArrayBuffer()) += ((params.head.name,
                         Apply(Apply(Select(obj, TermName("getPrepare")), args), List(q"batchInfo"))))
-                    case TermName("merge") | TermName("add") =>
+                    case TermName("merge") | TermName("add") | TermName("increment") =>
                       // Nothing to be done
                     case _ =>
                       throw new RuntimeException(s"unexpected method $meth")
