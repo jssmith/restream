@@ -9,7 +9,11 @@ if (term_type eq "png") {
   set terminal pngcairo size 2000,500
   set output "phaseplot.png"
 } else {
-  set terminal x11 persist
+  if (term_type eq "wxt") {
+    set terminal wxt persist
+  } else {
+    set terminal x11 persist
+  }
 }
 
 line_weight = 1

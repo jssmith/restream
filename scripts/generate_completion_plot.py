@@ -4,22 +4,26 @@ import os
 import sys
 import subprocess
 import heapq
+from optparse import OptionParser
 
 #
 # Script to generate a plot of phase progress (event time) vs. real time
 # Currently just displays the output, but gnuplot can also generate e.g. svg / eps
-# Usage: ./generate_completion_plot.py --tTERM_TYPE path_to_part0.perf path_to_part1.perf ...
 #
 
-if len(sys.argv) < 2:
-    print 'Usage: ./generate_completion_plot.py path_to_part0.perf path_to_part1.perf ... '
-    print ' e.g.: ./generate_completion_plot.py --tpng path_to_part0.perf path_to_part1.perf ... '
-    print '       (TERM_TYPE defaults to x11)'
-    quit()
+usage = """%prog [options] path_to_part0.perf path_to_part1.perf ..."""
+
+parser = OptionParser(usage)
+parser.add_option('-t', '--terminal', type='string', dest='terminal', default='x11',
+                  help='Terminal type: x11, png, wxt (default x11)')
+(options, args) = parser.parse_args()
+
+if (len(args)) < 1:
+    parser.error("Must specify partition data files")
 
 gnuplot_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'completionplot.gnu')
 
-term_type = next((x[3:] for x in sys.argv[1:] if x.startswith('--t')), 'x11')
+term_type = options.terminal
 
 start_ts = sys.maxint
 num_partitions = 0
@@ -31,7 +35,7 @@ def rgb(hex):
     return 65536 * r + 256 * g + b
 colors = map(rgb, ("FF5555", "33FFFFF", "FF33FF", "FF0000", "5555FF", "33FF33"))
 
-for fname in sys.argv[1:]:
+for fname in args:
     with open(fname, 'r') as f:
         lines = f.readlines()
 
@@ -63,6 +67,6 @@ for fname in sys.argv[1:]:
 subprocess.call(['gnuplot', '-e', 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"'
                 .format(start_ts, num_phases, num_partitions), gnuplot_script])
 
-# for part_idx in xrange(0, num_partitions):
-#     for phase_idx in xrange(0, num_phases):
-#         os.unlink('/tmp/phase{}-{}.dat'.format(part_idx, phase_idx))
+for part_idx in xrange(0, num_partitions):
+    for phase_idx in xrange(0, num_phases):
+        os.unlink('/tmp/phase{}-{}.dat'.format(part_idx, phase_idx))

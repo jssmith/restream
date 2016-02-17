@@ -4,19 +4,27 @@ import os
 import sys
 import subprocess
 from math import floor
+from optparse import OptionParser
 import heapq
 
 #
 # Script to generate a plot of batch start/end times
 # Currently just displays the output, but gnuplot can also generate e.g. svg / eps
-# Usage: ./generate_phase_plot.py --tTERM_TYPE path_to_part0.perf path_to_part1.perf ...
 #
 
-if len(sys.argv) < 2:
-    print 'Usage: ./generate_phase_plot.py --tTERM_TYPE path_to_part0.perf path_to_part1.perf ... '
-    print ' e.g.: ./generate_phase_plot.py --tpng path_to_part0.perf path_to_part1.perf ... '
-    print '       (TERM_TYPE defaults to x11)'
-    quit()
+usage = """%prog [options] path_to_part0.perf path_to_part1.perf ..."""
+
+parser = OptionParser(usage)
+parser.add_option('-t', '--terminal', type='string', dest='terminal', default='x11',
+                  help='Terminal type: x11, png, wxt (default x11)')
+parser.add_option('-i', '--batch-boundary-interval', type='int', dest='batch_boundary_interval', default=1,
+                  help='Batch boundary interval: Skip this many batches between each batch ending line (def 1)')
+parser.add_option('-p', '--batch-boundary-phases', type='string', dest='batch_boundary_phases', default='0',
+                  help='Batch boundary phases: A space-separated list of phases to plot batch boundaries for (def 0)')
+(options, args) = parser.parse_args()
+
+if (len(args)) < 1:
+    parser.error("Must specify partition data files")
 
 gnuplot_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'phaseplot.gnu')
 
@@ -26,9 +34,17 @@ num_partitions = 0
 lowest_batch_timestamp = None
 batch_interval = None
 
-term_type = next((x[3:] for x in sys.argv[1:] if x.startswith('--t')), 'x11')
+batch_boundaries = {}  # phase_num -> (part_num -> list(batch_end_ts))
+batch_boundary_interval = options.batch_boundary_interval
 
-for fname in filter(lambda arg: not arg.startswith('--t'), sys.argv[1:]):
+desired_phases = map(int, options.batch_boundary_phases.split(' '))
+
+term_type = options.terminal
+
+for p in desired_phases:
+    batch_boundaries[p] = {}
+
+for fname in args:
     with open(fname, 'r') as f:
         lines = f.readlines()
 
@@ -39,6 +55,11 @@ for fname in filter(lambda arg: not arg.startswith('--t'), sys.argv[1:]):
     partition_num = int(lines[0][0])
     num_partitions = max(num_partitions, partition_num + 1)
     num_phases = max(map(lambda l: int(l[1]), lines)) + 1
+
+    batch_count = {}
+    for p in desired_phases:
+        batch_count[p] = 0
+        batch_boundaries[p][partition_num] = list()
 
     start_ts = min(start_ts, min(map(lambda l: int(l[3]), lines)))
     if lowest_batch_timestamp is None:
@@ -51,9 +72,14 @@ for fname in filter(lambda arg: not arg.startswith('--t'), sys.argv[1:]):
         phases.append((list(), list(), list()))  # START, END, batchEndTimestamp
 
     for line in lines:
-        phases[int(line[1])][0 if line[4] == 'START' else 1].append(int(line[3]))
+        phase_num = int(line[1])
+        phases[phase_num][0 if line[4] == 'START' else 1].append(int(line[3]))
         if line[4] == 'START':
-            phases[int(line[1])][2].append(int(line[2]))
+            phases[phase_num][2].append(int(line[2]))
+        elif line[4] == 'END' and phase_num in desired_phases:
+            if (batch_count[phase_num] % batch_boundary_interval) == 0:
+                batch_boundaries[phase_num][partition_num].append(line[3])
+            batch_count[phase_num] += 1
 
     with open('/tmp/partition{}.dat'.format(partition_num), 'w') as f:
         for phase_num, phase in enumerate(phases):
@@ -61,6 +87,13 @@ for fname in filter(lambda arg: not arg.startswith('--t'), sys.argv[1:]):
             for start, end, batch_ts in zip(phase[0], phase[1], phase[2]):
                 f.write('{} {} {} {} {}\n'.format(phase_num, start, end, int((batch_ts-lowest_batch_timestamp)/batch_interval), color_idx % 6 + 1))
                 color_idx += 1
+
+for phase_num, partitioned_batches in batch_boundaries.iteritems():
+    with open('/tmp/batches{}.dat'.format(phase_num), 'w') as f:
+        f.write('-1 {}\n'.format(' '.join(partitioned_batches[0])))
+        for part_num, batches in partitioned_batches.iteritems():
+            f.write('{} {}\n'.format(part_num * (num_phases+1) + phase_num, ' '.join(batches)))
+        f.write('{} {}\n'.format(num_partitions * (num_phases+1), ' '.join(partitioned_batches[num_partitions-1])))
 
 replay_ytics = list()
 for ytic in xrange(-1, num_partitions*(num_phases+1)):
@@ -73,8 +106,11 @@ with open(gnuplot_script, 'r') as f:
     with open('/tmp/phaseplot.tmp.gnu', 'w') as f_new:
         f_new.write(old.replace('_REPLAY_YTICS_', '({})'.format(', '.join(replay_ytics))))
         
-subprocess.call(['gnuplot', '-e', 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"'
-                .format(start_ts, num_phases, num_partitions, term_type), '/tmp/phaseplot.tmp.gnu'])
+subprocess.call(['gnuplot', '-e',
+                 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"; batch_boundary_cols={}; batch_boundary_phases="{}"'
+                .format(start_ts, num_phases, num_partitions, term_type,
+                        len(batch_boundaries[desired_phases[0]][0]), ' '.join(map(str, desired_phases))),
+                 '/tmp/phaseplot.tmp.gnu'])
 
 for idx in xrange(0, num_partitions):
     os.unlink('/tmp/partition{}.dat'.format(idx))
