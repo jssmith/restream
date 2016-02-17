@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Distributed launch. Starts the workers.
-# Usage: ./dlaunch.sh num_workers memory_size enable_debug
+# Usage: ./dlaunch.sh num_workers memory_size gc_opt enable_debug
 #  e.g.: ./dlaunch.sh 12 6000m true
 #
 
@@ -9,10 +9,12 @@ NUM=$1
 echo "Launching $NUM services"
 
 mem_size=$2
-use_debug=$3
+gc_opt=$3
+use_debug=$4
 
-if [[ $# -ne 3 ]]; then
-  echo "Usage: ./dlaunch.sh num_workers memory_size enable_debug"
+
+if [[ $# -ne 4 ]]; then
+  echo "Usage: ./dlaunch.sh num_workers memory_size gc_opt enable_debug"
   echo " e.g.: ./dlaunch.sh 12 6000m true"
   exit
 fi
@@ -36,6 +38,6 @@ for port in `seq $PORT_START $PORT_END`; do
   HOST=${WORKERS[$HOSTINDEX]}
   HOST=`echo $HOST`
   echo "Launch on $HOST:$port"
-  ssh $HOST "bash /home/ec2-user/replaydb-worker/llaunch.sh $port $mem_size $use_debug"
+  ssh $HOST "bash /home/ec2-user/replaydb-worker/llaunch.sh $port $mem_size $gc_opt $use_debug"
   echo "$HOST:$port" >> /home/ec2-user/conf/latesthosts.txt
 done

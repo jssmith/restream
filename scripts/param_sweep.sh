@@ -7,8 +7,8 @@
 #  e.g.: ./param_sweep.sh 10 5m "1 2 4 8" "1 2 3 4" "replaydb.exec.spam.SimpleSpamDetectorStats replaydb.exec.spam.SimpleSpamDetectorStats"
 #
 
-if [[ $# -ne 6 ]]; then
-  echo "Usage: ./param_sweep.sh iterations size_spec memsize host_counts jvms_per_host detectors"
+if [[ $# -ne 7 ]]; then
+  echo "Usage: ./param_sweep.sh iterations size_spec memsize host_counts jvms_per_host detectors gc_opts"
   echo "       where all args except iterations and size_spec should be a space-separated"
   echo "       list of values to sweep over"
   echo " e.g.: ./param_sweep.sh 10 5m 3000m \"1 2 4 8\" \"1 2 3 4\" \"replaydb.exec.spam.SimpleSpamDetectorStats replaydb.exec.spam.SimpleSpamDetectorStats\""
@@ -23,6 +23,7 @@ mem_size=$3
 host_counts=$4
 jvms_per_host=$5
 detectors=$6
+gc_opts=$7
 
 for iteration in `seq 1 $iterations`; do
   for nhosts in $host_counts; do
@@ -30,15 +31,17 @@ for iteration in `seq 1 $iterations`; do
     for jvmsperhost in $jvms_per_host; do
       partitions=$((nhosts*jvmsperhost))
       for detector in $detectors; do
-        $HOME/replaydb/scripts/dkill.sh
-        $HOME/replaydb/scripts/dlaunch.sh $partitions $mem_size $USE_DEBUG
-        echo "lanched $partitions partitions on $nhosts hosts"
-        sleep 2;
-        fnbase="$nhosts-$partitions-$iteration-$detector"
-        $HOME/replaydb/scripts/ddrive.sh $detector $size_spec $partitions true false > $fnbase.txt 2>> $fnbase.timing
-        mkdir $fnbase-log
-        for host in `cat ~/conf/workers.txt`; do
-          scp $host:log/* $fnbase-log
+        for gc_opt in $gc_opts; do
+          $HOME/replaydb/scripts/dkill.sh
+          $HOME/replaydb/scripts/dlaunch.sh $partitions $mem_size $gc_opt $USE_DEBUG
+          echo "lanched $partitions partitions on $nhosts hosts"
+          sleep 2;
+          fnbase="$nhosts-$partitions-$iteration-$detector-$gc_opt"
+          $HOME/replaydb/scripts/ddrive.sh $detector $size_spec $partitions true false > $fnbase.txt 2>> $fnbase.timing
+          mkdir $fnbase-log
+          for host in `cat ~/conf/workers.txt`; do
+            scp $host:log/* $fnbase-log
+          done
         done
       done
     done
