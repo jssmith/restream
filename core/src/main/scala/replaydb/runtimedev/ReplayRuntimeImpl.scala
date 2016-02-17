@@ -40,7 +40,7 @@ class ReplayRuntimeImpl(val c: Context) {
             meth match {
               case TermName("get") | TermName("getRandom") =>
                 ReadDataflow(obj)
-              case TermName("merge") | TermName("add") =>
+              case TermName("merge") | TermName("add") | TermName("increment") =>
                 WriteDataflow(obj)
               case _ =>
                 throw new RuntimeException(s"unexpected method $meth")
