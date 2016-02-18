@@ -14,7 +14,7 @@ set ylabel 'ReplayDB (partitionId-phaseId)'
 
 if (term_type eq "png") {
   set terminal pngcairo size (output_width),(output_height)
-  set output "phaseplot.png"
+  set output sprintf('%s.png', output_filename)
 } else {
   if (term_type eq "wxt") {
     set terminal wxt persist

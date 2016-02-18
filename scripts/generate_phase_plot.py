@@ -27,8 +27,10 @@ parser.add_option('-m', '--xrange-min', type='int', dest='xrange_min', default=0
                   help='xrange minimum: Define the lower limit for the x-range of the plot, in ms (def 0)')
 parser.add_option('-w', '--output-width', type='int', dest='output_width', default=2000,
                   help='output width: Width of the output (if using png terminal type) (def 2000)')
-parser.add_option('-o', '--output-height', type='int', dest='output_height', default=800,
+parser.add_option('-y', '--output-height', type='int', dest='output_height', default=800,
                   help='output height: Height of the output (if using png terminal type) (def 800)')
+parser.add_option('-o', '--output-filename', type='string', dest='output_filename', default='phaseplot',
+                  help='output filename: Name of file to save to (if using png terminal type) (def phaseplot)')
 (options, args) = parser.parse_args()
 
 if (len(args)) < 1:
@@ -150,8 +152,10 @@ with open(gnuplot_script, 'r') as f:
         f_new.write(old.replace('_REPLAY_YTICS_', '({})'.format(', '.join(replay_ytics))))
         
 subprocess.call(['gnuplot', '-e',
-                 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"; xrange_min={}; xrange_max="{}"; output_width={}; output_height={}; batch_boundary_cols={}; batch_boundary_phases="{}"'
-                .format(start_ts, num_phases, num_partitions, term_type, xrange_min, xrange_max, options.output_width, options.output_height,
+                 'start_ts={}; num_phases={}; num_partitions={}; term_type="{}"; xrange_min={}; xrange_max="{}"; '
+                 'output_width={}; output_height={}; output_filename="{}"; batch_boundary_cols={}; batch_boundary_phases="{}"'
+                .format(start_ts, num_phases, num_partitions, term_type, xrange_min, xrange_max,
+                        options.output_width, options.output_height, options.output_filename,
                         len(batch_boundaries[desired_phases[0]][0]), ' '.join(map(str, desired_phases))),
                  '/tmp/phaseplot.tmp.gnu'])
 
