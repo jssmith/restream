@@ -37,10 +37,11 @@ object ProcessStats extends App {
   }
 
   def getRunconfig(timingFile: File): LoggedRunConfiguration = {
-    val rcRe = """(\d+)-(\d+)-(\d+)-([a-zA-Z\.]+).timing""".r
-    timingFile.getName match {
-      case rcRe(numHosts, numPartitions, iteration, detector) =>
-        new LoggedRunConfiguration(numHosts.toInt, numPartitions.toInt,
+    val rcRe = """(\d+)-(\d+)-(\d+)-([a-zA-Z\.]+)-(default|parallel|g1|cms).timing""".r
+    val name = timingFile.getName
+    name match {
+      case rcRe(numHosts, numPartitions, iteration, detector, gc) =>
+        new LoggedRunConfiguration(name, numHosts.toInt, numPartitions.toInt,
           iteration.toInt, detector)
     }
   }
@@ -52,15 +53,15 @@ object ProcessStats extends App {
   try {
     for (tf <- timingFiles) {
       val rc = getRunconfig(tf)
-      val completionMs = getTime(tf)
-      //    println(s"have timing file $tf ($rc) with time ${getTime(tf)}")
-      val wl = new WorkerLogs(new File(statsDirectory,  s"${rc.numHosts}-${rc.numPartitions}-${rc.iteration}-${rc.detector}-log"), rc)
       try {
+        val completionMs = getTime(tf)
+        //    println(s"have timing file $tf ($rc) with time ${getTime(tf)}")
+        val wl = new WorkerLogs(new File(statsDirectory,  rc.getLogName), rc)
         wl.checkErrors()
         pw.println(s"${rc.getCSV},$completionMs,${wl.summarizePerf().getCsv}")
       } catch {
-        case _: RuntimeException =>
-          println(s"skipping $rc")
+        case e: RuntimeException =>
+          println(s"skipping $rc ${e.getMessage()}")
       }
     }
   } finally {

@@ -52,7 +52,7 @@ class WorkerLogs(workerLogPath: File, runConfig: LoggedRunConfiguration) {
     val errFiles = workerLogPath.listFiles(new FilenameFilter {
       override def accept(dir: File, name: String): Boolean = name.endsWith(".err")
     })
-    if (errFiles.isEmpty) {
+    if (errFiles == null || errFiles.isEmpty) {
       throw new RuntimeException("expected size zero error files but found no error files")
     }
     errFiles.foreach { f =>
