@@ -94,7 +94,7 @@ object LaunchInstances extends App {
   //val securityGroupId = "sg-97252df2" // Erik's account
   val securityGroupId = "sg-4ed9072b" // Johann
   val instanceProfileName = "replaydb-role"
-  val placementGroupName = "replaydb-p2"
+  val placementGroupName = "replaydb-p1"
   val workerPrefix = prefix + "-worker"
   val masterName = prefix + "-master"
 
