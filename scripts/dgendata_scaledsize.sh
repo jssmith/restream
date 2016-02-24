@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Generate data on all workers, and locally (truncated to the length size_spec, 
+# Generate data on all workers, and locally (truncated to the length size_spec,
 #     i.e. length used with one partition)
 # In this case, num_events should be the number of events *per split*
 # Usage: ./dgendata_scaledsize.sh size_spec num_events num_users split_nums [ keep_only=false ]
@@ -10,8 +10,8 @@
 #  note that this will only work if each host is running only one partition
 
 if [[ $# -lt 4 ]]; then
-  echo "Usage: ./dgendata_scaledsize.sh size_spec num_events num_users split_nums [ keep_only=false ]"
-  echo "e.g.: ./dgendata_scaledsize.sh 5m-each 5000000 100000 \"1 2 4 8 16 32\" true"
+  echo "Usage: ./dgendata_scaledsize.sh size_spec num_events num_users split_nums [ keep_only=false ] [ partitioned=false ]"
+  echo "e.g.: ./dgendata_scaledsize.sh 5m-each 5000000 100000 \"1 2 4 8 16 32\" true true"
   echo ""
   echo "Note that in this case, num_events should be the number of events *per split*"
   echo ""
@@ -25,6 +25,11 @@ if [ $# -ge 5 ]; then
 else
   keep_only=false
 fi
+if [ $# -ge 6 ]; then
+  partitioned=$6
+else
+  partitioned=false
+fi
 
 echo "generating data remotely, $2 events per partition"
 idx=0
@@ -34,7 +39,7 @@ for host in `cat $HOME/conf/workers.txt`; do
   else
     keep_only_arg=-1
   fi
-  ssh $host "bash -l -c '/home/ec2-user/replaydb-worker/lgendata_scaledsize.sh $1 $2 $3 \"$4\" $keep_only_arg'" &
+  ssh $host "bash -l -c '/home/ec2-user/replaydb-worker/lgendata_scaledsize.sh $1 $2 $3 \"$4\" $keep_only_arg $partitioned'" &
   idx=$(($idx+1))
 done
 

@@ -17,7 +17,7 @@ class SimpleSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStat
   with HasSpamCounter with HasReplayStates[ReplayState with Threaded] {
   import replayStateFactory._
 
-  val friendships: ReplayMap[UserPair, Int] = getReplayMap(0)
+  val friendships: ReplayMap[UserPair, Int] = getReplayMap(0, (up: UserPair) => List(up.a.hashCode, up.b.hashCode))
   val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
   val spamCounter: ReplayCounter = getReplayCounter
   val nonfriendMessagesInLastInterval: ReplayMap[Long, Long] = getReplayMap(0)
