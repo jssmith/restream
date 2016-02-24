@@ -16,7 +16,7 @@ usage = """%prog [options] path_to_part0.perf path_to_part1.perf ..."""
 
 parser = OptionParser(usage)
 parser.add_option('-t', '--terminal', type='string', dest='terminal', default='x11',
-                  help='Terminal type: x11, png, wxt (default x11)')
+                  help='Terminal type: x11,png,wxt,eps (default x11)')
 parser.add_option('-i', '--batch-boundary-interval', type='int', dest='batch_boundary_interval', default=1,
                   help='Batch boundary interval: Skip this many batches between each batch ending line (def 1)')
 parser.add_option('-p', '--batch-boundary-phases', type='string', dest='batch_boundary_phases', default='0',

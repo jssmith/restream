@@ -19,7 +19,12 @@ if (term_type eq "png") {
   if (term_type eq "wxt") {
     set terminal wxt persist
   } else {
-    set terminal x11 persist
+    if (term_type eq "eps") {
+      set terminal epscairo
+      set output sprintf('%s.eps', output_filename)
+    } else {
+      set terminal x11 persist
+    }
   }
 }
 

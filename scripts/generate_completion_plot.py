@@ -15,7 +15,7 @@ usage = """%prog [options] path_to_part0.perf path_to_part1.perf ..."""
 
 parser = OptionParser(usage)
 parser.add_option('-t', '--terminal', type='string', dest='terminal', default='x11',
-                  help='Terminal type: x11, png, wxt (default x11)')
+                  help='Terminal type: x11,png,wxt,eps (default x11)')
 (options, args) = parser.parse_args()
 
 if (len(args)) < 1:
