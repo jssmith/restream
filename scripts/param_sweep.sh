@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Script to easily do a parameter sweep of distributed driving 
+# Script to easily do a parameter sweep of distributed driving
 # Usage: ./param_sweep.sh iterations size_spec host_counts jvms_per_host detectors
 #        where all args except iterations and size_spec should be a space-separated
 #        list of values to sweep over
@@ -27,7 +27,7 @@ batch_sizes=$6
 for iteration in `seq 1 $iterations`; do
   for nhosts in $host_counts; do
     cp $HOME/conf/workers-$nhosts.txt /home/ec2-user/conf/workers.txt
-    partitions=nhosts
+    partitions=$nhosts
     for detector in $detectors; do
       for batch_size in $batch_sizes; do
       for partitioned in false true; do
@@ -46,4 +46,3 @@ for iteration in `seq 1 $iterations`; do
     done
   done
 done
-
