@@ -7,10 +7,16 @@ case class PerfSummary(
   phaseThreadMs: Long,
   kryoSendMs: Long,
   kryoRecvMs: Long,
-  kryoSendBytes: Long,
-  kryoRecvBytes: Long
+  kryoSendBytes: Array[Long],
+  kryoRecvBytes: Array[Long]
 ) {
+  private def sum(x: Array[Long]): Double = {
+    x.sum
+  }
+  private def skew(x: Array[Long]): Double = {
+    x.max.toDouble * x.length / x.sum
+  }
   def getCsv: String = {
-    s"$readerThreadMs,$phaseThreadMs,$bossThreadMs,$workerThreadMs,$kryoSendMs,$kryoRecvMs,$kryoSendBytes,$kryoRecvBytes"
+    s"$readerThreadMs,$phaseThreadMs,$bossThreadMs,$workerThreadMs,$kryoSendMs,$kryoRecvMs,${sum(kryoSendBytes)},${sum(kryoRecvBytes)},${skew(kryoSendBytes)},${skew(kryoRecvBytes)}"
   }
 }
