@@ -20,7 +20,7 @@ class WorkerLogs(workerLogPath: File, runConfig: LoggedRunConfiguration) {
     val regEx = pattern.r
     (for (m <- regEx.findAllMatchIn(txt)) yield {
       m.group(1).toLong
-    }).toArray
+    }).filter(_>0).toArray
   }
   def summarizePerf(): PerfSummary = {
     val perfFiles = workerLogPath.listFiles(new FilenameFilter {
@@ -34,8 +34,8 @@ class WorkerLogs(workerLogPath: File, runConfig: LoggedRunConfiguration) {
       val phaseThreadMs = findAllTimes(perfText, """thread \d+ \(phase \d+\) finished with elapsed cpu time (\d+) ms""").sum
       val kryoSendMs = findAllTimes(perfText, """sent_kryo_ms=(\d+)""").sum
       val kryoRecvMs = findAllTimes(perfText, """recv_kryo_ms=(\d+)""").sum
-      val kryoSendBytes = findAllTimes(perfText, """sent_bytes=(\d+)""").sum
-      val kryoRecvBytes = findAllTimes(perfText, """recv_bytes=(\d+)""").sum
+      val kryoSendBytes = findAllTimes(perfText, """sent_bytes=(\d+)""")
+      val kryoRecvBytes = findAllTimes(perfText, """recv_bytes=(\d+)""")
       new PerfSummary(
         readerThreadMs = readerThreadMs,
         bossThreadMs = bossThreadMs,
@@ -54,8 +54,8 @@ class WorkerLogs(workerLogPath: File, runConfig: LoggedRunConfiguration) {
       phaseThreadMs = p1.phaseThreadMs + p2.phaseThreadMs,
       kryoSendMs = p1.kryoSendMs + p2.kryoSendMs,
       kryoRecvMs = p1.kryoRecvMs + p2.kryoRecvMs,
-      kryoSendBytes = p1.kryoSendBytes + p2.kryoSendBytes,
-      kryoRecvBytes = p1.kryoRecvBytes + p2.kryoRecvBytes
+      kryoSendBytes = p1.kryoSendBytes ++ p2.kryoSendBytes,
+      kryoRecvBytes = p1.kryoRecvBytes ++ p2.kryoRecvBytes
     ))
   }
   def checkErrors(): Unit = {

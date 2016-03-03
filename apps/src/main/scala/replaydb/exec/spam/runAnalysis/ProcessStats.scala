@@ -49,7 +49,7 @@ object ProcessStats extends App {
   val outputFile = new File(statsDirectory, "performance.csv")
   val pw = new PrintWriter(new BufferedWriter(new FileWriter(outputFile)))
   pw.print("detector,hosts,partitions,overall_ms,")
-  pw.println("reader_thread_ms,phase_threads_ms,io_boss_ms,io_worker_ms,kryo_send_ms,kryo_recv_ms,kryo_send_bytes,kryo_recv_bytes")
+  pw.println("reader_thread_ms,phase_threads_ms,io_boss_ms,io_worker_ms,kryo_send_ms,kryo_recv_ms,kryo_send_bytes,kryo_recv_bytes,kryo_send_skew,kryo_recv_skew")
   try {
     for (tf <- timingFiles) {
       val rc = getRunconfig(tf)
