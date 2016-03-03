@@ -6,7 +6,7 @@ import replaydb.runtimedev.BatchInfo
 
 import scala.collection.mutable
 
-class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long, partitionId: Int) {
+class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long, partitionId: Int, numPartitions: Int, numPhases: Int) {
   val logger = Logger(LoggerFactory.getLogger(classOf[BatchProgressCoordinator]))
   abstract class ThreadCoordinator(partitionId: Int, phaseId: Int) extends BatchInfo(partitionId, phaseId) {
     def awaitAdvance(ts: Long): Unit
@@ -17,9 +17,7 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long, pa
   }
 
   def update(phaseId: Int, maxTimestamp: Long): Unit = {
-    x.synchronized {
-      x(phaseId).values.foreach(_.update(maxTimestamp))
-    }
+    x(phaseId).foreach(_.update(maxTimestamp))
   }
 
   class PhaseLimit(phaseId: Int) extends ThreadCoordinator(partitionId, phaseId) {
@@ -50,17 +48,12 @@ class BatchProgressCoordinator(startTimestamp: Long, batchTimeInterval: Long, pa
     def batchId: Int = throw new UnsupportedOperationException
   }
 
-  val x = mutable.HashMap[Int, mutable.HashMap[Int, PhaseLimit]]()
+  val x: Array[Array[PhaseLimit]] = Array.ofDim(numPhases, numPartitions)
+  for (i <- 0 until numPhases; j <- 0 until numPartitions) {
+    x(i)(j) = new PhaseLimit(i)
+  }
 
   def getCoordinator(partitionId: Int, phaseId: Int): ThreadCoordinator = {
-    x.synchronized {
-      if (!x.contains(phaseId)) {
-        x += phaseId -> mutable.HashMap()
-      }
-      if (!x(phaseId).contains(partitionId)) {
-        x(phaseId) += partitionId -> new PhaseLimit(phaseId)
-      }
-      x(phaseId)(partitionId)
-    }
+    x(phaseId)(partitionId)
   }
 }

@@ -36,9 +36,9 @@ class WorkerServiceHandler(server: Server) extends SimpleChannelUpstreamHandler 
         }
         val program = constructor.newInstance(stateFactory)
         val runtime = program.asInstanceOf[HasRuntimeInterface].getRuntimeInterface
-        server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp, runConfig.batchTimeInterval, c.workerId)
+        server.batchProgressCoordinator = new BatchProgressCoordinator(runConfig.startTimestamp,
+          runConfig.batchTimeInterval, c.workerId, runConfig.numPartitions, runConfig.numPhases)
 
-        // TODO these two probably need to change
         server.startLatch = new CountDownLatch(runConfig.numPhases * c.partitionMaps.size)
         server.finishLatch = new CountDownLatch(runConfig.hosts.length) // number of workers
 
