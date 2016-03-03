@@ -20,14 +20,12 @@ class SimpleSpamDetectorStats(replayStateFactory: replaydb.runtimedev.ReplayStat
   val friendships: ReplayMap[UserPair, Int] = getReplayMap(0, (up: UserPair) => List(up.a.hashCode, up.b.hashCode))
   val friendSendRatio: ReplayMap[Long, (Long, Long)] = getReplayMap((0L,0L))
   val spamCounter: ReplayCounter = getReplayCounter
-  val nonfriendMessagesInLastInterval: ReplayMap[Long, Long] = getReplayMap(0)
   val messageSpamRatings: ReplayTimestampLocalMap[Long, Int] = getReplayTimestampLocalMap(0)
 
   // TODO Ideally this becomes automated by the code generation portion
   def getAllReplayStates: Seq[ReplayState with Threaded] = {
     val states = List(
-      friendships, friendSendRatio, spamCounter,
-      messageSpamRatings, nonfriendMessagesInLastInterval)
+      friendships, friendSendRatio, spamCounter, messageSpamRatings)
     for (s <- states) {
       if (!s.isInstanceOf[ReplayState with Threaded]) {
         throw new UnsupportedOperationException

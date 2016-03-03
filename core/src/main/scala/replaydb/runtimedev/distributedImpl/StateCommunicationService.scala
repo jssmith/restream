@@ -12,8 +12,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
-// TODO ETK - I *think* this is cleaning up all unnecessary state (i.e. GC'ing itself)
-//            but want to think more about it and make sure that's true
+// TODO ETK make sure some of these things with communication get moved out of the synchronization
 
 class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfiguration: RunConfiguration) {
 
