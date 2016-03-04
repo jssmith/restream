@@ -288,9 +288,9 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
 object StateCommunicationService {
   val MaxMessagesPerCommand = 50000
 
-  case class StateWrite[T](collectionId: Int, ts: Long, key: Any, merge: T => T)
-  case class StateRead(collectionId: Int, ts: Long, key: Any)
-  case class StateResponse(collectionId: Int, ts: Long, key: Any, value: Option[Any])
+  case class StateWrite[T](ts: Long, key: Any, merge: (T) => T)
+  case class StateRead(ts: Long, key: Any)
+  case class StateResponse(ts: Long, key: Any, value: Option[Any])
 
   def splitIntoMessages[T:ClassTag](input: Array[Array[T]]): Array[Array[Array[T]]] = {
     val result = ArrayBuffer[Array[Array[T]]]()

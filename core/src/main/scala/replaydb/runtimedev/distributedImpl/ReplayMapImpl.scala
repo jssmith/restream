@@ -47,13 +47,13 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
 
   override def getPrepare(ts: Long, key: K)(implicit batchInfo: BatchInfo): Unit = {
     val sourceWorker = commService.getSourceWorker(key, partitionFn)
-    queuedLocalReadPrepares(batchInfo.phaseId, sourceWorker, batchInfo.batchEndTs).offer(StateRead(collectionId, ts, key))
+    queuedLocalReadPrepares(batchInfo.phaseId, sourceWorker, batchInfo.batchEndTs).offer(StateRead(ts, key))
   }
 
   override def merge(ts: Long, key: K, fn: V => V)(implicit batchInfo: BatchInfo): Unit = {
     val destWorkers = commService.getDestWorkers(key, partitionFn)
     for (worker <- destWorkers) {
-      queuedWrites(batchInfo.phaseId, worker, batchInfo.batchEndTs).offer(StateWrite(collectionId, ts, key, fn))
+      queuedWrites(batchInfo.phaseId, worker, batchInfo.batchEndTs).offer(StateWrite(ts, key, fn))
     }
   }
 
@@ -78,7 +78,7 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
 
   def fulfillRemoteReadPrepare(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateResponse] = {
     queuedRemoteReadPrepares.remove(phaseId, workerId, batchEndTs).toArray[StateRead](Array[StateRead]()).
-      map(rp => StateResponse(collectionId, rp.ts, rp.key, requestRemoteRead(rp.ts, rp.key.asInstanceOf[K])))
+      map(rp => StateResponse(rp.ts, rp.key, requestRemoteRead(rp.ts, rp.key.asInstanceOf[K])))
   }
 
   def insertRemoteWrites(writes: Array[StateWrite[_]]): Unit = {
