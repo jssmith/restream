@@ -5,6 +5,7 @@ import java.util.concurrent.locks.{Lock, Condition, ReentrantLock}
 import com.typesafe.scalalogging.Logger
 import org.jboss.netty.channel._
 import org.slf4j.LoggerFactory
+import replaydb.runtimedev.ReplayState
 import replaydb.service.driver.{RunConfiguration, Command}
 import replaydb.service.{ProgressTracker, ClientGroupBase}
 import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateResponse, StateRead, StateWrite}
@@ -54,7 +55,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
   }
 
   // State is owned by worker #: partitionFn(key) % workerCount
-  val states: ArrayBuffer[ReplayMapImpl[Any, Any]] = ArrayBuffer()
+  val states: ArrayBuffer[ReplayState with Partitioned] = ArrayBuffer()
 
   val commandsReceived: Array[Array[mutable.Map[Long, Int]]] = Array.ofDim(numPhases, numWorkers)
   val cmdsInBatch: Array[Array[mutable.Map[Long, Int]]] = Array.ofDim(numPhases, numWorkers)
@@ -146,9 +147,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
       //logger.info(s"Phase $workerId-$phaseId processing read requests for ${readRequestsToProcess.get.size} partitions")
       processStateReadRequests(phaseId, batchEndTs)
       // at this point, no more reads will be coming for this specific phase/batch...
-      // Can GC after the second to last phase since the last phase doesn't read or write anything
-      // (last phase's reads are carried out by the second to last phase)
-      if (phaseId == numPhases - 2) {
+      if (phaseId == numPhases - 1) {
         PerfLogger.logGc("Custom GC stats: (total merged values in collection, total unmerged values, number of ReplayValues, GC'd values)"
           + (for ((s, id) <- states.zipWithIndex) yield {
           s"State ID $id: ${s.gcOlderThan(batchEndTs)}"
@@ -203,7 +202,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
     val numFinished = partitionsFinished(phaseId).getOrElse(batchEndTs, 0) + 1
     if (numFinished == 1) {
       states.foreach(_.prepareForBatch(phaseId,
-        batchEndTs + (2 + numPhases + ProgressTracker.FirstPhaseBatchExtraAllowance) * runConfiguration.batchTimeInterval))
+        batchEndTs + (2 + numPhases + ProgressTracker.FirstPhaseBatchExtraAllowance) * batchTimeInterval))
     }
     if (numFinished < numLocalPartitions) {
       partitionsFinished(phaseId)(batchEndTs) = numFinished
@@ -214,6 +213,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
     partitionsFinishedLocks(phaseId).unlock()
 
     if (phaseId == numPhases - 1) {
+      states.foreach(_.cleanupBatch(phaseId, batchEndTs))
       return // nothing to be done - final phase can't have any readPrepares or writes
     }
 
@@ -241,6 +241,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
       sendStateUpdateCommand(
         StateUpdateCommand(workerId, phaseId, batchEndTs, cmdsInBatch, writeChunks.last, readPrepareChunks.last), i)
     }
+    states.foreach(_.cleanupBatch(phaseId, batchEndTs))
   }
 
   // Return the worker which should be contacted to get the given key (for reads)
@@ -268,13 +269,13 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
     }
   }
 
-  def registerReplayState(collectionId: Int, rs: ReplayMapImpl[_, _]): Unit = {
+  def registerReplayState(collectionId: Int, rs: ReplayState with Partitioned): Unit = {
     if (states.length != collectionId) {
       throw new IllegalStateException("collectionId must be equal to (previous number of ReplayStates added)")
     }
-    states += rs.asInstanceOf[ReplayMapImpl[Any, Any]]
+    states += rs
     for (pid <- 0 until numPhases; batchNumber <- 0 until (2 + numPhases + ProgressTracker.FirstPhaseBatchExtraAllowance)) {
-      rs.prepareForBatch(pid, runConfiguration.startTimestamp + batchNumber * runConfiguration.batchTimeInterval)
+      rs.prepareForBatch(pid, runConfiguration.startTimestamp + batchNumber * batchTimeInterval)
     }
   }
 
@@ -282,6 +283,8 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
     s"Local Reads: $readRequestsSatisfiedLocally / Remote Reads $readRequestsSatisfiedRemotely // " +
       s"Local Writes $writesSentLocally / Remote Writes $writesSentRemotely"
   }
+
+  def batchTimeInterval: Long = runConfiguration.batchTimeInterval
 
 }
 

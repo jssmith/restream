@@ -59,6 +59,7 @@ object DistributedSpamDetector extends App {
     .newInstance(new ReplayStateFactory {
     override def getReplayMap[K, V: ClassTag](default: => V, partitionFn: K => List[Int] = null): ReplayMap[K, V] = null
     override def getReplayCounter: ReplayCounter = null
+    override def getReplayAccumulator: ReplayAccumulator = null
     override def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = null
   }).getRuntimeInterface.numPhases
 

@@ -10,5 +10,7 @@ trait ReplayStateFactory {
 
   def getReplayCounter: ReplayCounter
 
+  def getReplayAccumulator: ReplayAccumulator
+
   def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V]
 }

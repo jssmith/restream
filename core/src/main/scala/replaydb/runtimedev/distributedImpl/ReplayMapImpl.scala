@@ -7,9 +7,10 @@ import replaydb.runtimedev.{ReplayMap, BatchInfo}
 
 import scala.reflect.ClassTag
 import scala.collection.mutable
+import scala.collection.JavaConversions._
 
 class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commService: StateCommunicationService,
-                                     partitionFunction: K => List[Int] = null) extends ReplayMap[K, V] {
+                                     partitionFunction: K => List[Int] = null) extends ReplayMap[K, V] with Partitioned {
 
   val internalReplayMap = new replaydb.runtimedev.threadedImpl.ReplayMapImpl[K, V](default)
 
@@ -17,8 +18,9 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
   val queuedLocalReadPrepares = new ConcurrentBufferQueue[StateRead]()
   val queuedRemoteReadPrepares = new ConcurrentBufferQueue[StateRead]()
 
-  val preparedValues: Array[mutable.Map[Long, ConcurrentHashMap[(Long, K), Option[V]]]] = Array.ofDim(commService.numPhases)
-  (0 until commService.numPhases).foreach(preparedValues(_) = mutable.HashMap())
+  val preparedValues: Array[ConcurrentHashMap[Long, ConcurrentHashMap[(Long, K), Option[V]]]] = Array.ofDim(commService.numPhases)
+  (0 until commService.numPhases).foreach(preparedValues(_) =
+    new ConcurrentHashMap[Long, ConcurrentHashMap[(Long, K), Option[V]]]())
 
   def prepareForBatch(phaseId: Int, batchEndTs: Long): Unit = {
     queuedWrites.prepForBatch(phaseId, batchEndTs)
@@ -62,7 +64,7 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
   }
 
   def getAndClearLocalReadPrepares(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateRead] = {
-    queuedLocalReadPrepares.remove(phaseId, workerId, batchEndTs).toArray(Array[StateRead]())
+    queuedLocalReadPrepares.remove(phaseId, workerId, batchEndTs).toArray(Array[StateRead]()).distinct
   }
 
   def insertPreparedValues(phaseId: Int, batchEndTs: Long, responses: Array[StateResponse]): Unit = {
@@ -89,6 +91,10 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
 
   private def requestRemoteRead(ts: Long, key: K): Option[V] = {
     internalReplayMap.get(ts, key)
+  }
+
+  def cleanupBatch(phaseId: Int, batchEndTs: Long): Unit = {
+    preparedValues(phaseId).remove(batchEndTs)
   }
 
   def gcOlderThan(ts: Long): (Int, Int, Int, Int) = {

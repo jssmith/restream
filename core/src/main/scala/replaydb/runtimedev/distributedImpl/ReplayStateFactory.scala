@@ -1,7 +1,7 @@
 package replaydb.runtimedev.distributedImpl
 
 import replaydb.runtimedev.threadedImpl.ReplayTimestampLocalMapImpl
-import replaydb.runtimedev.{ReplayCounter, ReplayMap, ReplayTimestampLocalMap}
+import replaydb.runtimedev.{ReplayAccumulator, ReplayCounter, ReplayMap, ReplayTimestampLocalMap}
 
 import scala.reflect.ClassTag
 
@@ -21,6 +21,13 @@ class ReplayStateFactory(commService: StateCommunicationService) extends replayd
     commService.registerReplayState(nextStateId, newCounter.internalMap)
     nextStateId += 1
     newCounter
+  }
+
+  def getReplayAccumulator: ReplayAccumulator = {
+    val newAccumulator = new ReplayAccumulatorImpl(nextStateId, commService)
+    commService.registerReplayState(nextStateId, newAccumulator)
+    nextStateId += 1
+    newAccumulator
   }
 
   def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = {

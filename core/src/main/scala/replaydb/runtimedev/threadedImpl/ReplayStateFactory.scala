@@ -1,6 +1,6 @@
 package replaydb.runtimedev.threadedImpl
 
-import replaydb.runtimedev.{ReplayCounter, ReplayMap, ReplayTimestampLocalMap}
+import replaydb.runtimedev.{ReplayAccumulator, ReplayCounter, ReplayMap, ReplayTimestampLocalMap}
 
 import scala.reflect.ClassTag
 
@@ -11,6 +11,10 @@ class ReplayStateFactory extends replaydb.runtimedev.ReplayStateFactory {
 
   def getReplayCounter: ReplayCounter = {
     new ReplayCounterImpl
+  }
+
+  def getReplayAccumulator: ReplayAccumulator = {
+    new ReplayAccumulatorImpl
   }
 
   def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = {
