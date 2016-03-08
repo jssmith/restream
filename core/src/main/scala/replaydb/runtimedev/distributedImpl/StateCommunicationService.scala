@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory
 import replaydb.runtimedev.ReplayState
 import replaydb.service.driver.{RunConfiguration, Command}
 import replaydb.service.{ProgressTracker, ClientGroupBase}
-import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateResponse, StateRead, StateWrite}
 import replaydb.util.PerfLogger
 
 import scala.collection.mutable
@@ -43,7 +42,11 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
       }
     }
   }
-  client.connect(runConfiguration.hosts.zipWithIndex.filter(_._2 != workerId).map(_._1))
+  connectToClients()
+
+  def connectToClients(): Unit = {
+    client.connect(runConfiguration.hosts.zipWithIndex.filter(_._2 != workerId).map(_._1))
+  }
 
   def close(): Unit = {
     client.closeWhenDone(true)
@@ -291,9 +294,19 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
 object StateCommunicationService {
   val MaxMessagesPerCommand = 50000
 
-  case class StateWrite[T](ts: Long, key: Any, merge: (T) => T)
-  case class StateRead(ts: Long, key: Any)
-  case class StateResponse(ts: Long, key: Any, value: Option[Any])
+  trait StateRead {
+    def ts: Long
+  }
+
+  trait StateResponse {
+    def ts: Long
+    def value: Any
+  }
+
+  trait StateWrite {
+    def ts: Long
+    def merge: Any
+  }
 
   def splitIntoMessages[T:ClassTag](input: Array[Array[T]]): Array[Array[Array[T]]] = {
     val result = ArrayBuffer[Array[Array[T]]]()

@@ -2,7 +2,8 @@ package replaydb.runtimedev.distributedImpl
 
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 
-import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateResponse, StateRead, StateWrite}
+import replaydb.runtimedev.distributedImpl.ReplayMapImpl.{StateReadMap, StateResponseMap, StateWriteMap}
+import replaydb.runtimedev.distributedImpl.StateCommunicationService._
 import replaydb.runtimedev.{ReplayMap, BatchInfo}
 
 import scala.reflect.ClassTag
@@ -14,7 +15,7 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
 
   val internalReplayMap = new replaydb.runtimedev.threadedImpl.ReplayMapImpl[K, V](default)
 
-  val queuedWrites = new ConcurrentBufferQueue[StateWrite[_]]()
+  val queuedWrites = new ConcurrentBufferQueue[StateWriteMap[K, V]]()
   val queuedLocalReadPrepares = new ConcurrentBufferQueue[StateRead]()
   val queuedRemoteReadPrepares = new ConcurrentBufferQueue[StateRead]()
 
@@ -49,18 +50,18 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
 
   override def getPrepare(ts: Long, key: K)(implicit batchInfo: BatchInfo): Unit = {
     val sourceWorker = commService.getSourceWorker(key, partitionFn)
-    queuedLocalReadPrepares(batchInfo.phaseId, sourceWorker, batchInfo.batchEndTs).offer(StateRead(ts, key))
+    queuedLocalReadPrepares(batchInfo.phaseId, sourceWorker, batchInfo.batchEndTs).offer(StateReadMap(ts, key))
   }
 
   override def merge(ts: Long, key: K, fn: V => V)(implicit batchInfo: BatchInfo): Unit = {
     val destWorkers = commService.getDestWorkers(key, partitionFn)
     for (worker <- destWorkers) {
-      queuedWrites(batchInfo.phaseId, worker, batchInfo.batchEndTs).offer(StateWrite(ts, key, fn))
+      queuedWrites(batchInfo.phaseId, worker, batchInfo.batchEndTs).offer(StateWriteMap(ts, key, fn))
     }
   }
 
-  def getAndClearWrites(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateWrite[_]] = {
-    queuedWrites.remove(phaseId, workerId, batchEndTs).toArray[StateWrite[_]](Array[StateWrite[_]]())
+  def getAndClearWrites(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateWrite] = {
+    queuedWrites.remove(phaseId, workerId, batchEndTs).toArray(Array[StateWrite]())
   }
 
   def getAndClearLocalReadPrepares(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateRead] = {
@@ -68,8 +69,9 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
   }
 
   def insertPreparedValues(phaseId: Int, batchEndTs: Long, responses: Array[StateResponse]): Unit = {
-    for (resp <- responses) {
-      preparedValues(phaseId+1)(batchEndTs).put((resp.ts, resp.key.asInstanceOf[K]), resp.value.asInstanceOf[Option[V]])
+    for (resp <- responses.filter(_.isInstanceOf[StateResponseMap[K,V]])) {
+      val r = resp.asInstanceOf[StateResponseMap[K,V]]
+      preparedValues(phaseId+1)(batchEndTs).put((r.ts, r.key), r.value)
     }
   }
 
@@ -79,13 +81,15 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
   }
 
   def fulfillRemoteReadPrepare(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateResponse] = {
-    queuedRemoteReadPrepares.remove(phaseId, workerId, batchEndTs).toArray[StateRead](Array[StateRead]()).
-      map(rp => StateResponse(rp.ts, rp.key, requestRemoteRead(rp.ts, rp.key.asInstanceOf[K])))
+    queuedRemoteReadPrepares.remove(phaseId, workerId, batchEndTs)
+      .filter(_.isInstanceOf[StateReadMap[K]]).map(_.asInstanceOf[StateReadMap[K]])
+      .map(rp => StateResponseMap(rp.ts, rp.key, requestRemoteRead(rp.ts, rp.key)).asInstanceOf[StateResponse]).toArray
   }
 
-  def insertRemoteWrites(writes: Array[StateWrite[_]]): Unit = {
-    for (w <- writes) {
-      internalReplayMap.merge(w.ts, w.key.asInstanceOf[K], w.asInstanceOf[StateWrite[V]].merge)
+  def insertRemoteWrites(writes: Array[StateWrite]): Unit = {
+    for (sw <- writes) {
+      val w = sw.asInstanceOf[StateWriteMap[K, V]]
+      internalReplayMap.merge(w.ts, w.key, w.merge)
     }
   }
 
@@ -127,4 +131,10 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
       }
     }
   }
+}
+
+object ReplayMapImpl {
+  case class StateWriteMap[K, V](ts: Long, key: K, merge: (V) => V) extends StateWrite
+  case class StateReadMap[K](ts: Long, key: K) extends StateRead
+  case class StateResponseMap[K, V](ts: Long, key: K, value: Option[V]) extends StateResponse
 }

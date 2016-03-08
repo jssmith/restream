@@ -6,9 +6,6 @@ import replaydb.runtimedev._
 import replaydb.runtimedev.threadedImpl._
 import replaydb.util.time._
 
-import scala.collection.immutable
-
-
 /*
 RULES:
 

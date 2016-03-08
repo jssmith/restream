@@ -57,11 +57,13 @@ object DistributedSpamDetector extends App {
 
   val numPhases = spamDetector.getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
     .newInstance(new ReplayStateFactory {
-    override def getReplayMap[K, V: ClassTag](default: => V, partitionFn: K => List[Int] = null): ReplayMap[K, V] = null
-    override def getReplayCounter: ReplayCounter = null
-    override def getReplayAccumulator: ReplayAccumulator = null
-    override def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = null
-  }).getRuntimeInterface.numPhases
+      override def getReplayMap[K, V: ClassTag](default: => V, partitionFn: K => List[Int] = null): ReplayMap[K, V] = null
+      override def getReplayMapTopK[K, V](default: => V, partitionFn: K => List[Int] = null)
+                                         (implicit ord: Ordering[V], ct: ClassTag[V]): ReplayMapTopK[K, V] = null
+      override def getReplayCounter: ReplayCounter = null
+      override def getReplayAccumulator: ReplayAccumulator = null
+      override def getReplayTimestampLocalMap[K, V](default: => V): ReplayTimestampLocalMap[K, V] = null
+    }).getRuntimeInterface.numPhases
 
   val runConfiguration = new RunConfiguration(numPartitions = numPartitions, numPhases = numPhases, hosts,
     startTimestamp = startTime, batchTimeInterval = batchTimeInterval, approxBatchSize = batchSize,

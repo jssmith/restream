@@ -5,7 +5,7 @@ import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateRead,
 trait Partitioned {
   def prepareForBatch(phaseId: Int, batchEndTs: Long): Unit
 
-  def getAndClearWrites(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateWrite[_]]
+  def getAndClearWrites(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateWrite]
 
   def getAndClearLocalReadPrepares(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateRead]
 
@@ -16,7 +16,7 @@ trait Partitioned {
 
   def fulfillRemoteReadPrepare(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateResponse]
 
-  def insertRemoteWrites(writes: Array[StateWrite[_]]): Unit
+  def insertRemoteWrites(writes: Array[StateWrite]): Unit
 
   def cleanupBatch(phaseId: Int, batchEndTs: Long): Unit
 

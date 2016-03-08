@@ -4,4 +4,4 @@ import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateRead,
 import replaydb.service.driver.Command
 
 case class StateUpdateCommand(originatingWorkerId: Int, phaseId: Int, batchEndTs: Long, cmdsInBatch: Int,
-                              writes: Array[Array[StateWrite[_]]], readPrepares: Array[Array[StateRead]]) extends Command
+                              writes: Array[Array[StateWrite]], readPrepares: Array[Array[StateRead]]) extends Command

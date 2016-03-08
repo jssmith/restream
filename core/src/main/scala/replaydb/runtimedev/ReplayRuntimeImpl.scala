@@ -1,14 +1,19 @@
 package replaydb.runtimedev
 
 import replaydb.event.Event
-import replaydb.runtimedev.threadedImpl.{CoordinatorInterface, RunProgressCoordinator}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.immutable
 import scala.reflect.macros.blackbox.Context
 
 class ReplayRuntimeImpl(val c: Context) {
   import c.universe._
+
+  val WRITE_METHODS = List("add", "merge").map(TermName(_))
+  val READ_METHODS = immutable.Map("get" -> "getPrepare", "getTopK" -> "getPrepareTopK").map {
+    case (k, v) => TermName(k).asInstanceOf[Name] -> TermName(v)
+  }
 
   def replaceTransform(src: Name, tgt: Name) =  new Transformer {
     override def transform(tree: Tree): Tree = tree match {
@@ -37,13 +42,12 @@ class ReplayRuntimeImpl(val c: Context) {
       def add(x: c.Expr[Any]) = {
         val dataflow: List[Dataflow] = x.tree.collect {
           case Apply(Select(obj,meth: Name), _) if obj.tpe <:< typeOf[ReplayState] =>
-            meth match {
-              case TermName("get") | TermName("getRandom") =>
-                ReadDataflow(obj)
-              case TermName("merge") | TermName("add") =>
-                WriteDataflow(obj)
-              case _ =>
-                throw new RuntimeException(s"unexpected method $meth")
+            if (READ_METHODS.contains(meth)) {
+              ReadDataflow(obj)
+            } else if (WRITE_METHODS.contains(meth)) {
+              WriteDataflow(obj)
+            } else {
+              throw new RuntimeException(s"unexpected method $meth")
             }
         }
         df += new BindingDesc(x, dataflow)
@@ -109,14 +113,11 @@ class ReplayRuntimeImpl(val c: Context) {
 
               body.foreach {
                 case Apply(Select(obj,meth: Name), args: List[Tree]) if obj.tpe <:< typeOf[ReplayState] =>
-                  meth match {
-                    case TermName("get") | TermName("getRandom") =>
-                      outstandingPrepares.getOrElseUpdate(params.head.tpt.tpe, ArrayBuffer()) += ((params.head.name,
-                        Apply(Apply(Select(obj, TermName("getPrepare")), args), List(q"batchInfo"))))
-                    case TermName("merge") | TermName("add") =>
-                      // Nothing to be done
-                    case _ =>
-                      throw new RuntimeException(s"unexpected method $meth")
+                  if (READ_METHODS.contains(meth)) {
+                    outstandingPrepares.getOrElseUpdate(params.head.tpt.tpe, ArrayBuffer()) += ((params.head.name,
+                      Apply(Apply(Select(obj, READ_METHODS(meth)), args), List(q"batchInfo"))))
+                  } else if (!WRITE_METHODS.contains(meth)) {
+                    throw new RuntimeException(s"unexpected method $meth")
                   }
                 case _ =>
               }

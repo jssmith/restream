@@ -5,6 +5,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 import java.util.function.BiFunction
 
+import replaydb.runtimedev.distributedImpl.ReplayAccumulatorImpl.{StateWriteAccum, StateResponseAccum, StateReadAccum}
 import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateRead, StateResponse, StateWrite}
 import replaydb.runtimedev.{BatchInfo, ReplayAccumulator}
 import scala.collection.mutable
@@ -64,10 +65,10 @@ class ReplayAccumulatorImpl(collectionId: Int, commService: StateCommunicationSe
   }
 
   def getPrepare(ts: Long)(implicit batchInfo: BatchInfo): Unit = {
-    queuedLocalReadPrepares(batchInfo.phaseId)(batchInfo.batchEndTs).offer(StateRead(ts, 0))
+    queuedLocalReadPrepares(batchInfo.phaseId)(batchInfo.batchEndTs).offer(StateReadAccum(ts))
   }
 
-  def getAndClearWrites(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateWrite[_]] = {
+  def getAndClearWrites(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateWrite] = {
     accumulatedWriteLock.readLock().lock()
     if (!accumulatedWrites(phaseId).contains(batchEndTs)) {
       val tempMap = new util.TreeMap[Long, Long](queuedWrites(phaseId)(batchEndTs))
@@ -88,7 +89,7 @@ class ReplayAccumulatorImpl(collectionId: Int, commService: StateCommunicationSe
       accumulatedWrites(phaseId)(batchEndTs).lastEntry.getValue
     }
     accumulatedWriteLock.readLock().unlock()
-    Array(StateWrite[Long](batchEndTs, 0, _ => value))
+    Array(StateWriteAccum(batchEndTs, value))
   }
 
   def getAndClearLocalReadPrepares(phaseId: Int, workerId: Int, batchEndTs: Long): Array[StateRead] = {
@@ -100,9 +101,10 @@ class ReplayAccumulatorImpl(collectionId: Int, commService: StateCommunicationSe
     accumulatedEvaluated.put(batchEndTs, accumulated.headMap(batchEndTs).values().sum)
     accumulatedLock.readLock().unlock()
     for (resp <- responses) {
+      val r = resp.asInstanceOf[StateResponseAccum]
       // could use ConcurrentHashMap.merge here but I think it's overkill
       preparedValues(phaseId + 1)(batchEndTs)(resp.ts) =
-        preparedValues(phaseId + 1)(batchEndTs).getOrDefault(resp.ts, 0) + resp.value.get.asInstanceOf[Long]
+        preparedValues(phaseId + 1)(batchEndTs).getOrDefault(resp.ts, 0) + r.value
     }
   }
 
@@ -116,15 +118,16 @@ class ReplayAccumulatorImpl(collectionId: Int, commService: StateCommunicationSe
     val ret = (queuedRemoteReadPrepares(phaseId)(workerId).remove(batchEndTs) match {
       case Some(q) => q.toArray
       case None => Array()
-    }).map(rp => StateResponse(rp.ts, rp.key, Some(requestRemoteRead(rp.ts, phaseId, batchEndTs))))
+    }).map(rp => StateResponseAccum(rp.ts, requestRemoteRead(rp.ts, phaseId, batchEndTs)).asInstanceOf[StateResponse])
     accumulatedWriteLock.readLock().unlock()
     ret
   }
 
-  def insertRemoteWrites(writes: Array[StateWrite[_]]): Unit = {
+  def insertRemoteWrites(writes: Array[StateWrite]): Unit = {
     accumulatedLock.writeLock().lock()
-    for (w <- writes) {
-      accumulated(w.ts) = accumulated(w.ts) + w.asInstanceOf[StateWrite[Long]].merge(0)
+    for (sw <- writes) {
+      val w = sw.asInstanceOf[StateWriteAccum]
+      accumulated(w.ts) = accumulated(w.ts) + w.merge
     }
     accumulatedLock.writeLock().unlock()
   }
@@ -158,4 +161,10 @@ class ReplayAccumulatorImpl(collectionId: Int, commService: StateCommunicationSe
     (-1, -1, -1, -1)
   }
 
+}
+
+object ReplayAccumulatorImpl {
+  case class StateWriteAccum(ts: Long, merge: Long) extends StateWrite
+  case class StateReadAccum(ts: Long) extends StateRead
+  case class StateResponseAccum(ts: Long, value: Long) extends StateResponse
 }
