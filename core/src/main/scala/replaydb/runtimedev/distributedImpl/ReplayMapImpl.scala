@@ -4,6 +4,7 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 
 import replaydb.runtimedev.distributedImpl.ReplayMapImpl.{StateReadMap, StateResponseMap, StateWriteMap}
 import replaydb.runtimedev.distributedImpl.StateCommunicationService._
+import replaydb.runtimedev.threadedImpl.Threaded
 import replaydb.runtimedev.{ReplayMap, BatchInfo}
 
 import scala.reflect.ClassTag
@@ -13,7 +14,8 @@ import scala.collection.JavaConversions._
 class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commService: StateCommunicationService,
                                      partitionFunction: K => List[Int] = null) extends ReplayMap[K, V] with Partitioned {
 
-  val internalReplayMap = new replaydb.runtimedev.threadedImpl.ReplayMapImpl[K, V](default)
+  val internalReplayMap: ReplayMap[K, V] with Threaded =
+    new replaydb.runtimedev.threadedImpl.ReplayMapImpl[K, V](default)
 
   val queuedWrites = new ConcurrentBufferQueue[StateWriteMap[K, V]]()
   val queuedLocalReadPrepares = new ConcurrentBufferQueue[StateRead]()

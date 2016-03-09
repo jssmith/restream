@@ -16,9 +16,17 @@ class ReplayStateFactory(commService: StateCommunicationService) extends replayd
     newMap
   }
 
-  def getReplayMapTopK[K, V](default: => V, partitionFn: K => List[Int] = null)
+  def getReplayMapTopKLazy[K, V](default: => V, partitionFn: K => List[Int] = null)
+                                (implicit ord: Ordering[V], ct: ClassTag[V]): ReplayMapTopK[K, V] = {
+    val newMap = new ReplayMapTopKLazyImpl[K, V](default, nextStateId, commService, partitionFn)(ord, ct)
+    commService.registerReplayState(nextStateId, newMap)
+    nextStateId += 1
+    newMap
+  }
+
+  def getReplayMapTopK[K, V](default: => V, maxCount: Int, partitionFn: K => List[Int] = null)
                             (implicit ord: Ordering[V], ct: ClassTag[V]): ReplayMapTopK[K, V] = {
-    val newMap = new ReplayMapTopKImpl[K, V](default, nextStateId, commService, partitionFn)(ord, ct)
+    val newMap = new ReplayMapTopKImpl[K, V](default, maxCount, nextStateId, commService, partitionFn)(ord, ct)
     commService.registerReplayState(nextStateId, newMap)
     nextStateId += 1
     newMap

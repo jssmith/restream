@@ -3,7 +3,7 @@ package replaydb.service.driver
 import com.twitter.chill.ScalaKryoInstantiator
 import replaydb.runtimedev.distributedImpl.ReplayAccumulatorImpl.{StateResponseAccum, StateReadAccum, StateWriteAccum}
 import replaydb.runtimedev.distributedImpl.ReplayMapImpl.{StateReadMap, StateWriteMap, StateResponseMap}
-import replaydb.runtimedev.distributedImpl.ReplayMapTopKImpl.{StateReadTopK, StateResponseTopK}
+import replaydb.runtimedev.distributedImpl.ReplayMapTopKLazyImpl.{StateReadTopK, StateResponseTopK}
 import replaydb.runtimedev.distributedImpl.StateCommunicationService.{StateWrite, StateRead, StateResponse}
 import replaydb.runtimedev.distributedImpl.{StateRequestResponse, StateUpdateCommand}
 

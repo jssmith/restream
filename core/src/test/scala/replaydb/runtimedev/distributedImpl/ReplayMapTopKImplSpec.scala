@@ -13,7 +13,7 @@ class ReplayMapTopKImplSpec extends FlatSpec {
     val commServices = (0 until cnt).map(new LocalStateCommunicationService(_, runConfig))
     commServices.foreach(_.setWorkers(commServices.toList))
     val replayStates = (for ((commService, idx) <- commServices.zipWithIndex) yield {
-      val rs = new ReplayMapTopKImpl[Long, Long](0, idx, commService)
+      val rs = new ReplayMapTopKLazyImpl[Long, Long](0, idx, commService)
       commService.registerReplayState(0, rs)
       rs
     }).toList
@@ -23,7 +23,7 @@ class ReplayMapTopKImplSpec extends FlatSpec {
     override def batchEndTs = bets
   }
 
-  def submitWrite(states: List[ReplayMapTopKImpl[Long, Long]], workerNum: Int, phaseNum: Int, batchEndTs: Long, ts: Long, key: Long, newVal: Long): Unit = {
+  def submitWrite(states: List[ReplayMapTopKLazyImpl[Long, Long]], workerNum: Int, phaseNum: Int, batchEndTs: Long, ts: Long, key: Long, newVal: Long): Unit = {
     states(workerNum).merge(ts, key, _ => newVal)(getBI(workerNum, phaseNum, batchEndTs))
   }
   

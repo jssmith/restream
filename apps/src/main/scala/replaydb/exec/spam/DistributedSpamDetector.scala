@@ -58,7 +58,9 @@ object DistributedSpamDetector extends App {
   val numPhases = spamDetector.getConstructor(classOf[replaydb.runtimedev.ReplayStateFactory])
     .newInstance(new ReplayStateFactory {
       override def getReplayMap[K, V: ClassTag](default: => V, partitionFn: K => List[Int] = null): ReplayMap[K, V] = null
-      override def getReplayMapTopK[K, V](default: => V, partitionFn: K => List[Int] = null)
+      override def getReplayMapTopKLazy[K, V](default: => V, partitionFn: K => List[Int] = null)
+                                             (implicit ord: Ordering[V], ct: ClassTag[V]): ReplayMapTopK[K, V] = null
+      override def getReplayMapTopK[K, V](default: => V, maxCount: Int, partitionFn: K => List[Int] = null)
                                          (implicit ord: Ordering[V], ct: ClassTag[V]): ReplayMapTopK[K, V] = null
       override def getReplayCounter: ReplayCounter = null
       override def getReplayAccumulator: ReplayAccumulator = null

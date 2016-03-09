@@ -110,10 +110,13 @@ class ReplayValueImpl[T : ClassTag](default: => T) extends ReplayValue[T] with T
       resizeValueArrayIfNecessary(toMerge.length)
       var lastValue: T = if (size > 0) values(validDataEnd - 1) else default
       toMerge.foreach { mr =>
-        lastValue = mr.merge(lastValue)
-        timestamps(validDataEnd) = mr.ts
-        values(validDataEnd) = lastValue
-        validDataEnd += 1
+        val newValue = mr.merge(lastValue)
+        if (lastValue != newValue) {
+          timestamps(validDataEnd) = mr.ts
+          values(validDataEnd) = newValue
+          validDataEnd += 1
+          lastValue = newValue
+        }
       }
       ReplayValueImpl.hitAvg.add(0)
       // Just merged, so answer is at the top
