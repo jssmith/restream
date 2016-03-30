@@ -37,6 +37,7 @@ object SerialSpamDetector2 extends App {
     lastTimestamp = e.ts
     pm.increment()
   })
+  si.updateAllPhases(PrintSpamCounter(lastTimestamp))
   pm.finished()
   println("Final spam count: " + stats.spamCounter.get(Long.MaxValue))
 }
