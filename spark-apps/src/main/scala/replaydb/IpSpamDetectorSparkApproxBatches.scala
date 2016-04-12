@@ -55,8 +55,8 @@ object IpSpamDetectorSparkApproxBatches {
 
     var batchNum = 0
 
-    var messageCount = 0
-    var newFriendEventCount = 0
+    var messageCount = 0L
+    var newFriendEventCount = 0L
 
     var spamCounts = 0L
     var allFriendships: RDD[((Long, Long), Int)] = sc.emptyRDD[((Long, Long), Int)]

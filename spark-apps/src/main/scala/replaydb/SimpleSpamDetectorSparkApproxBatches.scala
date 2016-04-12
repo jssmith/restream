@@ -58,8 +58,8 @@ object SimpleSpamDetectorSparkApproxBatches {
     var userFriendMessageCounts: RDD[(Long, (Int, Int))] = sc.emptyRDD[(Long, (Int, Int))]
     var spamCountByUser: RDD[(Long, Int)] = sc.emptyRDD[(Long, Int)]
 
-    var messageEventCount = 0
-    var newFriendEventCount = 0
+    var messageEventCount = 0L
+    var newFriendEventCount = 0L
 
     for (i <- 0 until numBatches) {
       val batchFn = s"$baseFn-$batchNum"
