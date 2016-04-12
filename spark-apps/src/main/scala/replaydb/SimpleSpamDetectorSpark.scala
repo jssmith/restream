@@ -55,8 +55,10 @@ object SimpleSpamDetectorSpark {
     val messageEvents = events.filter(_.isInstanceOf[MessageEvent]).map(_.asInstanceOf[MessageEvent])
     val newFriendEvents = events.filter(_.isInstanceOf[NewFriendshipEvent]).map(_.asInstanceOf[NewFriendshipEvent])
 
+    val messageCount = messageEvents.count()
+    val newFriendEventCount = newFriendEvents.count()
     if (printDebug) {
-      println(s"Message count ${messageEvents.count()} // newFriendEvent count ${newFriendEvents.count()}")
+      println(s"Message count $messageCount // newFriendEvent count $newFriendEventCount")
       println(s"Number of distinct users is ${messageEvents.map(_.senderUserId).distinct().count()}")
     }
 
@@ -172,7 +174,8 @@ object SimpleSpamDetectorSpark {
     val endTime = System.currentTimeMillis() - startTime
 
     println(s"Final spam count is: $spamCount from ${spamCtByUser.filter(_._2 > 0).count()} users")
-    println(s"Final runtime was $endTime ms      (${endTime / 1000} sec)")
+    println(s"Final runtime was $endTime ms (${endTime / 1000} sec)")
+    println(s"Process rate was ${(newFriendEventCount + messageCount) / (endTime / 1000)} per second")
   }
 
 
