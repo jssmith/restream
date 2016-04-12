@@ -40,7 +40,11 @@ object EventGenerator extends App {
   val batches = if (args.length == 8) { args(7).toInt } else { 1 }
   val rnd = new MersenneTwister(903485435L)
 
-  val batchSize = Math.ceil(numEvents.toDouble / batches.toDouble).toInt
+  val batchSize = if (batches == 1) {
+    Integer.MAX_VALUE
+  } else {
+    Math.ceil(numEvents.toDouble / batches.toDouble).toInt
+  }
 
   val filePath = new File(baseFilename).getParentFile
   if (!filePath.exists()) {
@@ -64,7 +68,7 @@ object EventGenerator extends App {
   var batchNum = 0
   try {
     eventSource.genEvents(numEvents, e => {
-      if (eventsGenerated >= batchNum * batchSize) {
+      if (eventsGenerated == 0 || eventsGenerated > batchNum * batchSize) {
         val filename = if (batches == 1) { baseFilename } else { s"$baseFilename-$batchNum" }
         if (w.nonEmpty) {
           w.get.close()
