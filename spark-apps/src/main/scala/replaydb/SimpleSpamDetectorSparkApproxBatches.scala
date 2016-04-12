@@ -20,20 +20,20 @@ object SimpleSpamDetectorSparkApproxBatches {
     def compare(x: (Long, A), y: (Long, A)): Int = x._1.compare(y._1)
   }
 
-  val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing").setMaster("local[4]")
+  val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
 //  conf.set("spark.kryo.registrationRequired", "true")
 //  conf.set("spark.kryo.classesToRegister", "scala.collection.mutable.TreeSet," +
 //    "scala.collection.mutable.WrappedArray")
-  val sc = new SparkContext(conf)
 
   def main(args: Array[String]) {
 
-    if (args.length < 3 || args.length > 4) {
+    if (args.length < 4 || args.length > 5) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar baseFilename numPartitions numBatches [ printDebug=false ]
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip baseFilename numPartitions numBatches [ printDebug=false ]
           |  Example values:
+          |    master-ip      = 171.41.41.31
           |    baseFilename   = ~/data/events.out
           |    numPartitions  = 4
           |    numBatches     = 100
@@ -42,10 +42,13 @@ object SimpleSpamDetectorSparkApproxBatches {
       System.exit(1)
     }
 
-    val baseFn = args(0)
-    val numPartitions = args(1).toInt
-    val numBatches = args(2).toInt
-    val printDebug = if (args.length > 3 && args(3) == "true") true else false
+    conf.setMaster(s"spark://${args(0)}:7077")
+    val sc = new SparkContext(conf)
+
+    val baseFn = args(1)
+    val numPartitions = args(2).toInt
+    val numBatches = args(3).toInt
+    val printDebug = if (args.length > 4 && args(4) == "true") true else false
 
     var batchNum = 0
 
@@ -55,8 +58,8 @@ object SimpleSpamDetectorSparkApproxBatches {
 
     for (i <- 0 until numBatches) {
       val batchFn = s"$baseFn-$batchNum"
-      val filenames = (0 until numPartitions).map(i => s"$batchFn-$i").toArray
-      val events = loadFiles(filenames)
+      val filenames = (0 until numPartitions).map(i => s"$batchFn-$i")
+      val events = KryoLoad.loadFiles(sc, filenames)
       val messageEvents = events.filter(_.isInstanceOf[MessageEvent]).map(_.asInstanceOf[MessageEvent])
       val newFriendEvents = events.filter(_.isInstanceOf[NewFriendshipEvent]).map(_.asInstanceOf[NewFriendshipEvent])
 
@@ -120,46 +123,4 @@ object SimpleSpamDetectorSparkApproxBatches {
 
   }
 
-
-
-  def loadFiles(filenames: Seq[String]): RDD[Event] = {
-    val instantiator = new ScalaKryoInstantiator
-    def load(filename: String): Iterator[Event] = {
-      val kryo = instantiator.newKryo()
-      kryo.register(classOf[MessageEvent])
-      kryo.register(classOf[NewFriendshipEvent])
-
-      new Iterator[Event] {
-        val input = new Input(new BufferedInputStream(new FileInputStream(filename)))
-        var done = false
-        var nextEvent: Event = null
-
-        override def next: Event = {
-          hasNext
-          val retEvent = nextEvent
-          nextEvent = null
-          retEvent
-        }
-
-        override def hasNext: Boolean = {
-          if (done) {
-            return false
-          }
-          if (nextEvent == null) {
-            try {
-              nextEvent = kryo.readClassAndObject(input).asInstanceOf[Event]
-            } catch {
-              case e: KryoException =>
-                input.close()
-                done = true
-            }
-          }
-          nextEvent != null
-        }
-      }
-    }
-    val partitions = filenames.length
-    sc.parallelize(filenames, partitions).flatMap(load)
-  }
 }
-
