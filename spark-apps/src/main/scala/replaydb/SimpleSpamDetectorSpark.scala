@@ -28,7 +28,7 @@ object SimpleSpamDetectorSpark {
     }
   }
 
-  val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing")
+  val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing").setMaster("spark://ip-172-31-31-41:7077")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
 //  conf.set("spark.kryo.registrationRequired", "true")
