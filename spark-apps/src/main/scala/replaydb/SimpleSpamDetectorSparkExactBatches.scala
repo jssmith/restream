@@ -4,9 +4,7 @@ import java.io.{BufferedInputStream, FileInputStream}
 
 import com.esotericsoftware.kryo.KryoException
 import com.twitter.chill.{Input, ScalaKryoInstantiator}
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 
@@ -14,7 +12,7 @@ import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-object SimpleSpamDetectorSpark {
+object SimpleSpamDetectorSparkExactBatches {
 
   // Takes (Long, A) pairs and sorts them by the first member of
   // the tuple (the timestamp)
@@ -22,52 +20,43 @@ object SimpleSpamDetectorSpark {
     def compare(x: (Long, A), y: (Long, A)): Int = x._1.compare(y._1)
   }
 
-  class QueueTimestampOrdering extends Ordering[Queue[(Long, (Int, Int))]] {
-    def compare(x: Queue[(Long, (Int, Int))], y: Queue[(Long, (Int, Int))]): Int = {
-      -1 * x.head._1.compare(y.head._1)
-    }
-  }
-
-  val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing")
+  val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing").setMaster("local[4]")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
 //  conf.set("spark.kryo.registrationRequired", "true")
 //  conf.set("spark.kryo.classesToRegister", "scala.collection.mutable.TreeSet," +
 //    "scala.collection.mutable.WrappedArray")
+  val sc = new SparkContext(conf)
 
   def main(args: Array[String]) {
 
     if (args.length < 3 || args.length > 4) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip baseFilename numPartitions [ printDebug=false ]
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar baseFilename numPartitions numBatches[ printDebug=false ]
           |  Example values:
-          |    master-ip      = 172.31.31.41
           |    baseFilename   = ~/data/events.out
           |    numPartitions  = 4
+          |    numBatches     = 100
           |    printDebug     = true
         """.stripMargin)
       System.exit(1)
     }
 
-    conf.setMaster(s"spark://${args(0)}:7077")
-    val sc = new SparkContext(conf)
-
-    val startTime = System.currentTimeMillis()
-
-    val baseFn = args(1)
-    val numPartitions = args(2).toInt
+    val baseFn = args(0)
+    val numPartitions = args(1).toInt
+    val numBatches = args(2).toInt
     val printDebug = if (args.length > 3 && args(3) == "true") true else false
     val filenames = (0 until numPartitions).map(i => s"$baseFn-$i").toArray
 
-    val events = loadFiles(sc, filenames)
+    var batchNum = 0
+
+    val events = loadFiles(filenames)
 
     val messageEvents = events.filter(_.isInstanceOf[MessageEvent]).map(_.asInstanceOf[MessageEvent])
     val newFriendEvents = events.filter(_.isInstanceOf[NewFriendshipEvent]).map(_.asInstanceOf[NewFriendshipEvent])
 
-    val messageCount = messageEvents.count()
-    val newFriendEventCount = newFriendEvents.count()
     if (printDebug) {
-      println(s"Message count $messageCount // newFriendEvent count $newFriendEventCount")
+      println(s"Message count ${messageEvents.count()} // newFriendEvent count ${newFriendEvents.count()}")
       println(s"Number of distinct users is ${messageEvents.map(_.senderUserId).distinct().count()}")
     }
 
@@ -145,7 +134,11 @@ object SimpleSpamDetectorSpark {
     // map of uid -> many (ts, (friendSendCt, nonfriendSendCt)
     val usersWithMsgSendCts = usersWithMsgSentToFriendOrNot.groupByKey().mapValues(listOfQueues => {
       var outList = Queue[(Long, (Int, Int))]()
-      val queues = mutable.PriorityQueue()(new QueueTimestampOrdering)
+      val queues = mutable.PriorityQueue()(new Ordering[Queue[(Long, (Int, Int))]] {
+        def compare(x: Queue[(Long, (Int, Int))], y: Queue[(Long, (Int, Int))]): Int = {
+          -1 * x.head._1.compare(y.head._1)
+        }
+      })
       queues ++= listOfQueues
       var runningTotal = (0, 0)
       while (queues.nonEmpty) {
@@ -176,56 +169,49 @@ object SimpleSpamDetectorSpark {
 
     val spamCount = spamCtByUser.map(_._2).sum()
 
-    val endTime = System.currentTimeMillis() - startTime
-
     println(s"Final spam count is: $spamCount from ${spamCtByUser.filter(_._2 > 0).count()} users")
-    println(s"Final runtime was $endTime ms (${endTime / 1000} sec)")
-    println(s"Process rate was ${(newFriendEventCount + messageCount) / (endTime / 1000)} per second")
   }
 
-  def loadFiles(sc: SparkContext, filenames: Seq[String]): RDD[Event] = {
-    val partitions = filenames.length
-    sc.parallelize(filenames, partitions).flatMap(KryoLoad.load)
-  }
-}
 
-object KryoLoad {
 
-  def load(filename: String): Iterator[Event] = {
+  def loadFiles(filenames: Seq[String]): RDD[Event] = {
     val instantiator = new ScalaKryoInstantiator
-    val kryo = instantiator.newKryo()
-    kryo.register(classOf[MessageEvent])
-    kryo.register(classOf[NewFriendshipEvent])
+    def load(filename: String): Iterator[Event] = {
+      val kryo = instantiator.newKryo()
+      kryo.register(classOf[MessageEvent])
+      kryo.register(classOf[NewFriendshipEvent])
 
-    new Iterator[Event] {
-      val input = new Input(new BufferedInputStream(new FileInputStream(filename)))
-      var done = false
-      var nextEvent: Event = null
+      new Iterator[Event] {
+        val input = new Input(new BufferedInputStream(new FileInputStream(filename)))
+        var done = false
+        var nextEvent: Event = null
 
-      override def next: Event = {
-        hasNext
-        val retEvent = nextEvent
-        nextEvent = null
-        retEvent
-      }
-
-      override def hasNext: Boolean = {
-        if (done) {
-          return false
+        override def next: Event = {
+          hasNext
+          val retEvent = nextEvent
+          nextEvent = null
+          retEvent
         }
-        if (nextEvent == null) {
-          try {
-            nextEvent = kryo.readClassAndObject(input).asInstanceOf[Event]
-          } catch {
-            case e: KryoException =>
-              input.close()
-              done = true
+
+        override def hasNext: Boolean = {
+          if (done) {
+            return false
+          }
+          if (nextEvent == null) {
+            try {
+              nextEvent = kryo.readClassAndObject(input).asInstanceOf[Event]
+            } catch {
+              case e: KryoException =>
+                input.close()
+                done = true
             }
+          }
+          nextEvent != null
         }
-        nextEvent != null
       }
     }
+    val partitions = filenames.length
+    sc.parallelize(filenames, partitions).flatMap(load)
   }
-
 }
 

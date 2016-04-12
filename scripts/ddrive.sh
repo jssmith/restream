@@ -43,6 +43,6 @@ echo "Driving $SPAM_DETECTOR with $NUM partitions"
 time java -Xmx2000m \
   -cp /home/ec2-user/replaydb/apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar \
   replaydb.exec.spam.DistributedSpamDetector $SPAM_DETECTOR \
-  $DATA_ROOT/events-$SIZE_SPEC-split-$NUM$DATA_PARTITION_SUFFIX \
+  $DATA_ROOT/events-$SIZE_SPEC-split-$NUM$DATA_PARTITION_SUFFIX/events.out \
   $NUM $BATCH_SIZE /home/ec2-user/conf/latesthosts.txt $WAIT_AT_BOUNDARY $PARTITIONED
 
