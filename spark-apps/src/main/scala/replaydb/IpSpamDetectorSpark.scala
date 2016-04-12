@@ -49,6 +49,8 @@ object IpSpamDetectorSpark {
     conf.setMaster(s"spark://${args(0)}:7077")
     val sc = new SparkContext(conf)
 
+    val startTime = System.currentTimeMillis()
+
     val baseFn = args(1)
     val numPartitions = args(2).toInt
     val printDebug = if (args.length > 3 && args(3) == "true") true else false
@@ -59,8 +61,10 @@ object IpSpamDetectorSpark {
     val messageEvents = events.filter(_.isInstanceOf[MessageEvent]).map(_.asInstanceOf[MessageEvent])
     val newFriendEvents = events.filter(_.isInstanceOf[NewFriendshipEvent]).map(_.asInstanceOf[NewFriendshipEvent])
 
+    val messageCount = messageEvents.count()
+    val newFriendEventCount = newFriendEvents.count()
     if (printDebug) {
-      println(s"Message count ${messageEvents.count()} // newFriendEvent count ${newFriendEvents.count()}")
+      println(s"Message count $messageCount // newFriendEvent count $newFriendEventCount")
       println(s"Number of distinct users is ${messageEvents.map(_.senderUserId).distinct().count()}")
     }
 
@@ -212,6 +216,10 @@ object IpSpamDetectorSpark {
     }).filter(_._2)
 
     println(s"Total number of spam messages is ${spamMsgIds.count()}")
+
+    val endTime = System.currentTimeMillis() - startTime
+    println(s"Final runtime was $endTime ms (${endTime / 1000} sec)")
+    println(s"Process rate was ${(newFriendEventCount + messageCount) / (endTime / 1000)} per second")
   }
 
 }

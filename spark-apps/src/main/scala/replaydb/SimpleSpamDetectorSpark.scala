@@ -176,9 +176,9 @@ object SimpleSpamDetectorSpark {
 
     val spamCount = spamCtByUser.map(_._2).sum()
 
-    val endTime = System.currentTimeMillis() - startTime
-
     println(s"Final spam count is: $spamCount from ${spamCtByUser.filter(_._2 > 0).count()} users")
+
+    val endTime = System.currentTimeMillis() - startTime
     println(s"Final runtime was $endTime ms (${endTime / 1000} sec)")
     println(s"Process rate was ${(newFriendEventCount + messageCount) / (endTime / 1000)} per second")
   }

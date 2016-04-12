@@ -46,12 +46,17 @@ object IpSpamDetectorSparkApproxBatches {
     conf.setMaster(s"spark://${args(0)}:7077")
     val sc = new SparkContext(conf)
 
+    val startTime = System.currentTimeMillis()
+
     val baseFn = args(1)
     val numPartitions = args(2).toInt
     val numBatches = args(3).toInt
     val printDebug = if (args.length > 4 && args(4) == "true") true else false
 
     var batchNum = 0
+
+    var messageCount = 0L
+    var newFriendEventCount = 0L
 
     var spamCounts = 0L
     var allFriendships: RDD[((Long, Long), Int)] = sc.emptyRDD[((Long, Long), Int)]
@@ -65,6 +70,9 @@ object IpSpamDetectorSparkApproxBatches {
       val events = KryoLoad.loadFiles(sc, filenames)
       val messageEvents = events.filter(_.isInstanceOf[MessageEvent]).map(_.asInstanceOf[MessageEvent])
       val newFriendEvents = events.filter(_.isInstanceOf[NewFriendshipEvent]).map(_.asInstanceOf[NewFriendshipEvent])
+
+      messageCount += messageEvents.count()
+      newFriendEventCount += newFriendEvents.count()
 
       val spamMessagesFromMessageSendCt = messageEvents.map(me => me.senderUserId -> me.messageId)
         .leftOuterJoin(userFriendMessageCounts)
@@ -149,6 +157,10 @@ object IpSpamDetectorSparkApproxBatches {
 
     //println(s"FINAL SPAM COUNT: ${spamCountByUser.map({case (id, cnt) => cnt}).sum}")
     println(s"FINAL SPAM COUNT: $spamCounts")
+
+    val endTime = System.currentTimeMillis() - startTime
+    println(s"Final runtime was $endTime ms (${endTime / 1000} sec)")
+    println(s"Process rate was ${(newFriendEventCount + messageCount) / (endTime / 1000)} per second")
   }
 }
 
