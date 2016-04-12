@@ -7,12 +7,14 @@ import scala.collection.mutable
   * prefix-master (if not already present) and increases the number of workers at
   * prefix-worker-index to be at least numWorkers (if there are already >= numWorkers
   * launched, does nothing).
+  *
+  * If spotBid is specified and nonnegative, launches spot instances. Otherwise, launches on-demand instances.
  */
 object LaunchInstances extends App {
 
   if (args.length < 3) {
     println(
-      """Usage: LaunchInstances numWorkers prefix workerInstanceType [launchMaster = false]
+      """Usage: LaunchInstances numWorkers prefix workerInstanceType [launchMaster = false] [spotBid = -1]
       """.stripMargin)
     System.exit(1)
   }
@@ -21,6 +23,7 @@ object LaunchInstances extends App {
   val prefix = args(1)
   val workerInstanceType = args(2)
   val launchMaster = if (args.length > 3) args(3).toBoolean else false
+  val spotBid = if (args.length > 4 && args(4).toFloat >= 0) Some(args(4).toFloat) else None
 
   val initScript =
     """
@@ -79,6 +82,8 @@ object LaunchInstances extends App {
       |curl https://bintray.com/sbt/rpm/rpm | tee /etc/yum.repos.d/bintray-sbt-rpm.repo
       |yum install -y sbt
       |
+      |
+      |
       |mkdir /home/ec2-user/conf
       |chown ec2-user /home/ec2-user/conf
     """.stripMargin
@@ -90,21 +95,14 @@ object LaunchInstances extends App {
 
 //  val masterInstanceType = "c3.large"
   val masterInstanceType = workerInstanceType // Can't have two different types of instances in the same placement group
-  val keyName = "replaydb"
+  val keyName = "ek-aws" // TODO Johann: change to yours since I pull mine down from dropbox anyway
+  val securityGroupName = "restream" // restream - NOTE that we switched to using name instead of id
   //val securityGroupId = "sg-97252df2" // Erik's account
-  val securityGroupId = "sg-4ed9072b" // Johann
-  val instanceProfileName = "replaydb-role"
-  val placementGroupName = "replaydb-p1"
+//  val securityGroupId = "sg-4ed9072b" // Johann
+  val instanceProfileName = "restream-role"
+  val placementGroupName = "restream-p1"
   val workerPrefix = prefix + "-worker"
   val masterName = prefix + "-master"
-
-  if (launchMaster && Utils.getInstances(true, masterName).isEmpty) {
-    println(s"Existing master instance not found; launching now at $masterName")
-    Utils.launchInstances(masterInstanceType, keyName, securityGroupId, instanceProfileName, placementGroupName,
-      List(masterName), masterInitScript)
-  } else if (launchMaster) {
-    println("Existing master instance found; not launching a new one.")
-  }
 
   val workerNames = Utils.getInstances(true, workerPrefix).map(Utils.getName)
   val newWorkerNames = mutable.ArrayBuffer[String]()
@@ -119,10 +117,31 @@ object LaunchInstances extends App {
 
   if (newWorkerNames.nonEmpty) {
     println(s"Launching ${newWorkerNames.length} new instances at: ${newWorkerNames.mkString(", ")}")
-    Utils.launchInstances(workerInstanceType, keyName, securityGroupId, instanceProfileName, placementGroupName,
-      newWorkerNames.toList, workerInitScript)
+    spotBid match {
+      case Some(bid) =>
+        Utils.launchSpotInstances(workerInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
+          newWorkerNames.toList, workerInitScript, bid)
+      case None =>
+        Utils.launchInstances(workerInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
+          newWorkerNames.toList, workerInitScript)
+    }
   } else {
     println(s"Already found ${workerNames.length} worker instances; not launching any new ones.")
+  }
+
+  if (launchMaster && Utils.getInstances(true, masterName).isEmpty) {
+    println(s"Existing master instance not found; launching now at $masterName")
+    spotBid match {
+      case Some(bid) =>
+        Utils.launchSpotInstances(masterInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
+          List(masterName), masterInitScript, bid)
+      case None =>
+        Utils.launchInstances(masterInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
+          List(masterName), masterInitScript)
+    }
+
+  } else if (launchMaster) {
+    println("Existing master instance found; not launching a new one.")
   }
 
 }
