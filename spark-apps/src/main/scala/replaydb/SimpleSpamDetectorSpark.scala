@@ -22,6 +22,12 @@ object SimpleSpamDetectorSpark {
     def compare(x: (Long, A), y: (Long, A)): Int = x._1.compare(y._1)
   }
 
+  class QueueTimestampOrdering extends Ordering[Queue[(Long, (Int, Int))]] {
+    def compare(x: Queue[(Long, (Int, Int))], y: Queue[(Long, (Int, Int))]): Int = {
+      -1 * x.head._1.compare(y.head._1)
+    }
+  }
+
   val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
@@ -136,11 +142,7 @@ object SimpleSpamDetectorSpark {
     // map of uid -> many (ts, (friendSendCt, nonfriendSendCt)
     val usersWithMsgSendCts = usersWithMsgSentToFriendOrNot.groupByKey().mapValues(listOfQueues => {
       var outList = Queue[(Long, (Int, Int))]()
-      val queues = mutable.PriorityQueue()(new Ordering[Queue[(Long, (Int, Int))]] {
-        def compare(x: Queue[(Long, (Int, Int))], y: Queue[(Long, (Int, Int))]): Int = {
-          -1 * x.head._1.compare(y.head._1)
-        }
-      })
+      val queues = mutable.PriorityQueue()(new QueueTimestampOrdering)
       queues ++= listOfQueues
       var runningTotal = (0, 0)
       while (queues.nonEmpty) {
