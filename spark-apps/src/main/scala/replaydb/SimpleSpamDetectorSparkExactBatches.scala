@@ -4,9 +4,7 @@ import java.io.{BufferedInputStream, FileInputStream}
 
 import com.esotericsoftware.kryo.KryoException
 import com.twitter.chill.{Input, ScalaKryoInstantiator}
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 
@@ -14,7 +12,7 @@ import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-object SimpleSpamDetectorSpark {
+object SimpleSpamDetectorSparkExactBatches {
 
   // Takes (Long, A) pairs and sorts them by the first member of
   // the tuple (the timestamp)
@@ -22,7 +20,7 @@ object SimpleSpamDetectorSpark {
     def compare(x: (Long, A), y: (Long, A)): Int = x._1.compare(y._1)
   }
 
-  val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing")
+  val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing").setMaster("local[4]")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
 //  conf.set("spark.kryo.registrationRequired", "true")
@@ -32,23 +30,25 @@ object SimpleSpamDetectorSpark {
 
   def main(args: Array[String]) {
 
-    if (args.length < 2 || args.length > 3) {
+    if (args.length < 3 || args.length > 4) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar baseFilename numPartitions [ printDebug=false ]
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar baseFilename numPartitions numBatches[ printDebug=false ]
           |  Example values:
           |    baseFilename   = ~/data/events.out
           |    numPartitions  = 4
+          |    numBatches     = 100
           |    printDebug     = true
         """.stripMargin)
       System.exit(1)
     }
 
-    val startTime = System.currentTimeMillis()
-
     val baseFn = args(0)
     val numPartitions = args(1).toInt
-    val printDebug = if (args.length > 2 && args(2) == "true") true else false
+    val numBatches = args(2).toInt
+    val printDebug = if (args.length > 3 && args(3) == "true") true else false
     val filenames = (0 until numPartitions).map(i => s"$baseFn-$i").toArray
+
+    var batchNum = 0
 
     val events = loadFiles(filenames)
 
@@ -169,10 +169,7 @@ object SimpleSpamDetectorSpark {
 
     val spamCount = spamCtByUser.map(_._2).sum()
 
-    val endTime = System.currentTimeMillis() - startTime
-
     println(s"Final spam count is: $spamCount from ${spamCtByUser.filter(_._2 > 0).count()} users")
-    println(s"Final runtime was $endTime ms      (${endTime / 1000} sec)")
   }
 
 
