@@ -42,7 +42,7 @@ object SimpleSpamDetectorSparkApproxBatches {
       System.exit(1)
     }
 
-    if (args(0) == "master") {
+    if (args(0) == "local") {
       conf.setMaster(s"local[${args(2)}]")
     } else {
       conf.setMaster(s"spark://${args(0)}:7077")
