@@ -49,7 +49,11 @@ object SimpleSpamDetectorSpark {
       System.exit(1)
     }
 
-    conf.setMaster(s"spark://${args(0)}:7077")
+    if (args(0) == "local") {
+      conf.setMaster(s"local[${args(2)}]")
+    } else {
+      conf.setMaster(s"spark://${args(0)}:7077")
+    }
     val sc = new SparkContext(conf)
 
     val startTime = System.currentTimeMillis()

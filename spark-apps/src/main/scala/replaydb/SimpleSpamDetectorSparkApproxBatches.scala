@@ -42,7 +42,12 @@ object SimpleSpamDetectorSparkApproxBatches {
       System.exit(1)
     }
 
-    conf.setMaster(s"spark://${args(0)}:7077")
+    if (args(0) == "local") {
+      conf.setMaster(s"local[${args(2)}]")
+    } else {
+      conf.setMaster(s"spark://${args(0)}:7077")
+    }
+
     val sc = new SparkContext(conf)
 
     val startTime = System.currentTimeMillis()
@@ -52,8 +57,6 @@ object SimpleSpamDetectorSparkApproxBatches {
     val numBatches = args(3).toInt
     val printDebug = if (args.length > 4 && args(4) == "true") true else false
 
-    var batchNum = 0
-
     var allFriendships: RDD[((Long, Long), Int)] = sc.emptyRDD[((Long, Long), Int)]
     var userFriendMessageCounts: RDD[(Long, (Int, Int))] = sc.emptyRDD[(Long, (Int, Int))]
     var spamCountByUser: RDD[(Long, Int)] = sc.emptyRDD[(Long, Int)]
@@ -61,7 +64,7 @@ object SimpleSpamDetectorSparkApproxBatches {
     var messageEventCount = 0L
     var newFriendEventCount = 0L
 
-    for (i <- 0 until numBatches) {
+    for (batchNum <- 0 until numBatches) {
       val batchFn = s"$baseFn-$batchNum"
       val filenames = (0 until numPartitions).map(i => s"$batchFn-$i")
       val events = KryoLoad.loadFiles(sc, filenames)
@@ -116,8 +119,6 @@ object SimpleSpamDetectorSparkApproxBatches {
           case _ => (0, 0)
         })
         //.foldByKey((0, 0))({case ((f1, nf1), (f2, nf2)) => (f1 + f2, nf1 + nf2)})
-
-      batchNum += 1
     }
 
     if (printDebug) {
