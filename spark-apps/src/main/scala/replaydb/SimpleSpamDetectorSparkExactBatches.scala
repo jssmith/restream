@@ -75,6 +75,16 @@ object SimpleSpamDetectorSparkExactBatches {
       }
       newList
     }
+
+    def gcUpTo(gcTs: Long): TSValList[A] = {
+      var removeCount = -1
+      list.forall { case (ts, _) => 
+        removeCount += 1
+        ts < gcTs
+      }
+      list.remove(0, removeCount)
+      this
+    }
   }
 
   val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing").setMaster("local[4]")
@@ -131,6 +141,13 @@ object SimpleSpamDetectorSparkExactBatches {
 
       messageEventCount += messageEvents.count()
       newFriendEventCount += newFriendEvents.count()
+      val lowestMessageTs = messageEvents.min()(new Ordering[MessageEvent] {
+        def compare(x: MessageEvent, y: MessageEvent) = x.ts.compare(y.ts)
+      }).ts
+      val lowestFriendEventTs = newFriendEvents.min()(new Ordering[NewFriendshipEvent] {
+        def compare(x: NewFriendshipEvent, y: NewFriendshipEvent) = x.ts.compare(y.ts)
+      }).ts
+      val lowestTs = Math.min(lowestMessageTs, lowestFriendEventTs)
 
       val newFriendships = newFriendEvents.flatMap((nfe: NewFriendshipEvent) => {
         List((nfe.userIdA, nfe.userIdB) -> new TSValList((nfe.ts, 1)),
@@ -139,8 +156,8 @@ object SimpleSpamDetectorSparkExactBatches {
 
       allFriendships = allFriendships.fullOuterJoin(newFriendships)
         .mapValues({
-          case (Some(a), Some(b)) => a.merge(b, _ + _)
-          case (Some(a), None) => a
+          case (Some(a), Some(b)) => a.merge(b, _ + _).gcUpTo(lowestTs)
+          case (Some(a), None) => a.gcUpTo(lowestTs)
           case (None, Some(b)) => b
           case _ => throw new IllegalArgumentException
         })
@@ -196,8 +213,8 @@ object SimpleSpamDetectorSparkExactBatches {
       })
 
       userFriendMessageCounts = userFriendMessageCounts.fullOuterJoin(usersWithMsgSentToFriendOrNotAgg).mapValues({
-        case (Some(a), Some(b)) => a.merge(b, (ct1, ct2) => (ct1._1+ct2._1, ct1._2+ct2._2))
-        case (Some(a), None) => a
+        case (Some(a), Some(b)) => a.merge(b, (ct1, ct2) => (ct1._1+ct2._1, ct1._2+ct2._2)).gcUpTo(lowestTs)
+        case (Some(a), None) => a.gcUpTo(lowestTs)
         case (None, Some(b)) => b.sumOverIncremental((0, 0), (ct1, ct2) => (ct1._1+ct2._1, ct1._2+ct2._2))
         case _ => throw new IllegalArgumentException
       })
