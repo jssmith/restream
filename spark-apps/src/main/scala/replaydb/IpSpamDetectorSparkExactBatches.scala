@@ -1,13 +1,13 @@
 package replaydb
 
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{SparkConf, SparkContext}
 import replaydb.event.{MessageEvent, NewFriendshipEvent}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-object SimpleSpamDetectorSparkExactBatches {
+object IpSpamDetectorSparkExactBatches {
 
   val conf = new SparkConf().setAppName("ReStream Example Over Spark Testing").setMaster("local[4]")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
@@ -47,7 +47,8 @@ object SimpleSpamDetectorSparkExactBatches {
 
     var allFriendships: RDD[((Long, Long), TSValList[Int])] = sc.emptyRDD[((Long, Long), TSValList[Int])]
     var userFriendMessageCounts: RDD[(Long, TSValList[IntPair])] = sc.emptyRDD[(Long, TSValList[IntPair])]
-    var spamCountByUser: RDD[(Long, Int)] = sc.emptyRDD[(Long, Int)]
+    var ipMessageCounts: RDD[(Int, TSValList[IntPair])] = sc.emptyRDD[(Int, TSValList[IntPair])]
+    var spamCount = 0L
 
     var messageEventCount = 0L
     var newFriendEventCount = 0L
@@ -84,20 +85,20 @@ object SimpleSpamDetectorSparkExactBatches {
           case _ => throw new IllegalArgumentException
         })
 
-      val msgsWithTs = messageEvents.map(me => (me.senderUserId, me.recipientUserId) -> me.ts)
+      val msgsWithTs = messageEvents.map(me => (me.senderUserId, me.recipientUserId) ->(me.ts, me.messageId))
       // Combine together messages from the same user to cut down on the amount of joining done
-      val msgsWithTsAgg = msgsWithTs.aggregateByKey(ArrayBuffer[Long]())((buf, v) => {
-        buf.insert(buf.lastIndexWhere(_ < v) + 1, v)
+      val msgsWithTsAgg = msgsWithTs.aggregateByKey(ArrayBuffer[(Long, Long)]())((buf, v) => {
+        buf.insert(buf.lastIndexWhere(_._1 < v._1) + 1, v)
         buf
       }, (buf1, buf2) => {
         var idx1 = 0
         var idx2 = 0
-        val outBuf = new ArrayBuffer[Long](buf1.length + buf2.length)
+        val outBuf = new ArrayBuffer[(Long, Long)](buf1.length + buf2.length)
         while (idx1 < buf1.length || idx2 < buf2.length) {
           if (idx1 == buf1.length) {
             outBuf.append(buf2(idx2))
             idx2 += 1
-          } else if ((idx2 == buf2.length) || (buf1(idx1) < buf2(idx2))) {
+          } else if ((idx2 == buf2.length) || (buf1(idx1)._1 < buf2(idx2)._1)) {
             outBuf.append(buf1(idx1))
             idx1 += 1
           } else {
@@ -106,21 +107,21 @@ object SimpleSpamDetectorSparkExactBatches {
           }
         }
         outBuf
-      }).mapValues(buf => TSValList[Int](buf.map(_ -> 1).toArray:_*))
+      }).mapValues(buf => TSValList[Long](buf.toArray: _*))
 
       val usersWithMsgSentToFriendOrNot = msgsWithTsAgg.leftOuterJoin(allFriendships)
         .map({
-          case ((sendID, _), (sendTs, tsValListOption)) => sendID -> sendTs.evaluateAgainst[Int, IntPair](tsValListOption, {
-            case (_, Some(friendVal)) => if (friendVal == 0) (0, 1) else (1, 0)
-            case (_, None) => (0, 1)
+          case ((sendID, _), (messageIds, tsValListOption)) => sendID -> messageIds.evaluateAgainst[Int, (Long, IntPair)](tsValListOption, {
+            case (mId, Some(friendVal)) => mId -> (if (friendVal == 0) (0, 1) else (1, 0))
+            case (mId, None) => mId ->(0, 1)
           })
         }) // first just map to sent to friend or not, then combine those forward
 
       // map of uid -> many (ts, (friendSendCt, nonfriendSendCt)
       val usersWithMsgSentToFriendOrNotAgg = usersWithMsgSentToFriendOrNot.groupByKey().mapValues(listOfQueues => {
-        val outList = new TSValList[IntPair]()
+        val outList = new TSValList[(Long, IntPair)]()
         // basically do a k-way sorted list merge
-        val queues = mutable.PriorityQueue()(new BufferTimestampOrdering[IntPair])
+        val queues = mutable.PriorityQueue()(new BufferTimestampOrdering[(Long, IntPair)])
         queues ++= listOfQueues.map(_.buf)
         while (queues.nonEmpty) {
           val nextQueue = queues.dequeue()
@@ -134,40 +135,63 @@ object SimpleSpamDetectorSparkExactBatches {
       })
 
       userFriendMessageCounts = userFriendMessageCounts.fullOuterJoin(usersWithMsgSentToFriendOrNotAgg).mapValues({
-        case (Some(a), Some(b)) => a.merge[IntPair](b, addPairs[Int]).gcUpTo(lowestTs)
+        case (Some(a), Some(b)) => a.merge[(Long, IntPair)](b, { case (base, (mId, inc)) => addPairs[Int](base, inc) }).gcUpTo(lowestTs)
         case (Some(a), None) => a.gcUpTo(lowestTs)
-        case (None, Some(b)) => b.sumOverIncremental((0, 0), addPairs[Int])
+        case (None, Some(b)) => b.sumOverIncremental((0, 0), { case (base, (mId, inc)) => addPairs[Int](base, inc) })
         case _ => throw new IllegalArgumentException
       })
 
-      val newSpamCounts = usersWithMsgSentToFriendOrNotAgg.leftOuterJoin(userFriendMessageCounts)
-        .mapValues({
-          case (messageSends, Some(sendCounts)) =>
-            messageSends.evaluateAgainst[IntPair, Boolean](Some(sendCounts), (_, sendCount) => sendCount match {
-              case Some((f, nf)) => f + nf > 5 && nf > 2 * f
-              case _ => false
-            })
-          case (messageSends, None) => TSValList((0, 0))
-        })
-        .mapValues(_.buf.count(_._2 == true))
+      val friendSpamMessageIds = usersWithMsgSentToFriendOrNotAgg.leftOuterJoin(userFriendMessageCounts)
+        .mapValues({ case (messages, sendCounts) => messages.evaluateAgainst[IntPair, (Long, IntPair)](sendCounts, (msg, sendCount) =>
+          (msg, sendCount) match {
+            case ((mId, _), Some((friendCt, nonfriendCt))) => mId ->(friendCt, nonfriendCt)
+            case ((mId, _), None) => mId ->(0, 0)
+          }
+        )
+        }).flatMap({ case (ip, tsValList) => tsValList.buf.map({ case (ts, (mId, sendCount)) => mId -> sendCount }).filter({
+        case (mId, (friend, nonFriend)) => friend + nonFriend > 5 && nonFriend > 2 * friend
+      }).map(_._1)
+      })
 
-      spamCountByUser = spamCountByUser.fullOuterJoin(newSpamCounts)
+      val ipSentEmailOrNot = messageEvents.map(me => me.senderIp ->(me.ts, me.messageId -> (if (hasEmail(me.content)) (1, 0) else (0, 1))))
+        .groupByKey().mapValues(allValues => {
+        val outList = new TSValList[(Long, IntPair)]()
+        // basically do a k-way sorted list merge
+        val queue = mutable.PriorityQueue()(new Ordering[TSVal[(Long, IntPair)]] {
+          def compare(x: TSVal[(Long, IntPair)], y: TSVal[(Long, IntPair)]) = -1 * x._1.compare(y._1)
+        })
+        queue ++= allValues
+        while (queue.nonEmpty) {
+          val next = queue.dequeue()
+          outList.buf.append(next)
+        }
+        outList
+      })
+
+      ipMessageCounts = ipMessageCounts.fullOuterJoin(ipSentEmailOrNot)
         .mapValues({
-          case (Some(a), Some(b)) => a + b
-          case (Some(a), None)    => a
-          case (None, Some(b))    => b
+          case (Some(a), Some(b)) => a.merge[(Long, IntPair)](b, (base, inc) => addPairs[Int](base, inc._2)).gcUpTo(lowestTs)
+          case (Some(a), None) => a.gcUpTo(lowestTs)
+          case (None, Some(b)) => b.sumOverIncremental((0, 0), (base, inc) => addPairs[Int](base, inc._2))
           case _ => throw new IllegalArgumentException
         })
-    }
 
-    if (printDebug) {
-      println(s"Number of users: ${spamCountByUser.count()}")
-      println(s"Top 20 spammers: ${spamCountByUser.takeOrdered(20)(new Ordering[(Long, Int)] {
-        def compare(x: (Long, Int), y: (Long, Int)) = -1 * x._2.compare(y._2)
-      }).mkString(", ")}")
-    }
+      val ipSpamMessageIds = ipSentEmailOrNot.leftOuterJoin(ipMessageCounts).mapValues({
+        case (messages, sendCounts) => messages.evaluateAgainst[IntPair, (Long, IntPair)](sendCounts, (msg, sendCount) =>
+          (msg, sendCount) match {
+            case ((mId, _), Some((emailCt, nonEmailCt))) => mId ->(emailCt, nonEmailCt)
+            case ((mId, _), None) => mId ->(0, 0)
+          }
+        )
+      }).flatMap({ case (ip, tsValList) => tsValList.buf.map({ case (ts, (mId, sendCount)) => mId -> sendCount }).filter({
+        case (mId, (email, noEmail)) => (email + noEmail > 0) && (email.toDouble / (email + noEmail).toDouble > 0.2)
+      }).map(_._1)
+      })
 
-    println(s"FINAL SPAM COUNT: ${spamCountByUser.map({case (id, cnt) => cnt}).sum}")
+      spamCount += ipSpamMessageIds.intersection(friendSpamMessageIds).count()
+    }
+    
+    println(s"FINAL SPAM COUNT: $spamCount")
 
     val endTime = System.currentTimeMillis() - startTime
     println(s"Final runtime was $endTime ms (${endTime / 1000} sec)")

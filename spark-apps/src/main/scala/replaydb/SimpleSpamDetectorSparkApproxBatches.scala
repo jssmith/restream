@@ -98,7 +98,7 @@ object SimpleSpamDetectorSparkApproxBatches {
           case ((sendId, rcvId), (cnt, Some(friend))) => sendId -> (cnt, 0) // friends
           case ((sendId, rcvId), (cnt, None)) =>         sendId -> (0, cnt) // not friends
         })
-        .foldByKey((0, 0))({case ((f1, nf1), (f2, nf2)) => (f1 + f2, nf1 + nf2)})
+        .foldByKey((0, 0))(addPairs[Int])
 
       allFriendships = allFriendships.fullOuterJoin(newFriendEvents.flatMap(nfe =>
         List((nfe.userIdA, nfe.userIdB) -> 1, (nfe.userIdB, nfe.userIdA) -> 1)
@@ -110,15 +110,7 @@ object SimpleSpamDetectorSparkApproxBatches {
       })
       //.foldByKey(0)(_ + _)
 
-      userFriendMessageCounts = userFriendMessageCounts
-        .fullOuterJoin(messagesSentToFriend)
-        .mapValues({
-          case (Some((f1, nf1)), Some((f2, nf2))) => (f1 + f2, nf1 + nf2)
-          case (Some((f1, nf1)), None)            => (f1, nf1)
-          case (None, Some((f2, nf2)))            => (f2, nf2)
-          case _ => (0, 0)
-        })
-        //.foldByKey((0, 0))({case ((f1, nf1), (f2, nf2)) => (f1 + f2, nf1 + nf2)})
+      userFriendMessageCounts = userFriendMessageCounts.fullOuterJoin(messagesSentToFriend).mapValues(addPairsOption[Int])
     }
 
     if (printDebug) {

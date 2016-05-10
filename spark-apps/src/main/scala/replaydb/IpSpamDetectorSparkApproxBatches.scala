@@ -23,11 +23,6 @@ object IpSpamDetectorSparkApproxBatches {
 //  conf.set("spark.kryo.classesToRegister", "scala.collection.mutable.TreeSet," +
 //    "scala.collection.mutable.WrappedArray")
 
-  private val emailRegex = """[\w-_\.+]*[\w-_\.]\@([\w]+\.)+[\w]+[\w]""".r
-  def hasEmail(msg: String): Boolean = {
-    emailRegex.pattern.matcher(msg).find()
-  }
-
   def main(args: Array[String]) {
 
     if (args.length < 4 || args.length > 5) {
@@ -113,7 +108,7 @@ object IpSpamDetectorSparkApproxBatches {
           case ((sendId, rcvId), (cnt, Some(friend))) => sendId -> (cnt, 0) // friends
           case ((sendId, rcvId), (cnt, None)) =>         sendId -> (0, cnt) // not friends
         })
-        .foldByKey((0, 0))({case ((f1, nf1), (f2, nf2)) => (f1 + f2, nf1 + nf2)})
+        .foldByKey((0, 0))(addPairs[Int])
 
       allFriendships = allFriendships.fullOuterJoin(newFriendEvents.flatMap(nfe =>
         List((nfe.userIdA, nfe.userIdB) -> 1, (nfe.userIdB, nfe.userIdA) -> 1)
@@ -125,29 +120,15 @@ object IpSpamDetectorSparkApproxBatches {
       })
       //.foldByKey(0)(_ + _)
 
-      userFriendMessageCounts = userFriendMessageCounts
-        .fullOuterJoin(messagesSentToFriend)
-        .mapValues({
-          case (Some((f1, nf1)), Some((f2, nf2))) => (f1 + f2, nf1 + nf2)
-          case (Some((f1, nf1)), None)            => (f1, nf1)
-          case (None, Some((f2, nf2)))            => (f2, nf2)
-          case _ => (0, 0)
-        })
-        //.foldByKey((0, 0))({case ((f1, nf1), (f2, nf2)) => (f1 + f2, nf1 + nf2)})
+      userFriendMessageCounts = userFriendMessageCounts.fullOuterJoin(messagesSentToFriend).mapValues(addPairsOption[Int])
 
       val ipSendCt = messageEvents.map(me => me.senderIp -> hasEmail(me.content))
         .aggregateByKey((0, 0))({
           case ((email, noEmail), hasEmail) =>
             if (hasEmail) { (email + 1, noEmail) } else { (email, noEmail + 1) }
-        }, {case ((email1, noEmail1), (email2, noEmail2)) => (email1 + email2, noEmail1 + noEmail2)})
+        }, addPairs[Int])
 
-      ipMessageCounts = ipMessageCounts.fullOuterJoin(ipSendCt)
-        .mapValues({
-          case (Some((email1, noEmail1)), Some((email2, noEmail2))) => (email1 + email2, noEmail1 + noEmail2)
-          case (Some(a), None) => a
-          case (None, Some(a)) => a
-          case _ => (0, 0)
-        })
+      ipMessageCounts = ipMessageCounts.fullOuterJoin(ipSendCt).mapValues(addPairsOption[Int])
 
       batchNum += 1
     }
