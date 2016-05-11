@@ -197,7 +197,7 @@ object IpSpamDetectorSparkExactBatches {
     val eventCount = newFriendEventCount + messageEventCount
     println(s"Final runtime was $processTime ms (${processTime / 1000} sec)")
     println(s"Process rate was ${eventCount / (processTime / 1000)} per second")
-    println(s"CSV,IpSpamDetectorSparkExactBatches,$numPartitions,$eventCount,$processTime,$numBatches")
+    println(s"CSV,IpSpamDetectorSparkExactBatches,$numPartitions,$eventCount,$processTime,$numBatches,$spamCount")
   }
 
 }

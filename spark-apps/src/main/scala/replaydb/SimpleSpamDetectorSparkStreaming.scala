@@ -1,5 +1,7 @@
 package replaydb
 
+import java.util.concurrent.atomic.AtomicLong
+
 import org.apache.spark.streaming._
 import org.apache.spark.SparkConf
 import replaydb.event.{MessageEvent, NewFriendshipEvent}
@@ -17,14 +19,15 @@ object SimpleSpamDetectorSparkStreaming {
 
   def main(args: Array[String]) {
 
-    if (args.length != 4) {
+    if (args.length != 5) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip baseFilename numPartitions batchSizeMs
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip baseFilename numPartitions batchSizeMs totalEvents
           |  Example values:
           |    master-ip      = 171.41.41.31
           |    baseFilename   = ~/data/events.out
           |    numPartitions  = 4
           |    batchSizeMs    = 1000
+          |    totalEvents    = 500000
         """.stripMargin)
       System.exit(1)
     }
@@ -38,11 +41,10 @@ object SimpleSpamDetectorSparkStreaming {
     val baseFn = args(1)
     val numPartitions = args(2).toInt
     val batchSizeMs = args(3).toInt
+    val totalEvents = args(4).toInt
 
     val ssc = new StreamingContext(conf, Milliseconds(batchSizeMs))
     ssc.checkpoint("/tmp/spark_streaming_checkpoint")
-
-    val startTime = System.currentTimeMillis()
 
     val kryoReceivers = (0 until numPartitions).map(i => new KryoFileReceiver(s"$baseFn-$i"))
     val kryoStreams = kryoReceivers.map(ssc.receiverStream(_))
@@ -86,17 +88,29 @@ object SimpleSpamDetectorSparkStreaming {
     userNewSpamCount.foreachRDD(rdd => {
       val spamCount = rdd.map(_._2).sum
       totalSpam += spamCount
-      if (spamCount > 0) println(s"Count of new spam: $spamCount; total is $totalSpam")
+//      if (spamCount > 0) println(s"Count of new spam: $spamCount; total is $totalSpam")
     })
 
-    var totalEvents = 0.0
+    val eventsProcessed = new AtomicLong
     eventStream.foreachRDD(rdd => {
       val count = rdd.count()
-      totalEvents += count
-      if (count > 0) println(s"Events processed in this batch: $count; total is $totalEvents")
+      eventsProcessed.getAndAdd(count)
+//      if (count > 0) println(s"Events processed in this batch: $count; total is $totalEvents")
     })
 
     ssc.start()
+    val startTime = System.currentTimeMillis()
+    new Thread("Closer") {
+      override def run(): Unit = {
+        while (eventsProcessed.get() < totalEvents) {
+          Thread.sleep(1000)
+        }
+        val processTime = System.currentTimeMillis() - startTime
+        println(s"WordCountTopKSparkStreaming: $numPartitions partitions, $totalEvents events in $processTime ms (${totalEvents/(processTime/1000)} events/sec)")
+        println(s"CSV,SimpleSpamDetectorSparkStreaming,$numPartitions,$totalEvents,$processTime,$batchSizeMs,$totalSpam")
+        ssc.stop(true)
+      }
+    }.start()
     ssc.awaitTermination()
 //
 //    if (printDebug) {
@@ -108,8 +122,8 @@ object SimpleSpamDetectorSparkStreaming {
 //
 //    println(s"FINAL SPAM COUNT: ${userSpamCount.map({case (id, cnt) => cnt}).compute(Time(System.currentTimeMillis())).get.sum}")
 
-    val endTime = System.currentTimeMillis() - startTime
-    println(s"Final runtime was $endTime ms (${endTime / 1000} sec)")
+//    val endTime = System.currentTimeMillis() - startTime
+//    println(s"Final runtime was $endTime ms (${endTime / 1000} sec)")
 //    println(s"Process rate was ${(newFriendEventCount + messageEventCount) / (endTime / 1000)} per second")
   }
 
