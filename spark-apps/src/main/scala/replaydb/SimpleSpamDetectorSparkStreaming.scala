@@ -111,7 +111,7 @@ object SimpleSpamDetectorSparkStreaming {
           Thread.sleep(1000)
         }
         val processTime = System.currentTimeMillis() - startTime
-        println(s"WordCountTopKSparkStreaming: $numPartitions partitions, $totalEvents events in $processTime ms (${totalEvents/(processTime/1000)} events/sec)")
+        println(s"SimpleSpamDetectorSparkStreaming: $numPartitions partitions, $totalEvents events in $processTime ms (${totalEvents/(processTime/1000)} events/sec)")
         println(s"CSV,SimpleSpamDetectorSparkStreaming,$numPartitions,$totalEvents,$processTime,$batchSizeMs,$totalSpam")
         ssc.stop(true)
       }
