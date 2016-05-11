@@ -54,7 +54,7 @@ object SimpleSpamDetectorSparkExactBatches {
 
     for (batchNum <- 0 until numBatches) {
 
-      val batchFn = s"$baseFn-$batchNum"
+      val batchFn = if (numBatches == 1) baseFn else s"$baseFn-$batchNum"
       val filenames = (0 until numPartitions).map(i => s"$batchFn-$i")
 
       val events = KryoLoad.loadFiles(sc, filenames)
