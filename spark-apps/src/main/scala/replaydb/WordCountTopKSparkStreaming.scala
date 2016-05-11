@@ -1,5 +1,7 @@
 package replaydb
 
+import java.util.concurrent.atomic.AtomicLong
+
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming._
 import replaydb.event.MessageEvent
@@ -17,14 +19,15 @@ object WordCountTopKSparkStreaming {
 
   def main(args: Array[String]): Unit = {
 
-    if (args.length != 6) {
+    if (args.length != 7) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeMs
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeMs totalEvents
           |  Example values:
           |    master-ip      = 171.41.41.31
           |    baseFilename   = ~/data/events.out
           |    numPartitions  = 4
           |    batchSizeMs    = 1000
+          |    totalEvents    = 5000000
         """.stripMargin)
       System.exit(1)
     }
@@ -38,6 +41,7 @@ object WordCountTopKSparkStreaming {
     val baseFn = args(3)
     val numPartitions = args(4).toInt
     val batchSizeMs = args(5).toInt
+    val totalEvents = args(6).toInt
 
     val ssc = new StreamingContext(conf, Milliseconds(batchSizeMs))
     val hadoopConf = ssc.sparkContext.hadoopConfiguration;
@@ -58,13 +62,29 @@ object WordCountTopKSparkStreaming {
     windowedTopK.foreachRDD((rdd, time) => {
       if (time - lastPrintTime >= PrintInterval) {
         lastPrintTime = time
-        println(s"current top $K: ${rdd.takeOrdered(K)(new Ordering[(String, Int)] {
+        val currentTopString = rdd.takeOrdered(K)(new Ordering[(String, Int)] {
           def compare(x: (String, Int), y: (String, Int)) = -1 * x._2.compare(y._2)
-        }).mkString(", ")}")
+        }).mkString(", ")
+//        println(s"current top $K: $currentTopString")
       }
     })
 
+    val eventsProcessed = new AtomicLong
+    wordStream.foreachRDD(rdd => { eventsProcessed.addAndGet(rdd.count()) })
+
     ssc.start()
+    val startTime = System.currentTimeMillis()
+    new Thread("Closer") {
+      override def run(): Unit = {
+        while (eventsProcessed.get() < totalEvents) {
+          Thread.sleep(1000)
+        }
+        val processTime = System.currentTimeMillis() - startTime
+        println(s"WordCountTopKSparkStreaming: $numPartitions partitions, $totalEvents events in $processTime ms (${totalEvents/(processTime/1000)} events/sec)")
+        println(s"CSV,WordCountTopKSparkStreaming,$numPartitions,$totalEvents,$processTime,$batchSizeMs")
+        ssc.stop(true)
+      }
+    }.start()
     ssc.awaitTermination()
   }
 }
