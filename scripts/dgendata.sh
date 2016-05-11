@@ -50,4 +50,4 @@ done
 
 truncated_size=$(($2/50))
 echo "generating data locally, $truncated_size events"
-$HOME/replaydb-worker/lgendata.sh $1 $truncated_size $3 "$4" $batches -1
+$HOME/replaydb-worker/lgendata.sh $1 $truncated_size $3 "$4" 1 -1

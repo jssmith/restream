@@ -10,16 +10,16 @@ object SimpleSpamDetectorSparkStreaming {
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
   conf.set("spark.streaming.backpressure.enabled", "true")
-//  conf.set("spark.streaming.receiver.maxRate", "1000")
+  conf.set("spark.streaming.receiver.maxRate", "500000")
 //  conf.set("spark.kryo.registrationRequired", "true")
 //  conf.set("spark.kryo.classesToRegister", "scala.collection.mutable.TreeSet," +
 //    "scala.collection.mutable.WrappedArray")
 
   def main(args: Array[String]) {
 
-    if (args.length != 4) {
+    if (args.length != 6) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip baseFilename numPartitions batchSizeMs
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeMs
           |  Example values:
           |    master-ip      = 171.41.41.31
           |    baseFilename   = ~/data/events.out
@@ -35,12 +35,17 @@ object SimpleSpamDetectorSparkStreaming {
       conf.setMaster(s"spark://${args(0)}:7077")
     }
 
-    val baseFn = args(1)
-    val numPartitions = args(2).toInt
-    val batchSizeMs = args(3).toInt
+    val baseFn = args(3)
+    val numPartitions = args(4).toInt
+    val batchSizeMs = args(5).toInt
 
     val ssc = new StreamingContext(conf, Milliseconds(batchSizeMs))
-    ssc.checkpoint("/tmp/spark_streaming_checkpoint")
+    val hadoopConf = ssc.sparkContext.hadoopConfiguration;
+    hadoopConf.set("fs.s3.impl", "org.apache.hadoop.fs.s3native.NativeS3FileSystem")
+    hadoopConf.set("fs.s3.awsAccessKeyId", args(1))
+    hadoopConf.set("fs.s3.awsSecretAccessKey", args(2))
+
+    ssc.checkpoint("s3://spark-restream/checkpoint")
 
     val startTime = System.currentTimeMillis()
 
@@ -67,7 +72,7 @@ object SimpleSpamDetectorSparkStreaming {
         }
         key._1 -> (if (friends) (sendCt, 0) else (0, sendCt))
     }
-    val friendSpec = StateSpec.function(friendStateUpdateFunction _).numPartitions(numPartitions)
+    val friendSpec = StateSpec.function(friendStateUpdateFunction _) //.numPartitions(numPartitions)
     val userNewSendCt = msgsSentWithFriends.mapWithState[Boolean, (Long, IntPair)](friendSpec).reduceByKey(addPairs[Int])
 
     def userSendCtUpdateFunction(key: Long, value: Option[IntPair], state: State[IntPair]): (Long, Int) = value match {
@@ -79,7 +84,7 @@ object SimpleSpamDetectorSparkStreaming {
         state.update(addPairs(oldCt, newCt))
         key -> spamCt
     }
-    val userCountSpec = StateSpec.function(userSendCtUpdateFunction _).numPartitions(numPartitions)
+    val userCountSpec = StateSpec.function(userSendCtUpdateFunction _) //.numPartitions(numPartitions)
     val userNewSpamCount = userNewSendCt.mapWithState[IntPair, (Long, Int)](userCountSpec)
 
     var totalSpam = 0.0

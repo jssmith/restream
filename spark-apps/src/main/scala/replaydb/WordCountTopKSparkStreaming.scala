@@ -17,9 +17,9 @@ object WordCountTopKSparkStreaming {
 
   def main(args: Array[String]): Unit = {
 
-    if (args.length != 4) {
+    if (args.length != 6) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip baseFilename numPartitions batchSizeMs
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeMs
           |  Example values:
           |    master-ip      = 171.41.41.31
           |    baseFilename   = ~/data/events.out
@@ -35,12 +35,17 @@ object WordCountTopKSparkStreaming {
       conf.setMaster(s"spark://${args(0)}:7077")
     }
 
-    val baseFn = args(1)
-    val numPartitions = args(2).toInt
-    val batchSizeMs = args(3).toInt
+    val baseFn = args(3)
+    val numPartitions = args(4).toInt
+    val batchSizeMs = args(5).toInt
 
     val ssc = new StreamingContext(conf, Milliseconds(batchSizeMs))
-    ssc.checkpoint("/tmp/spark_streaming_checkpoint")
+    val hadoopConf = ssc.sparkContext.hadoopConfiguration;
+    hadoopConf.set("fs.s3.impl", "org.apache.hadoop.fs.s3native.NativeS3FileSystem")
+    hadoopConf.set("fs.s3.awsAccessKeyId", args(1))
+    hadoopConf.set("fs.s3.awsSecretAccessKey", args(2))
+
+    ssc.checkpoint("s3://spark-restream/checkpoint")
 
     val kryoReceivers = (0 until numPartitions).map(i => new KryoFileReceiver(s"$baseFn-$i"))
     val kryoStreams = kryoReceivers.map(ssc.receiverStream(_))
