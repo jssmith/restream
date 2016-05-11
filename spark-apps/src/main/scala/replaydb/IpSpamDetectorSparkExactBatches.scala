@@ -22,7 +22,7 @@ object IpSpamDetectorSparkExactBatches {
       println(
         """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip baseFilename numPartitions numBatches [ printDebug=false ]
           |  Example values:
-          |          |    master-ip      = 171.41.41.31
+          |    master-ip      = 171.41.41.31
           |    baseFilename   = ~/data/events.out
           |    numPartitions  = 4
           |    numBatches     = 100

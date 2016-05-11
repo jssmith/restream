@@ -9,6 +9,7 @@ package object replaydb {
 
   type TSVal[A] = (Long, A)
   type IntPair = (Int, Int)
+  type LongPair = (Long, Long)
 
   def addPairsOption[A](pairs: (Option[(A, A)], Option[(A, A)]))(implicit num: Numeric[A]): (A, A) = {
     pairs match {

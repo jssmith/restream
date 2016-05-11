@@ -63,7 +63,8 @@ object ReplayDBBuild extends Build {
     settings = buildSettings ++ Seq(
       name := "replaydb-spark-apps",
       libraryDependencies ++= Seq(
-        "org.apache.spark" %% "spark-core" % "1.6.1" % "provided"//,
+        "org.apache.spark" %% "spark-core" % "1.6.1" % "provided",
+        "org.apache.spark" %% "spark-streaming" % "1.6.1" % "provided"//,
         //"org.apache.spark" %% "spark-sql" % "1.5.1" % "provided",
         //"org.apache.spark" %% "spark-hive" % "1.5.1" % "provided"
       )
