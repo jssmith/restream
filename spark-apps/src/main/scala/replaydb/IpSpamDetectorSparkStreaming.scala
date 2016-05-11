@@ -6,12 +6,6 @@ import replaydb.event.{MessageEvent, NewFriendshipEvent}
 
 object IpSpamDetectorSparkStreaming {
 
-  // Takes (Long, A) pairs and sorts them by the first member of
-  // the tuple (the timestamp)
-  class TimestampOrdering[A] extends Ordering[(Long, A)] {
-    def compare(x: (Long, A), y: (Long, A)): Int = x._1.compare(y._1)
-  }
-
   val conf = new SparkConf().setAppName("ReStream Example Over Spark Streaming Testing")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
@@ -23,15 +17,14 @@ object IpSpamDetectorSparkStreaming {
 
   def main(args: Array[String]) {
 
-    if (args.length < 4 || args.length > 5) {
+    if (args.length != 4) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip baseFilename numPartitions batchSizeMs [ printDebug=false ]
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip baseFilename numPartitions batchSizeMs
           |  Example values:
           |    master-ip      = 171.41.41.31
           |    baseFilename   = ~/data/events.out
           |    numPartitions  = 4
           |    batchSizeMs    = 1000
-          |    printDebug     = true
         """.stripMargin)
       System.exit(1)
     }
@@ -45,7 +38,6 @@ object IpSpamDetectorSparkStreaming {
     val baseFn = args(1)
     val numPartitions = args(2).toInt
     val batchSizeMs = args(3).toInt
-    val printDebug = if (args.length > 4 && args(4) == "true") true else false
 
     val ssc = new StreamingContext(conf, Milliseconds(batchSizeMs))
     ssc.checkpoint("/tmp/spark_streaming_checkpoint")
