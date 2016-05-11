@@ -169,9 +169,11 @@ object SimpleSpamDetectorSparkExactBatches {
 
     println(s"FINAL SPAM COUNT: ${spamCountByUser.map({case (id, cnt) => cnt}).sum}")
 
-    val endTime = System.currentTimeMillis() - startTime
-    println(s"Final runtime was $endTime ms (${endTime / 1000} sec)")
-    println(s"Process rate was ${(newFriendEventCount + messageEventCount) / (endTime / 1000)} per second")
+    val processTime = System.currentTimeMillis() - startTime
+    val eventCount = newFriendEventCount + messageEventCount
+    println(s"Final runtime was $processTime ms (${processTime / 1000} sec)")
+    println(s"Process rate was ${eventCount / (processTime / 1000)} per second")
+    println(s"CSV,SimpleSpamDetectorSparkExactBatches,$numPartitions,$eventCount,$processTime,$numBatches")
   }
 
 }
