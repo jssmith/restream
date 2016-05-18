@@ -11,23 +11,27 @@ object IpSpamDetectorSparkStreaming {
   val conf = new SparkConf().setAppName("ReStream Example Over Spark Streaming Testing")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
-  conf.set("spark.streaming.backpressure.enabled", "true")
-//  conf.set("spark.streaming.receiver.maxRate", "1000")
+  // conf.set("spark.streaming.backpressure.enabled", "true")
+  // conf.set("spark.streaming.backpressure.initialRate", "100000")
 //  conf.set("spark.kryo.registrationRequired", "true")
 //  conf.set("spark.kryo.classesToRegister", "scala.collection.mutable.TreeSet," +
 //    "scala.collection.mutable.WrappedArray")
 
+  val eventsProcessed = new AtomicLong
+  val totalSpam = new AtomicLong
+
   def main(args: Array[String]) {
 
-    if (args.length != 7) {
+    if (args.length != 8) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeMs totalEvents
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeEvents batchSizeMs totalEvents
           |  Example values:
-          |    master-ip      = 171.41.41.31
-          |    baseFilename   = ~/data/events.out
-          |    numPartitions  = 4
-          |    batchSizeMs    = 1000
-          |    totalEvents    = 500000
+          |    master-ip       = 171.41.41.31
+          |    baseFilename    = ~/data/events.out
+          |    numPartitions   = 4
+          |    batchSizeEvents = 10000 (per partition)
+          |    batchSizeMs     = 3000
+          |    totalEvents     = 500000
         """.stripMargin)
       System.exit(1)
     }
@@ -40,8 +44,10 @@ object IpSpamDetectorSparkStreaming {
 
     val baseFn = args(3)
     val numPartitions = args(4).toInt
-    val batchSizeMs = args(5).toInt
-    val totalEvents = args(6).toInt
+    val batchSizeEvents = args(5).toInt
+    val batchSizeMs = args(6).toInt
+    val totalEvents = args(7).toInt
+    conf.set("spark.streaming.receiver.maxRate", batchSizeEvents.toString)
 
     val ssc = new StreamingContext(conf, Milliseconds(batchSizeMs))
     val hadoopConf = ssc.sparkContext.hadoopConfiguration;
@@ -104,18 +110,19 @@ object IpSpamDetectorSparkStreaming {
 
     val spamMessageIDs = userNewSpamMessages.join(ipNewSpamMessages)
 
-    var totalSpam = 0.0
-    spamMessageIDs.foreachRDD(rdd => {
-      val spamCount = rdd.count
-      totalSpam += spamCount
-      if (spamCount > 0) println(s"Count of new spam: $spamCount; total is $totalSpam")
+    // var totalSpam = 0.0
+    spamMessageIDs.count().foreachRDD(rdd => {
+      val spamCount = rdd.sum.toLong
+      totalSpam.addAndGet(spamCount)
+      // totalSpam += spamCount
+      // if (spamCount > 0) println(s"Count of new spam: $spamCount; total is $totalSpam")
     })
 
-    val eventsProcessed = new AtomicLong
-    eventStream.foreachRDD(rdd => {
-      val count = rdd.count()
-      eventsProcessed.getAndAdd(count)
-      //      if (count > 0) println(s"Events processed in this batch: $count; total is $totalEvents")
+    // val eventsProcessed = new AtomicLong
+    eventStream.count().foreachRDD(rdd => {
+      val count = rdd.sum.toLong
+      val ev = eventsProcessed.addAndGet(count)
+      if (count > 0) println(s"Events processed in this batch: $count; total is $ev")
     })
 
     ssc.start()
@@ -127,7 +134,7 @@ object IpSpamDetectorSparkStreaming {
         }
         val processTime = System.currentTimeMillis() - startTime
         println(s"IpSpamDetectorSparkStreaming: $numPartitions partitions, $totalEvents events in $processTime ms (${totalEvents/(processTime/1000)} events/sec)")
-        println(s"CSV,IpSpamDetectorSparkStreaming,$numPartitions,$totalEvents,$processTime,$batchSizeMs,$totalSpam")
+        println(s"CSV,IpSpamDetectorSparkStreaming,$numPartitions,$totalEvents,$processTime,$batchSizeEvents,$batchSizeMs,$totalSpam,${totalEvents/(processTime/1000)}")
         ssc.stop(true)
       }
     }.start()

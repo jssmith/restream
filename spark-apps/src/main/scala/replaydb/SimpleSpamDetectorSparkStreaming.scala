@@ -11,23 +11,27 @@ object SimpleSpamDetectorSparkStreaming {
   val conf = new SparkConf().setAppName("ReStream Example Over Spark Streaming Testing")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
-  conf.set("spark.streaming.backpressure.enabled", "true")
-  conf.set("spark.streaming.receiver.maxRate", "500000")
+  // conf.set("spark.streaming.backpressure.enabled", "true")
+  // conf.set("spark.streaming.backpressure.initialRate", "100000")
 //  conf.set("spark.kryo.registrationRequired", "true")
 //  conf.set("spark.kryo.classesToRegister", "scala.collection.mutable.TreeSet," +
 //    "scala.collection.mutable.WrappedArray")
 
+  val eventsProcessed = new AtomicLong
+  val totalSpam = new AtomicLong
+
   def main(args: Array[String]) {
 
-    if (args.length != 7) {
+    if (args.length != 8) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeMs totalEvents
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeEvents batchSizeMs totalEvents
           |  Example values:
-          |    master-ip      = 171.41.41.31
-          |    baseFilename   = ~/data/events.out
-          |    numPartitions  = 4
-          |    batchSizeMs    = 1000
-          |    totalEvents    = 500000
+          |    master-ip       = 171.41.41.31
+          |    baseFilename    = ~/data/events.out
+          |    numPartitions   = 4
+          |    batchSizeEvents = 100000 (per partition)
+          |    batchSizeMs     = 3000
+          |    totalEvents     = 500000
         """.stripMargin)
       System.exit(1)
     }
@@ -40,8 +44,11 @@ object SimpleSpamDetectorSparkStreaming {
 
     val baseFn = args(3)
     val numPartitions = args(4).toInt
-    val batchSizeMs = args(5).toInt
-    val totalEvents = args(6).toInt
+    val batchSizeEvents = args(5).toInt
+    val batchSizeMs = args(6).toInt
+    val totalEvents = args(7).toInt
+
+    conf.set("spark.streaming.receiver.maxRate", batchSizeEvents.toString)
 
     val ssc = new StreamingContext(conf, Milliseconds(batchSizeMs))
     val hadoopConf = ssc.sparkContext.hadoopConfiguration;
@@ -87,20 +94,22 @@ object SimpleSpamDetectorSparkStreaming {
         key -> spamCt
     }
     val userCountSpec = StateSpec.function(userSendCtUpdateFunction _) //.numPartitions(numPartitions)
-    val userNewSpamCount = userNewSendCt.mapWithState[IntPair, (Long, Int)](userCountSpec)
+    val userNewSpamCount = userNewSendCt.mapWithState[IntPair, (Long, Int)](userCountSpec)//.checkpoint(checkpointInterval)
 
-    var totalSpam = 0.0
-    userNewSpamCount.foreachRDD(rdd => {
-      val spamCount = rdd.map(_._2).sum
-      totalSpam += spamCount
-//      if (spamCount > 0) println(s"Count of new spam: $spamCount; total is $totalSpam")
+    userNewSpamCount.map(_._2).reduce(_ + _).foreachRDD(rdd => {
+      val spamCount = rdd.sum.toLong
+      totalSpam.addAndGet(spamCount)
+     // if (spamCount > 0) println(s"Count of new spam: $spamCount; total is $totalSpam")
     })
 
-    val eventsProcessed = new AtomicLong
-    eventStream.foreachRDD(rdd => {
-      val count = rdd.count()
-      eventsProcessed.getAndAdd(count)
-//      if (count > 0) println(s"Events processed in this batch: $count; total is $totalEvents")
+    // val eventsProcessed = new AtomicLong
+    // var lastTime = System.currentTimeMillis()
+    eventStream.count().foreachRDD(rdd => {
+      val count = rdd.sum.toLong
+      val ev = eventsProcessed.addAndGet(count)
+      // val timeNow = System.currentTimeMillis()
+      if (count > 0) println(s"Events processed in this batch: $count; total is $ev.") // Took ${timeNow-lastTime} ms (${count/(timeNow-lastTime)*1000} events/sec)")
+      // lastTime = timeNow
     })
 
     ssc.start()
@@ -112,7 +121,7 @@ object SimpleSpamDetectorSparkStreaming {
         }
         val processTime = System.currentTimeMillis() - startTime
         println(s"SimpleSpamDetectorSparkStreaming: $numPartitions partitions, $totalEvents events in $processTime ms (${totalEvents/(processTime/1000)} events/sec)")
-        println(s"CSV,SimpleSpamDetectorSparkStreaming,$numPartitions,$totalEvents,$processTime,$batchSizeMs,$totalSpam")
+        println(s"CSV,SimpleSpamDetectorSparkStreaming,$numPartitions,$totalEvents,$processTime,$batchSizeEvents,$batchSizeMs,${totalSpam.get()},${totalEvents/(processTime/1000)}")
         ssc.stop(true)
       }
     }.start()

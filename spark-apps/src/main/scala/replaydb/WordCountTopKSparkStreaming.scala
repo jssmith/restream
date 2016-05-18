@@ -10,24 +10,26 @@ object WordCountTopKSparkStreaming {
 
   val K = 10
   val WindowSize = Seconds(30)
-  val PrintInterval = Seconds(1)
+  val PrintInterval = Seconds(30)
 
   val conf = new SparkConf().setAppName("ReStream Example Over Spark Streaming Testing")
   conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   conf.set("spark.kryoserializer.buffer.max", "250m")
-  conf.set("spark.streaming.backpressure.enabled", "true")
+  // conf.set("spark.streaming.backpressure.enabled", "true")
+  // conf.set("spark.streaming.backpressure.initialRate", "100000")
 
   def main(args: Array[String]): Unit = {
 
-    if (args.length != 7) {
+    if (args.length != 8) {
       println(
-        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeMs totalEvents
+        """Usage: ./spark-submit --class replaydb.SpamDetectorSpark app-jar master-ip awsAccessKey awsSecretKey baseFilename numPartitions batchSizeEvents batchSizeMs totalEvents
           |  Example values:
-          |    master-ip      = 171.41.41.31
-          |    baseFilename   = ~/data/events.out
-          |    numPartitions  = 4
-          |    batchSizeMs    = 1000
-          |    totalEvents    = 5000000
+          |    master-ip       = 171.41.41.31
+          |    baseFilename    = ~/data/events.out
+          |    numPartitions   = 4
+          |    batchSizeEvents = 500000 (per partition)
+          |    batchSizeMs     = 1000
+          |    totalEvents     = 5000000
         """.stripMargin)
       System.exit(1)
     }
@@ -40,8 +42,10 @@ object WordCountTopKSparkStreaming {
 
     val baseFn = args(3)
     val numPartitions = args(4).toInt
-    val batchSizeMs = args(5).toInt
-    val totalEvents = args(6).toInt
+    val batchSizeMs = args(6).toInt
+    val batchSizeEvents = args(5).toInt
+    val totalEvents = args(7).toInt
+    conf.set("spark.streaming.receiver.maxRate", batchSizeEvents.toString)
 
     val ssc = new StreamingContext(conf, Milliseconds(batchSizeMs))
     val hadoopConf = ssc.sparkContext.hadoopConfiguration;
@@ -70,7 +74,7 @@ object WordCountTopKSparkStreaming {
     })
 
     val eventsProcessed = new AtomicLong
-    wordStream.foreachRDD(rdd => { eventsProcessed.addAndGet(rdd.count()) })
+    wordStream.count().foreachRDD(rdd => { eventsProcessed.addAndGet(rdd.sum.toLong) })
 
     ssc.start()
     val startTime = System.currentTimeMillis()
@@ -81,7 +85,7 @@ object WordCountTopKSparkStreaming {
         }
         val processTime = System.currentTimeMillis() - startTime
         println(s"WordCountTopKSparkStreaming: $numPartitions partitions, $totalEvents events in $processTime ms (${totalEvents/(processTime/1000)} events/sec)")
-        println(s"CSV,WordCountTopKSparkStreaming,$numPartitions,$totalEvents,$processTime,$batchSizeMs")
+        println(s"CSV,WordCountTopKSparkStreaming,$numPartitions,$totalEvents,$processTime,$batchSizeEvents,$batchSizeMs,0,${totalEvents/(processTime/1000)}")
         ssc.stop(true)
       }
     }.start()
