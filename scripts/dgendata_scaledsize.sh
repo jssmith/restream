@@ -10,12 +10,12 @@
 #  note that this will only work if each host is running only one partition
 
 if [[ $# -lt 4 ]]; then
-  echo "Usage: ./dgendata_scaledsize.sh size_spec num_events num_users split_nums [ batches=1 ] [ keep_only=false ] [ partitioned=false ]"
+  echo "Usage: ./dgendata_scaledsize.sh size_spec num_events num_users split_nums [ batches=1 ] [ keep_only=false ] [ partitioned=false ] [ alpha=1.0 ]"
   echo "e.g.: ./dgendata_scaledsize.sh 5m-each 5000000 100000 \"1 2 4 8 16 32\" 1 true true"
   echo ""
   echo "batches denotes the number of batches to break the files into (ONLY relevant for spark)"
   echo ""
-  echo "Note that in this case, num_events should be the number of events *per split*"
+  echo "Note that in this case, num_events should be t:q!he number of events *per split*"
   echo ""
   echo "if keep_only is true, each host will keep only the data relevant to its partition ID"
   echo "note that this will only work if each host is running only one partition"
@@ -37,7 +37,12 @@ if [ $# -ge 7 ]; then
 else
   partitioned=false
 fi
-
+if [ $# -ge 8 ]; then
+  ALPHA=$8
+else
+  ALPHA=1.0
+fi
+df
 echo "generating data remotely, $2 events per partition"
 idx=0
 for host in `cat $HOME/conf/workers.txt`; do
@@ -46,10 +51,10 @@ for host in `cat $HOME/conf/workers.txt`; do
   else
     keep_only_arg=-1
   fi
-  ssh $host "bash -l -c '/home/ec2-user/replaydb-worker/lgendata_scaledsize.sh $1 $2 $3 \"$4\" $batches $keep_only_arg $partitioned'" &
+  ssh $host "bash -l -c '/home/ec2-user/replaydb-worker/lgendata_scaledsize.sh $1 $2 $3 \"$4\" $batches $keep_only_arg $partitioned $ALPHA'" &
   idx=$(($idx+1))
 done
 
 truncated_size=$2
 echo "generating data locally, $truncated_size events"
-$HOME/replaydb-worker/lgendata.sh $1 $truncated_size $3 "$4" 1 -1
+$HOME/replaydb-worker/lgendata.sh $1 $truncated_size $3 "$4" 1 -1 false $ALPHA

@@ -95,12 +95,12 @@ object LaunchInstances extends App {
 
 //  val masterInstanceType = "c3.large"
   val masterInstanceType = workerInstanceType // Can't have two different types of instances in the same placement group
-  val keyName = "ek-aws" // TODO Johann: change to yours since I pull mine down from dropbox anyway
-  val securityGroupName = "restream" // restream - NOTE that we switched to using name instead of id
+  val keyName = "replaydb" // TODO Johann: change to yours since I pull mine down from dropbox anyway
+  val securityGroupName = "default" // restream - NOTE that we switched to using name instead of id
   //val securityGroupId = "sg-97252df2" // Erik's account
 //  val securityGroupId = "sg-4ed9072b" // Johann
-  val instanceProfileName = "restream-role"
-  val placementGroupName = "restream-p1"
+  val instanceProfileName = "replaydb-role"
+  val placementGroupName = "replaydb-p2"
   val workerPrefix = prefix + "-worker"
   val masterName = prefix + "-master"
 

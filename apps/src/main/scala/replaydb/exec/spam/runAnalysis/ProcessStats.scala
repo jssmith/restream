@@ -37,18 +37,18 @@ object ProcessStats extends App {
   }
 
   def getRunconfig(timingFile: File): LoggedRunConfiguration = {
-    val rcRe = """(\d+)-(\d+)-(\d+)-([a-zA-Z\.]+)-(default|parallel|g1|cms).timing""".r
+    val rcRe = """(\d+)-(\d+)-(\d+)-([a-zA-Z\.]+)-(true|false)-(\d+)-([\d\.]+).timing""".r
     val name = timingFile.getName
     name match {
-      case rcRe(numHosts, numPartitions, iteration, detector, gc) =>
+      case rcRe(numHosts, numPartitions, iteration, detector, partitioned, batchSize, alpha) =>
         new LoggedRunConfiguration(name, numHosts.toInt, numPartitions.toInt,
-          iteration.toInt, detector)
+          iteration.toInt, detector, alpha.toFloat)
     }
   }
 
   val outputFile = new File(statsDirectory, "performance.csv")
   val pw = new PrintWriter(new BufferedWriter(new FileWriter(outputFile)))
-  pw.print("detector,hosts,partitions,overall_ms,")
+  pw.print("detector,hosts,partitions,alpha,overall_ms,")
   pw.println("reader_thread_ms,phase_threads_ms,io_boss_ms,io_worker_ms,kryo_send_ms,kryo_recv_ms,kryo_send_bytes,kryo_recv_bytes,kryo_send_skew,kryo_recv_skew")
   try {
     for (tf <- timingFiles) {
