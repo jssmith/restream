@@ -64,12 +64,12 @@ object IpSpamDetectorSparkExactBatches {
 
       messageEventCount += messageEvents.count()
       newFriendEventCount += newFriendEvents.count()
-      val lowestMessageTs = messageEvents.min()(new Ordering[MessageEvent] {
+      val lowestMessageTs = if (messageEvents.count() != 0) {messageEvents.min()(new Ordering[MessageEvent] {
         def compare(x: MessageEvent, y: MessageEvent) = x.ts.compare(y.ts)
-      }).ts
-      val lowestFriendEventTs = newFriendEvents.min()(new Ordering[NewFriendshipEvent] {
+      }).ts} else { 0 }
+      val lowestFriendEventTs = if (newFriendEvents.count() != 0) { newFriendEvents.min()(new Ordering[NewFriendshipEvent] {
         def compare(x: NewFriendshipEvent, y: NewFriendshipEvent) = x.ts.compare(y.ts)
-      }).ts
+      }).ts} else { 0 }
       val lowestTs = Math.min(lowestMessageTs, lowestFriendEventTs)
 
       val newFriendships = newFriendEvents.flatMap((nfe: NewFriendshipEvent) => {
