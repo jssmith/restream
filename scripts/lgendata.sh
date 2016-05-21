@@ -51,7 +51,7 @@ else
 fi
 
 for i in ${SPLIT_NUMS[*]}; do
-  rm -rf $ROOT_DIR/events-$SIZE_SPEC-split-$i
+  rm -rf $ROOT_DIR/events-$SIZE_SPEC-split-$i$DATA_PARTITION_SUFFIX
   java -cp /home/ec2-user/replaydb-worker/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator \
     tunable $NUM_USERS $NUM_EVENTS $ROOT_DIR/events-$SIZE_SPEC-split-$i$DATA_PARTITION_SUFFIX/events.out $i $KEEP_ONLY $PARTITIONED $BATCHES
 done

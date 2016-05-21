@@ -18,9 +18,9 @@ object EventGenerator extends App {
     val Tunable = Value("tunable")
   }
 
-  if (args.length < 4 || args.length > 8) {
+  if (args.length < 4 || args.length > 9) {
     println(
-      """Usage: EventGenerator ( uniform | tunable ) numUsers numEvents baseFilename [ numSplits=1 ] [ keepOnly=-1 ] [ partitioned=false ] [ batches=1 ]
+      """Usage: EventGenerator ( uniform | tunable ) numUsers numEvents baseFilename [ numSplits=1 ] [ keepOnly=-1 ] [ partitioned=false ] [ batches=1 ] [ alpha = 1.0 ]
         |  example EventGenerator tunable 100000 5000000 /tmp/events-split-4/events.out 4 0 true
         |  keepOnly, if specified, denotes the *only* output partition that should actually be saved to disk (-1 for all)
       """.stripMargin)
@@ -37,7 +37,8 @@ object EventGenerator extends App {
   val numSplits = if (args.length >= 5) { Integer.parseInt(args(4)) } else { 1 }
   val keepOnly = if (args.length >= 6) { args(5).toInt } else { -1 }
   val partitioned = if (args.length >= 7) { args(6).toBoolean } else { false }
-  val batches = if (args.length == 8) { args(7).toInt } else { 1 }
+  val batches = if (args.length >= 8) { args(7).toInt } else { 1 }
+  val alpha = if (args.length == 9) { args(8).toDouble } else { 1.0d }
   val rnd = new MersenneTwister(903485435L)
 
   val batchSize = if (batches == 1) {
@@ -56,7 +57,8 @@ object EventGenerator extends App {
 
   val eventSource = generator match {
     case Generators.Uniform => new UniformEventSource(startTime, numUsers, rnd)
-    case Generators.Tunable => new TunableEventSource(startTime, numUsers, rnd, words)
+    case Generators.Tunable => new TunableEventSource(startTime = startTime,
+      numUsers = numUsers, rnd = rnd, words = words, alpha = alpha)
   }
   val eventStorage = new SocialNetworkStorage
   val pm = new ProgressMeter(printInterval = generator match {
