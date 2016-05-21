@@ -120,11 +120,11 @@ class ReplayMapImpl[K, V : ClassTag](default: => V, collectionId: Int, commServi
     }
 
     def get(phaseId: Int, workerId: Int, batchEndTs: Long): ConcurrentLinkedQueue[T] = {
-      queue(phaseId)(workerId)(batchEndTs)
+      queue(phaseId)(workerId).getOrElse(batchEndTs, new ConcurrentLinkedQueue[T]())
     }
 
     def remove(phaseId: Int, workerId: Int, batchEndTs: Long): ConcurrentLinkedQueue[T] = {
-      queue(phaseId)(workerId).remove(batchEndTs).get
+      queue(phaseId)(workerId).remove(batchEndTs).getOrElse(new ConcurrentLinkedQueue[T]())
     }
 
     def prepForBatch(phaseId: Int, batchEndTs: Long): Unit = {

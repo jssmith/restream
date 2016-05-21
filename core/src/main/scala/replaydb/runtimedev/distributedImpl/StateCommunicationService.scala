@@ -205,7 +205,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
     val numFinished = partitionsFinished(phaseId).getOrElse(batchEndTs, 0) + 1
     if (numFinished == 1) {
       states.foreach(_.prepareForBatch(phaseId,
-        batchEndTs + (2 + numPhases + ProgressTracker.FirstPhaseBatchExtraAllowance) * batchTimeInterval))
+        batchEndTs + (3 + numPhases + ProgressTracker.FirstPhaseBatchExtraAllowance) * batchTimeInterval))
     }
     if (numFinished < numLocalPartitions) {
       partitionsFinished(phaseId)(batchEndTs) = numFinished
@@ -277,7 +277,7 @@ class StateCommunicationService(workerId: Int, numLocalPartitions: Int, runConfi
       throw new IllegalStateException("collectionId must be equal to (previous number of ReplayStates added)")
     }
     states += rs
-    for (pid <- 0 until numPhases; batchNumber <- 0 until (2 + numPhases + ProgressTracker.FirstPhaseBatchExtraAllowance)) {
+    for (pid <- 0 until numPhases; batchNumber <- 0 until (3 + numPhases + ProgressTracker.FirstPhaseBatchExtraAllowance)) {
       rs.prepareForBatch(pid, runConfiguration.startTimestamp + batchNumber * batchTimeInterval)
     }
   }
