@@ -87,6 +87,8 @@ object ReplayDBBuild extends Build {
       libraryDependencies ++= Seq(
         "edu.princeton.cs" % "algs4" % "1.0.0.0"
       ),
+      // Download algs4 from https://github.com/kevin-wayne/algs4
+      // then install it locally using "mvn install"
       resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository"
     )
   )
