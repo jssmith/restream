@@ -41,13 +41,13 @@ object EventRateEstimator {
    *
    * @param fnBase file name base
    * @param numPartitions number of partitions
-   * @return [[EventRateDescription]] of the event rate
+   * @return [[EventRateDescription]] interval between events on a per-partition basis
    */
   def estimateRate(fnBase: String, numPartitions: Int): EventRateDescription = {
     val s = new SocialNetworkStorage
     val eventsToRead = 10000
     val startTime = new Min()
-    val avgRate = new Avg()
+    val avgInterval = new Avg()
     for (n <- 0 until numPartitions) {
       var firstTime = Long.MaxValue
       var lastTime = Long.MinValue
@@ -62,9 +62,9 @@ object EventRateEstimator {
         is.close()
       }
       startTime.update(firstTime)
-      avgRate.update(lastTime - firstTime)
+      avgInterval.update(lastTime - firstTime)
     }
-    new EventRateDescription(startTime(), avgRate().toDouble / eventsToRead.toDouble)
+    new EventRateDescription(startTime(), avgInterval().toDouble / eventsToRead.toDouble)
   }
 
 }

@@ -31,7 +31,7 @@ object ReplayDBBuild extends Build {
 
   lazy val root = Project("root", file("."),
     settings = buildSettings
-  ) aggregate(core, apps)
+  ) aggregate(core, apps, causalAnalysis)
 
   lazy val core = Project("core", file("core"),
     settings = buildSettings ++ Seq(
@@ -78,6 +78,16 @@ object ReplayDBBuild extends Build {
       libraryDependencies ++= Seq(
         "com.amazonaws" % "aws-java-sdk" % "1.10.50"
       )
+    )
+  )
+
+  lazy val causalAnalysis = Project("causal-analysis", file("causal-analysis"),
+    settings = buildSettings ++ Seq(
+      name := "replaydb-causal-analysis",
+      libraryDependencies ++= Seq(
+        "edu.princeton.cs" % "algs4" % "1.0.0.0"
+      ),
+      resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository"
     )
   )
 }
