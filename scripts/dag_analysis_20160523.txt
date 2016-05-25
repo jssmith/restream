@@ -1,0 +1,115 @@
+############################################
+
+DAG Analysis
+
+==============
+
+for alpha in 0.25 1.0 1.5 2.0; do
+  for partitions in 4 8 16; do
+    basepath=/Users/johann/tmp/events-500k-$alpha-split-$partitions/events.out
+    echo "$alpha $partitions"
+    echo $basepath
+	java -cp apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 500000 $basepath $partitions -1 false 1 $alpha
+	java -cp apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.spam.EventRateEstimate $basepath $partitions >> /Users/johann/tmp/rates.txt
+  done
+done
+
+for alpha in 0.25 1.0 1.5 2.0; do
+  for partitions in 2; do
+    basepath=/Users/johann/tmp/events-500k-$alpha-split-$partitions/events.out
+    echo "$alpha $partitions"
+    echo $basepath
+	java -cp apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 500000 $basepath $partitions -1 false 1 $alpha
+	java -cp apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.spam.EventRateEstimate $basepath $partitions >> /Users/johann/tmp/rates.txt
+  done
+done
+
+for alpha in 0.5 0.75 1.25 1.75 2.25; do
+  for partitions in 2 4 8 16; do
+    basepath=/Users/johann/tmp/events-500k-$alpha-split-$partitions/events.out
+    echo "$alpha $partitions"
+    echo $basepath
+	java -cp apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 500000 $basepath $partitions -1 false 1 $alpha
+	java -cp apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.spam.EventRateEstimate $basepath $partitions >> /Users/johann/tmp/rates.txt
+  done
+done
+
+runMain replaydb.exec.EventGenerator tunable 100000 5000000 /Users/johann/tmp/events-5m-0.25-split-4/events.out 4 -1 false 1 1.25
+
+
+
+
+
+runMain replaydb.exec.EventGenerator tunable 100000 5000000 /Users/johann/tmp/events-5m-0.25-split-1/events.out 1 -1 false 1 1.25
+
+runMain replaydb.exec.spam.CausalLoggingSerialSpamDetector replaydb.exec.spam.IpSpamDetectorStats /Users/johann/tmp/events-5m-0.25-split-1/events.out-0 /Users/johann/tmp/events-5m-0.25-split-4-dag
+
+1420070400000,185050.2904
+
+runMain replaydb.exec.spam.runAnalysis.BatchPathAnalysis /Users/johann/tmp/events-5m-0.25-split-4-dag 1420070400000 185050.2904 10000
+
+
+for alpha in 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0 2.25; do
+  for partitions in 1; do
+    basepath=/Users/johann/tmp/events-1m-$alpha-split-$partitions/events.out
+    echo "$alpha $partitions"
+    echo $basepath
+	java -cp apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.EventGenerator tunable 100000 1000000 $basepath $partitions -1 false 1 $alpha
+  done
+done
+
+while read x; do
+  echo $xcat
+  read -r -a params <<< $x
+  partitions="${params[0]}"
+  alpha="${params[1]}"
+  start="${params[2]}"
+  incr="${params[3]}"
+  fn=/Users/johann/tmp/events-1m-$alpha-split-1/events.out-0
+  echo $partitions $alpha $fn
+  java -Xmx6G -Xms6G -cp apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.spam.CausalLoggingSerialSpamDetector replaydb.exec.spam.IpSpamDetectorStats $fn $fn-dag
+  java -Xmx6G -Xms6G -Xss10m -cp causal-analysis/target/scala-2.11/replaydb-causal-analysis-assembly-0.1-SNAPSHOT.jar replaydb.exec.spam.runAnalysis.BatchPathAnalysis $fn-dag $start $incr 10000 $partitions >> /Users/johann/tmp/dag_analysis.txt
+done < /Users/johann/tmp/rates_only.txt
+
+java -Xmx6G -Xms6G -cp causal-analysis/target/scala-2.11/replaydb-causal-analysis-assembly-0.1-SNAPSHOT.jar replaydb.exec.spam.runAnalysis.BatchPathAnalysis /Users/johann/tmp/events-1m-2.25-split-1/events.out-0-dag 1420070400000 151056.0806 10000 4
+
+
+ >> /Users/johann/tmp/dag_analysis.txt
+do
+
+while read x; do
+  echo $xcat
+  read -r -a params <<< $x
+  partitions="${params[0]}"
+  alpha="${params[1]}"
+  start="${params[2]}"
+  incr="${params[3]}"
+  fn=/Users/johann/tmp/events-1m-$alpha-split-1/events.out-0
+  echo $partitions $alpha $fn
+  java -Xmx6G -Xms6G -cp apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar replaydb.exec.spam.CausalLoggingSerialSpamDetector replaydb.exec.spam.IpSpamDetectorStats $fn $fn-dag
+  java -Xmx6G -Xms6G -cp causal-analysis/target/scala-2.11/replaydb-causal-analysis-assembly-0.1-SNAPSHOT.jar replaydb.exec.spam.runAnalysis.BatchPathAnalysis $fn-dag $start $incr 10000 $partitions >> /Users/johann/tmp/dag_analysis.txt
+done < /Users/johann/tmp/rates_only_sorted_selected.txt
+
+
+
+
+while read x; do
+  echo $xcat
+  read -r -a params <<< $x
+  partitions="${params[0]}"
+  alpha="${params[1]}"
+  start="${params[2]}"
+  incr="${params[3]}"
+  fn=/Users/johann/tmp/events-1m-$alpha-split-1/events.out-0
+  echo $partitions $alpha $fn
+  java -Xmx6G -Xms6G -Xss20m -cp causal-analysis/target/scala-2.11/replaydb-causal-analysis-assembly-0.1-SNAPSHOT.jar replaydb.exec.spam.runAnalysis.BatchPathAnalysis $fn-dag $start $incr 10000 $partitions >> /Users/johann/tmp/dag_analysis_3.txt
+done < /Users/johann/tmp/rates_only.txt
+
+############################################
+# cleanup dag analysis for import to R
+
+echo "partitions,alpha,events,deplen"> ~/d/replaydb-paper/data/dag_analysis.csv;
+grep events dag_analysis.txt | grep -v "^/" | sed 's/-/ /g'  | awk '{ print $1","$4","$10","$15}' >> ~/d/replaydb-paper/data/dag_analysis.csv
+
+
+echo "partitions,alpha,events,deplen"> ~/d/replaydb-paper/data/dag_analysis_2.csv; grep events dag_analysis_2.txt | grep -v "^/" | sed 's/-/ /g'  | awk '{ print $1","$4","$10","$15}' >> ~/d/replaydb-paper/data/dag_analysis_2.csv
