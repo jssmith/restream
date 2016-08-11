@@ -10,15 +10,17 @@ import replaydb.event.{Event, MessageEvent, NewFriendshipEvent}
 import scala.collection.immutable.HashMap
 
 class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator,
-                          words: Array[String], alpha: Double = 1.0, spammerFraction: Double = 0.02) extends EventSource {
+                          words: Array[String], alpha: Double = 2.0, spammerFraction: Double = 0.02) extends EventSource {
   private var t = startTime
   private var messageIdSeq = 0L
   private val (userZipfDistribution, userProbabilities) = {
     val users = (1 to numUsers).toArray
-    val x = users.map(1.0 / FastMath.pow(_, alpha))
+    val zipfAlpha = 1D / (alpha - 1)
+    val x = users.map(1.0 / FastMath.pow(_, zipfAlpha))
     val xs = x.sum
     val probabilities = x.map(_/xs)
     MathArrays.shuffle(users, rnd)
+    println(s"number of users generated is $numUsers | ${probabilities.length}")
     (new EnumeratedIntegerDistribution(rnd, users, probabilities),
       HashMap() ++ (users.map(_.toLong) zip probabilities))
   }
@@ -54,6 +56,10 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator,
     rnd.nextInt(numUsers) + 1
   }
 
+  def isValid(userId: Long): Boolean = {
+    userId > 0 && userId <= numUsers
+  }
+
   private def getIpAddress(senderUserId: Long, spammer: Boolean): Int = {
     if (spammer) {
       spammerIpAddresses((senderUserId % spammerIpAddresses.length).toInt)
@@ -85,12 +91,13 @@ class TunableEventSource (startTime: Long, numUsers: Int, rnd: RandomGenerator,
       val userIdA = nextUserZipf()
       if (userIdA > spammerThreshold) {
         // Normal users choose their targets according to Zipfian distribution
-        val d = Math.max(2, (userProbabilities(userIdA) * 10 * numUsers).toInt)
+        val m = 10
+        val d = Math.max(2, (userProbabilities(userIdA) * m * numUsers).toInt)
         val userIdB = (userIdA + (if (rnd.nextBoolean()) {
           rnd.nextInt(d/2) + 1
         } else {
           -(rnd.nextInt(d/2) + 1)
-        }) + numUsers - 1) % numUsers + 1
+        }) + m * numUsers - 1) % numUsers + 1
         val userPair = (userIdA, userIdB)
         val e = if (!bf.mightContain(userPair) && rnd.nextBoolean()) {
           bf.put(userPair)

@@ -10,8 +10,8 @@
 #  note that this will only work if each host is running only one partition
 
 if [[ $# -lt 4 ]]; then
-  echo "Usage: ./dgendata_scaledsize.sh size_spec num_events num_users split_nums [ batches=1 ] [ keep_only=false ] [ partitioned=false ] [ alpha=1.0 ]"
-  echo "e.g.: ./dgendata_scaledsize.sh 5m-each 5000000 100000 \"1 2 4 8 16 32\" 1 true true"
+  echo "Usage: ./dgendata_scaledsize.sh size_spec num_events num_users split_nums [ batches=1 ] [ keep_only=false ] [ partitioned=false ] [ alpha=2.0 ]"
+  echo "e.g.: ./dgendata_scaledsize.sh 5m-each 5000000 100000 \"1 2 4 8 16 32\" 1 true true 2.0"
   echo ""
   echo "batches denotes the number of batches to break the files into (ONLY relevant for spark)"
   echo ""
@@ -40,7 +40,7 @@ fi
 if [ $# -ge 8 ]; then
   ALPHA=$8
 else
-  ALPHA=1.0
+  ALPHA=2.0
 fi
 df
 echo "generating data remotely, $2 events per partition"

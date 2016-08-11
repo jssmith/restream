@@ -9,11 +9,11 @@
 #
 
 if [[ $# -lt 5 ]]; then
-  echo "Usage: ./param_sweep.sh iterations size_spec memsize host_counts detectors [ batch_sizes=10000 ] [ alphas=1.0 ]"
+  echo "Usage: ./param_sweep_2.sh iterations size_spec memsize host_counts detectors [ batch_sizes=10000 ] [ alphas=2.0 ]"
   echo "       where all args except iterations and size_spec should be a space-separated"
   echo "       list of values to sweep over"
   echo "       NOTE: detectors will automatically prepend \"replaydb.exec.spam.\""
-  echo " e.g.: ./param_sweep.sh 10 5m 3000m \"1 2 4 8\" \"SimpleSpamDetectorStats IpSpamDetectorStats\" \"10000 50000\""
+  echo " e.g.: ./param_sweep.sh 10 5m 3000m \"1 2 4 8\" \"SimpleSpamDetectorStats IpSpamDetectorStats\" \"10000 50000\" \"1.75 2.0 2.25\" "
   exit
 fi
 
@@ -32,7 +32,7 @@ fi
 if [ $# -ge 7 ]; then
   alphas=$7
 else
-  alphas='1.0'
+  alphas='2.0'
 fi
 
 for iteration in `seq 1 $iterations`; do

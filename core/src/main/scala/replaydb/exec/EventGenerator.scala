@@ -20,7 +20,7 @@ object EventGenerator extends App {
 
   if (args.length < 4 || args.length > 9) {
     println(
-      """Usage: EventGenerator ( uniform | tunable ) numUsers numEvents baseFilename [ numSplits=1 ] [ keepOnly=-1 ] [ partitioned=false ] [ batches=1 ] [ alpha = 1.0 ]
+      """Usage: EventGenerator ( uniform | tunable ) numUsers numEvents baseFilename [ numSplits=1 ] [ keepOnly=-1 ] [ partitioned=false ] [ batches=1 ] [ alpha = 2.0 ]
         |  example EventGenerator tunable 100000 5000000 /tmp/events-split-4/events.out 4 0 true
         |  keepOnly, if specified, denotes the *only* output partition that should actually be saved to disk (-1 for all)
       """.stripMargin)
@@ -38,7 +38,7 @@ object EventGenerator extends App {
   val keepOnly = if (args.length >= 6) { args(5).toInt } else { -1 }
   val partitioned = if (args.length >= 7) { args(6).toBoolean } else { false }
   val batches = if (args.length >= 8) { args(7).toInt } else { 1 }
-  val alpha = if (args.length == 9) { args(8).toDouble } else { 1.0d }
+  val alpha = if (args.length == 9) { args(8).toDouble } else { 2.0d }
   val rnd = new MersenneTwister(903485435L)
 
   val batchSize = if (batches == 1) {

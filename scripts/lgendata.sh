@@ -11,8 +11,8 @@
 ROOT_DIR=/home/ec2-user/data0
 
 if [[ $# -lt 4 ]]; then
-  echo "Usage: ./lgendata.sh size_spec num_events num_users split_nums [ batches=1 ] [ keep_only=-1 ] [ partitioned=false ] [ alpha=1.0 ]"
-  echo "e.g.: ./lgendata.sh 50m 50000000 100000 \"1 2 4 8 16 32\" 1 1 true"
+  echo "Usage: ./lgendata.sh size_spec num_events num_users split_nums [ batches=1 ] [ keep_only=-1 ] [ partitioned=false ] [ alpha=2.0 ]"
+  echo "e.g.: ./lgendata.sh 50m 50000000 100000 \"1 2 4 8 16 32\" 1 1 true 2.0"
   echo "   keep_only denotes the denotes the *only* output partition that should "
   echo "   actually be saved to disk (-1 for all). should be this host's partition ID"
   echo ""
@@ -52,7 +52,7 @@ fi
 if [ $# -ge 8 ]; then
   ALPHA=$8
 else
-  ALPHA='1.0'
+  ALPHA='2.0'
 fi
 
 for i in ${SPLIT_NUMS[*]}; do
