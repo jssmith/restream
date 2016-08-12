@@ -44,16 +44,15 @@ for iteration in `seq 1 $iterations`; do
       partitioned=false
       #for partitioned in false true; do
       for alpha in $alphas; do
+        UUID=$(uuidgen)
         $HOME/replaydb/scripts/dkill.sh
         $HOME/replaydb/scripts/dlaunch.sh $partitions $mem_size default $USE_DEBUG
         echo "lanched $partitions partitions on $nhosts hosts"
         sleep 2;
-        fnbase="$nhosts-$partitions-$iteration-$detector-$partitioned-$batch_size-$alpha"
+        fnbase="$UUID-$nhosts-$partitions-$iteration-$detector-$partitioned-$batch_size-$alpha"
         $HOME/replaydb/scripts/ddrive.sh $detector $size_spec-$alpha $partitions $batch_size true $partitioned > $fnbase.txt 2>> $fnbase.timing
-        mkdir $fnbase-log
-        for host in `cat ~/conf/workers.txt`; do
-          scp $host:log/* $fnbase-log
-        done
+        pssh -i -h ~/conf/workers.txt 'gzip log/*.log'
+        pssh -i -h ~/conf/workers.txt 'aws s3 sync log s3://edu.berkeley.restream/log/$UUID'
       done
       done
     done
