@@ -3,6 +3,7 @@ package replaydb.exec.ec2
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.services.ec2.AmazonEC2Client
 import com.amazonaws.services.ec2.model.DescribeInstancesResult
+import replaydb.exec.ec2.InstanceIps._
 
 import scala.collection.JavaConversions._
 
@@ -10,10 +11,18 @@ import scala.collection.JavaConversions._
  * Show basic information about the instances
  */
 object ShowInstances extends App {
-  val showRunningOnly = args.length > 0 && args(0) == "true"
-  val credentials = new ProfileCredentialsProvider()
-  val ec2client = new AmazonEC2Client(credentials)
-  ec2client.setEndpoint(Utils.regionUrl)
+  if (args.length < 2) {
+    println(
+      """Usage: ShowInstances profile region [ showRunningOnly ]
+      """.stripMargin)
+    System.exit(1)
+  }
+
+  val profile = args(0)
+  val region = args(1)
+  val showRunningOnly = args.length > 2 && args(2) == "true"
+  val utils = new Utils(profile, region)
+  val (ec2client, _) = utils.getEC2ClientAndCredentials
   val instances: DescribeInstancesResult = ec2client.describeInstances()
   for (x <- instances.getReservations) {
     val instances = x.getInstances

@@ -12,18 +12,20 @@ import scala.collection.mutable
  */
 object LaunchInstances extends App {
 
-  if (args.length < 3) {
+  if (args.length < 5) {
     println(
-      """Usage: LaunchInstances numWorkers prefix workerInstanceType [launchMaster = false] [spotBid = -1]
+      """Usage: LaunchInstances profile region numWorkers prefix workerInstanceType [launchMaster = false] [spotBid = -1]
       """.stripMargin)
     System.exit(1)
   }
 
-  val numWorkers = args(0).toInt
-  val prefix = args(1)
-  val workerInstanceType = args(2)
-  val launchMaster = if (args.length > 3) args(3).toBoolean else false
-  val spotBid = if (args.length > 4 && args(4).toFloat >= 0) Some(args(4).toFloat) else None
+  val profile = args(0)
+  val region = args(1)
+  val numWorkers = args(2).toInt
+  val prefix = args(3)
+  val workerInstanceType = args(4)
+  val launchMaster = if (args.length > 5) args(5).toBoolean else false
+  val spotBid = if (args.length > 6 && args(6).toFloat >= 0) Some(args(6).toFloat) else None
 
   val initScript =
     """
@@ -31,14 +33,15 @@ object LaunchInstances extends App {
       |
       |yum update -y
       |
-      |aws s3 cp s3://replaydb/jdk-8u72-linux-x64.gz /tmp
+      |aws s3 cp s3://edu.berkeley.restream/dist/jdk-8u101-linux-x64.tar.gz /tmp
       |#wget -O /tmp/jdk-8u72-linux-x64.gz --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/8u72-b13/jdk-8u72-linux-x64.tar.gz
       |cd /opt
-      |tar -zxf /tmp/jdk-8u72-linux-x64.gz
-      |ln -s jdk1.8.0_72 java
-      |rm /tmp/jdk-8u72-linux-x64.gz
+      |tar -zxf /tmp/jdk-8u101-linux-x64.tar.gz
+      |ln -s jdk1.8.0_101 java
+      |rm /tmp/jdk-8u101-linux-x64.tar.gz
       |cd /home/ec2-user
-      |update-alternatives --install /usr/bin/java java /opt/jdk1.8.0_72/jre/bin/java 20000
+      |update-alternatives --install /usr/bin/java java /opt/jdk1.8.0_101/jre/bin/java 20000
+      |echo "export JAVA_HOME=/opt/java" >> ~/.bash_profile
       |
       |yum install -y zsh emacs
       |wget -O /tmp/zsh.zip https://dl.dropboxusercontent.com/u/6350499/zsh.zip
@@ -79,10 +82,10 @@ object LaunchInstances extends App {
       |git clone https://github.com/jssmith/replaydb /home/ec2-user/replaydb
       |chown -R ec2-user /home/ec2-user/replaydb
       |
+      |yum install -y pssh
+      |
       |curl https://bintray.com/sbt/rpm/rpm | tee /etc/yum.repos.d/bintray-sbt-rpm.repo
       |yum install -y sbt
-      |
-      |
       |
       |mkdir /home/ec2-user/conf
       |chown ec2-user /home/ec2-user/conf
@@ -95,16 +98,18 @@ object LaunchInstances extends App {
 
 //  val masterInstanceType = "c3.large"
   val masterInstanceType = workerInstanceType // Can't have two different types of instances in the same placement group
-  val keyName = "replaydb" // TODO Johann: change to yours since I pull mine down from dropbox anyway
+  val keyName = "restream-berkeley" // TODO Johann: change to yours since I pull mine down from dropbox anyway
   val securityGroupName = "default" // restream - NOTE that we switched to using name instead of id
   //val securityGroupId = "sg-97252df2" // Erik's account
 //  val securityGroupId = "sg-4ed9072b" // Johann
-  val instanceProfileName = "replaydb-role"
-  val placementGroupName = "replaydb-p2"
+  val instanceProfileName = "restream-role"
+  val placementGroupName = "restream-placement"
   val workerPrefix = prefix + "-worker"
   val masterName = prefix + "-master"
 
-  val workerNames = Utils.getInstances(true, workerPrefix).map(Utils.getName)
+  val utils = new Utils(profile, region)
+
+  val workerNames = utils.getInstances(true, workerPrefix).map(utils.getName)
   val newWorkerNames = mutable.ArrayBuffer[String]()
   var idx = 0
   while (newWorkerNames.length + workerNames.length < numWorkers) {
@@ -119,24 +124,24 @@ object LaunchInstances extends App {
     println(s"Launching ${newWorkerNames.length} new instances at: ${newWorkerNames.mkString(", ")}")
     spotBid match {
       case Some(bid) =>
-        Utils.launchSpotInstances(workerInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
+        utils.launchSpotInstances(workerInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
           newWorkerNames.toList, workerInitScript, bid)
       case None =>
-        Utils.launchInstances(workerInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
+        utils.launchInstances(workerInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
           newWorkerNames.toList, workerInitScript)
     }
   } else {
     println(s"Already found ${workerNames.length} worker instances; not launching any new ones.")
   }
 
-  if (launchMaster && Utils.getInstances(true, masterName).isEmpty) {
+  if (launchMaster && utils.getInstances(true, masterName).isEmpty) {
     println(s"Existing master instance not found; launching now at $masterName")
     spotBid match {
       case Some(bid) =>
-        Utils.launchSpotInstances(masterInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
+        utils.launchSpotInstances(masterInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
           List(masterName), masterInitScript, bid)
       case None =>
-        Utils.launchInstances(masterInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
+        utils.launchInstances(masterInstanceType, keyName, securityGroupName, instanceProfileName, placementGroupName,
           List(masterName), masterInitScript)
     }
 
