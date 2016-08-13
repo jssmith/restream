@@ -52,7 +52,7 @@ for iteration in `seq 1 $iterations`; do
         fnbase="$UUID-$nhosts-$partitions-$iteration-$detector-$partitioned-$batch_size-$alpha"
         $HOME/replaydb/scripts/ddrive.sh $detector $size_spec-$alpha $partitions $batch_size true $partitioned > $fnbase.txt 2>> $fnbase.timing
         pssh -i -h ~/conf/workers.txt 'gzip log/*.log'
-        pssh -i -h ~/conf/workers.txt 'aws s3 sync log s3://edu.berkeley.restream/log/$UUID'
+        pssh -i -h ~/conf/workers.txt "aws s3 sync log s3://edu.berkeley.restream/log/$UUID"
       done
       done
     done
