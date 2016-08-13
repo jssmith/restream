@@ -2,7 +2,7 @@ package replaydb.service
 
 import java.net.InetSocketAddress
 import java.util.concurrent.locks.ReentrantLock
-import java.util.concurrent.{Executors, CountDownLatch}
+import java.util.concurrent.{TimeUnit, Executors, CountDownLatch}
 
 import com.typesafe.scalalogging.Logger
 import org.jboss.netty.bootstrap.ClientBootstrap
@@ -15,6 +15,7 @@ import replaydb.service.driver._
 import replaydb.util.{PerfLogger, NetworkStats}
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.immutable
 
 abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
   InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory)
@@ -95,7 +96,15 @@ abstract class ClientGroupBase(runConfiguration: RunConfiguration) {
         new CloseWorkerCommand()
       } else {
         logger.debug("driver awaiting close in closeWhenDone")
-        workLatch.await()
+        var lastProgress = immutable.HashSet[(Int,Long)]()
+        while (!workLatch.await(300, TimeUnit.SECONDS)) {
+          val currentProgress = immutable.HashSet[(Int,Long)]() ++ progressTracker.lastSummary
+          if (currentProgress == lastProgress) {
+            throw new RuntimeException("Lack of progress - seem to be stuck")
+          }
+          logger.debug(s"driver still awaiting close in closeWhenDone, now at $currentProgress")
+          lastProgress = currentProgress
+        }
         logger.debug("driver finished awaiting close in closeWhenDone")
         new CloseCommand()
       }
