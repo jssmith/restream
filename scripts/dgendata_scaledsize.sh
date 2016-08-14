@@ -44,16 +44,11 @@ else
 fi
 df
 echo "generating data remotely, $2 events per partition"
-idx=0
-for host in `cat $HOME/conf/workers.txt`; do
-  if [ $keep_only = true ]; then
-    keep_only_arg=$idx
-  else
-    keep_only_arg=-1
-  fi
-  ssh $host "bash -l -c '/home/ec2-user/replaydb-worker/lgendata_scaledsize.sh $1 $2 $3 \"$4\" $batches $keep_only_arg $partitioned $ALPHA'" &
-  idx=$(($idx+1))
-done
+if [ $keep_only = true ]; then
+  pssh -h ~/conf/workers.txt -i -t 0 "/home/ec2-user/replaydb-worker/lgendata_scaledsize.sh $1 $2 $3 \"$4\" $batches \$PSSH_NODENUM $partitioned $ALPHA"
+else
+  pssh -h ~/conf/workers.txt -i -t 0 "/home/ec2-user/replaydb-worker/lgendata_scaledsize.sh $1 $2 $3 \"$4\" $batches -1 $partitioned $ALPHA"
+fi
 
 truncated_size=$2
 echo "generating data locally, $truncated_size events"
