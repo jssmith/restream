@@ -1,6 +1,7 @@
 package replaydb.exec.spam
 
 import org.apache.log4j.{Logger, PatternLayout, FileAppender, Level}
+import replaydb.event.{NewFriendshipEvent, MessageEvent}
 import replaydb.io.SocialNetworkStorage
 import replaydb.runtimedev.causalLoggingImpl.{Logger=>li,ReplayStateFactory}
 import replaydb.runtimedev.threadedImpl.MultiReaderEventSource
@@ -43,11 +44,31 @@ object CausalLoggingSerialSpamDetector extends App {
     .newInstance(new ReplayStateFactory)
   val si = stats.getRuntimeInterface
   var lastTimestamp = 0L
+  var timestampAdjustment = 0L
   val pm = new ProgressMeter(printInterval = 1000000, () => { si.updateAllPhases(new PrintSpamCounter(lastTimestamp)); ""})
   val es = new MultiReaderEventSource(inputFilename, 1, 100000)
   es.start()
   es.readEvents(e => {
-    si.updateAllPhases(e)
+    if (e.ts == lastTimestamp) {
+      timestampAdjustment += 1
+    }
+    si.updateAllPhases(e match {
+      case me: MessageEvent =>
+        MessageEvent(
+          me.ts + timestampAdjustment,
+          messageId = me.messageId,
+          senderUserId = me.senderUserId,
+          recipientUserId = me.recipientUserId,
+          senderIp = me.senderIp,
+          content = me.content
+        )
+      case nfe: NewFriendshipEvent =>
+        NewFriendshipEvent(
+          nfe.ts + timestampAdjustment,
+          userIdA = nfe.userIdA,
+          userIdB =  nfe.userIdB
+        )
+    })
     lastTimestamp = e.ts
     pm.increment()
   })

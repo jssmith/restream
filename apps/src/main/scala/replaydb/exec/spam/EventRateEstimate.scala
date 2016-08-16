@@ -6,6 +6,7 @@ object EventRateEstimate extends App {
 
   val partitionFnBase = args(0)
   val numPartitions = args(1).toInt
-  val r = EventRateEstimator.estimateRate(partitionFnBase, numPartitions)
-  println(s"estimating rate for $partitionFnBase and $numPartitions partitions as ${r.startTime}, ${r.eventIntervalMs}")
+  val eventsPerPartition = args(2).toInt
+  val r = EventRateEstimator.estimateRate(partitionFnBase, numPartitions, eventsPerPartition)
+  println(r.eventIntervalMs.toLong)
 }

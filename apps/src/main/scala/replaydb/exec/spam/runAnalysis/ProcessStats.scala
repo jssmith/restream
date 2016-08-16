@@ -37,18 +37,34 @@ object ProcessStats extends App {
   }
 
   def getRunconfig(timingFile: File): LoggedRunConfiguration = {
-    val rcRe = """(\d+)-(\d+)-(\d+)-([a-zA-Z\.]+)-(true|false)-(\d+)-([\d\.]+).timing""".r
+    val rcRe = """(^[0-9a-f\-]+)-(\d+)-(\d+)-(\d+)-([a-zA-Z\.]+)-(true|false)-(\d+)-([\d\.]+).timing""".r
     val name = timingFile.getName
     name match {
-      case rcRe(numHosts, numPartitions, iteration, detector, partitioned, batchSize, alpha) =>
+      case rcRe(uuid, numHosts, numPartitions, iteration, detector, partitioned, batchSize, alpha) =>
         new LoggedRunConfiguration(name, numHosts.toInt, numPartitions.toInt,
-          iteration.toInt, detector, alpha.toFloat)
+          iteration.toInt, detector, alpha.toFloat, uuid)
+    }
+  }
+
+  def switchExtension(f: File, from: String, to: String): File = {
+    val path = f.getCanonicalPath
+    if (!path.endsWith(from)) {
+      throw new RuntimeException("expected file ending in $from")
+    }
+    new File(path.substring(0, path.length - from.length) + to)
+  }
+
+  def checkException(f: File): Unit = {
+    for (line <- Source.fromFile(f).getLines()) {
+      if (line.contains("Exception")) {
+        throw new RuntimeException(s"found exception in $f")
+      }
     }
   }
 
   val outputFile = new File(statsDirectory, "performance.csv")
   val pw = new PrintWriter(new BufferedWriter(new FileWriter(outputFile)))
-  pw.print("detector,hosts,partitions,alpha,overall_ms,")
+  pw.print("uuid,detector,hosts,partitions,alpha,overall_ms,")
   pw.println("reader_thread_ms,phase_threads_ms,io_boss_ms,io_worker_ms,kryo_send_ms,kryo_recv_ms,kryo_send_bytes,kryo_recv_bytes,kryo_send_skew,kryo_recv_skew")
   try {
     for (tf <- timingFiles) {
@@ -56,9 +72,19 @@ object ProcessStats extends App {
       try {
         val completionMs = getTime(tf)
         //    println(s"have timing file $tf ($rc) with time ${getTime(tf)}")
+        // check for errors in the main log files
+        checkException(tf)
+        checkException(switchExtension(tf, ".timing",".txt"))
+
         val wl = new WorkerLogs(new File(statsDirectory,  rc.getLogName), rc)
-        wl.checkErrors()
-        pw.println(s"${rc.getCSV},$completionMs,${wl.summarizePerf().getCsv}")
+        val perfSummary = if (rc.numPartitions > 1) {
+          // check for errors in the worker log files
+          wl.checkErrors()
+          wl.summarizePerf()
+        } else {
+          PerfSummary.EMPTY
+        }
+        pw.println(s"${rc.getCSV},$completionMs,${perfSummary.getCsv}")
       } catch {
         case e: RuntimeException =>
           println(s"skipping $rc ${e.getMessage()}")

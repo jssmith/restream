@@ -16,7 +16,7 @@ object InstanceIps extends App {
   val profile = args(0)
   val region = args(1)
   val prefix = args(2)
-  val privateOnly = if (args.length == 2) args(1).toBoolean else false
+  val privateOnly = if (args.length == 4) args(3).toBoolean else false
 
   val utils = new Utils(profile, region)
   for ( i <- utils.getInstances(true, prefix)) {

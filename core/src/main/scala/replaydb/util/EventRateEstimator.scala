@@ -43,9 +43,8 @@ object EventRateEstimator {
    * @param numPartitions number of partitions
    * @return [[EventRateDescription]] interval between events on a per-partition basis
    */
-  def estimateRate(fnBase: String, numPartitions: Int): EventRateDescription = {
+  def estimateRate(fnBase: String, numPartitions: Int, eventsToRead: Int = 10000): EventRateDescription = {
     val s = new SocialNetworkStorage
-    val eventsToRead = 10000
     val startTime = new Min()
     val avgInterval = new Avg()
     for (n <- 0 until numPartitions) {

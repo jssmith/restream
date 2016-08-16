@@ -41,7 +41,13 @@ object LaunchInstances extends App {
       |rm /tmp/jdk-8u101-linux-x64.tar.gz
       |cd /home/ec2-user
       |update-alternatives --install /usr/bin/java java /opt/jdk1.8.0_101/jre/bin/java 20000
-      |echo "export JAVA_HOME=/opt/java" >> ~/.bash_profile
+      |echo "export JAVA_HOME=/opt/java" >> /home/ec2-user/.bash_profile
+      |
+      |echo "setting up for pssh"
+      |echo "AcceptEnv PSSH_NODENUM PSSH_HOST" >> /etc/ssh/sshd_config
+      |cat /etc/ssh/sshd_config
+      |service sshd restart
+      |echo "finished setting up for pssh"
       |
       |yum install -y zsh emacs
       |wget -O /tmp/zsh.zip https://dl.dropboxusercontent.com/u/6350499/zsh.zip

@@ -27,6 +27,7 @@ class Utils(profileName: String = "default", region: String = "us-west-2") {
   }
 
   def imageId = {
+    // Image with 2 SSD volumes attached
     region match {
       case "us-west-1" => "ami-59bbf839"
       case "us-west-2" => "ami-186ea578"
@@ -62,7 +63,7 @@ class Utils(profileName: String = "default", region: String = "us-west-2") {
 
     val rir = new RunInstancesRequest()
     rir.
-      withImageId(imageId).  // Image with 2 SSD volumes attached
+      withImageId(imageId).
       withInstanceType(instanceType).
       withMinCount(names.length).
       withMaxCount(names.length).
@@ -99,8 +100,7 @@ class Utils(profileName: String = "default", region: String = "us-west-2") {
     rsir.withSpotPrice(spotBid.toString).withInstanceCount(names.length)
 
     val launchSpec = new LaunchSpecification()
-      //withImageId("ami-d5ea86b5").  // Normal Amazon Linux
-      launchSpec.withImageId(imageId).  // Image with 2 SSD volumes attached
+      launchSpec.withImageId(imageId).
       withInstanceType(instanceType).
       withKeyName(keyName).
       withSecurityGroups(securityGroup).
