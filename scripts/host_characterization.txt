@@ -1,0 +1,41 @@
+# EC2 Host characterization commands
+
+dd if=/dev/zero of=/media/ephemeral0/data bs=1048576 count=5000
+
+time cat /media/ephemeral0/data | wc -c
+
+sudo dd if=/dev/zero of=/media/ephemeral1/data bs=1048576 count=5000
+
+sudo dd if=/dev/zero of=/home/ec2-user/data bs=1048576 count=5000
+
+
+
+echo "!#/bin/bash" > ~/flushcache.sh
+echo "free && sync && echo 3 > /proc/sys/vm/drop_caches && free" >> ~/flushcache.sh
+
+sudo yum --enablerepo=epel install -y iperf iperf3
+
+#configure the server
+
+sudo iperf3 -s -p 8888
+
+sudo iperf3 -c 172.31.28.203 -i 1 -t 15 -V -p 8888
+
+
+for ip in 172.31.1.254 172.31.2.0 172.31.1.255; do
+  echo $ip
+  sudo iperf3 -c $ip -i 1 -t 15 -V -p 8888
+done
+
+
+dd if=/dev/ of=/tmp/mydata bs=1048576 
+
+sudo iperf3 -c 172.31.27.215 -i 1 -t 15 -V -p 8888
+
+sudo iperf3 -c 172.31.1.254 -i 1 -t 15 -V -P2 -p 8888 &
+
+sudo iperf3 -c 172.31.2.0 -i 1 -t 15 -V -P2 -p 8888 &
+
+sudo iperf3 -c 172.31.1.255 -i 1 -t 15 -V -P2 -p 8888 &
+
+Seems we can get 500 to 600 mbits on c4.large instances.
