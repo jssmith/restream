@@ -1,0 +1,116 @@
+# Notes for alpha sweep experiemnts, August 2016
+
+# clone and install algs4 (even though not needed in prod)
+
+cd restream
+sbt -java-home /opt/java assembly
+
+
+Generate data
+wait until data is ready <= this turns out to be hard sometimes
+
+run experiments
+save output to s3
+
+=========================================
+
+sudo wget http://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo -O /etc/yum.repos.d/epel-apache-maven.repo
+sudo sed -i s/\$releasever/6/g /etc/yum.repos.d/epel-apache-maven.repo
+sudo yum install -y apache-maven
+mvn --version
+
+git clone https://github.com/kevin-wayne/algs4
+(cd algs4; mvn install)
+
+(cd replaydb; sbt assembly)
+
+# install the ssh key
+# scp in restream-berkeley.pem
+scp -i ~/.ssh/restream-berkeley.pem ~/.ssh/restream-berkeley.pem ec2-user@rs2master:.ssh
+  
+echo 'IdentityFile /home/ec2-user/.ssh/restream-berkeley.pem' >> .ssh/config; chmod 600 .ssh/config
+
+replaydb/scripts/distcode.sh
+
+# populate alphas.txt
+
+echo "3.0000
+2.3333
+2.0000
+1.8000
+1.6667
+1.5714
+1.5000
+1.4444
+1.4000
+1.3636
+1.3333
+1.3077
+1.2857
+1.2667
+1.2500" > ~/conf/alphas.txt
+
+
+
+
+
+for host in $(cat ~/conf/workers.txt); do scp sshd_config $host:/tmp; done
+pssh -i -h ~/conf/workers.txt 'sudo chown root.root /tmp/sshd_config && sudo chmod 600 /tmp/sshd_config &&  sudo mv /tmp/sshd_config /etc/ssh/sshd_config && sudo service sshd restart'
+
+pssh -i -h ~/conf/workers.txt 'echo "Node number $PSSH_NODENUM"'
+
+
+# generate code
+for alpha in $(cat ~/conf/alphas.txt); do ~/replaydb/scripts/dgendata_scaledsize.sh 5m-each 5000000 100000 "2" 1 true false $alpha; done
+pssh -i -h ~/conf/workers.txt "find data0/ -name 'events.out*'"
+
+cp ~/conf/workers-2.txt ~/conf/workers.txt
+for alpha in $(head -n2 ~/conf/alphas.txt); do ~/replaydb/scripts/dgendata_scaledsize.sh 5m-each 5000000 100000 "2" 1 true false $alpha; done
+~/replaydb/scripts/param_sweep_2.sh 4 5m-each 6000m "2" replaydb.exec.spam.IpSpamDetectorStats "10000" "$(cat ~/conf/alphas.txt)"
+
+
+cp ~/conf/workers-4.txt ~/conf/workers.txt
+for alpha in $(cat ~/conf/alphas.txt); do ~/replaydb/scripts/dgendata_scaledsize.sh 5m-each 5000000 100000 "4" 1 true false $alpha; done
+
+pssh -i -h ~/conf/workers-4.txt "find data0/ -name 'events.out-*' | grep 'split-4' | sort | xargs ls -sh"
+
+#
+cp ~/conf/workers-8.txt ~/conf/workers.txt
+for alpha in $(cat ~/conf/alphas.txt); do ~/replaydb/scripts/dgendata_scaledsize.sh 5m-each 5000000 100000 "8" 1 true false $alpha; done
+# verify
+pssh -i -h ~/conf/workers-8.txt "find data0/ -name 'events.out-*' | grep 'split-8' | sort | xargs ls -sh"
+
+~/replaydb/scripts/param_sweep_2.sh 4 5m-each 6000m "8" replaydb.exec.spam.IpSpamDetectorStats "10000" "$(cat ~/conf/alphas.txt)"
+
+
+#
+cp ~/conf/workers-16.txt ~/conf/workers.txt
+for alpha in $(cat ~/conf/alphas.txt); do ~/replaydb/scripts/dgendata_scaledsize.sh 5m-each 5000000 100000 "16" 1 true false $alpha; done
+# verify
+pssh -i -h ~/conf/workers-16.txt "find data0/ -name 'events.out-*' | grep 'split-16' | sort | xargs ls -sh"
+
+~/replaydb/scripts/param_sweep_2.sh 5 5m-each 6000m "16" replaydb.exec.spam.IpSpamDetectorStats "10000" "$(cat ~/conf/alphas.txt)"
+
+
+
+~/replaydb/scripts/param_sweep_2.sh 4 5m-each 6000m "4" replaydb.exec.spam.IpSpamDetectorStats "10000" "$(cat ~/conf/alphas.txt)"
+
+~/replaydb/scripts/param_sweep_2.sh 5 5m-each 6000m "2 4" replaydb.exec.spam.IpSpamDetectorStats "10000" "$(cat ~/conf/alphas.txt)"
+
+
+
+# single node timing
+touch workers.txt
+replaydb/scripts/distcode.sh
+for alpha in $(cat ~/conf/alphas.txt); do replaydb/scripts/lgendata.sh 5m 5000000 100000 1 1 -1 false $alpha; done
+
+for iteration in $(seq 2 2); do
+  for alpha in $(head -n1 ~/conf/alphas.txt); do
+    UUID=$(uuidgen)
+    fnbase="$UUID-1-1-$iteration-replaydb.exec.spam.IpSpamDetectorStats-false-1-$alpha"
+    time "java -Xmx6000m -Xmx6000m -Dreplaydb-logdir=/home/ec2-user/log \
+      -cp /home/ec2-user/replaydb/apps/target/scala-2.11/replaydb-apps-assembly-0.1-SNAPSHOT.jar \
+      replaydb.exec.spam.SerialSpamDetector2 replaydb.exec.spam.IpSpamDetectorStats \
+      /home/ec2-user/data0/events-5m-$alpha-split-1/events.out-0" > $fnbase.txt 2>> $fnbase.timing
+  done
+done
