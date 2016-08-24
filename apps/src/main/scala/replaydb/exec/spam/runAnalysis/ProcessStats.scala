@@ -42,7 +42,7 @@ object ProcessStats extends App {
     name match {
       case rcRe(uuid, numHosts, numPartitions, iteration, detector, partitioned, batchSize, alpha) =>
         new LoggedRunConfiguration(name, numHosts.toInt, numPartitions.toInt,
-          iteration.toInt, detector, alpha.toFloat, uuid)
+          iteration.toInt, detector, alpha.toFloat, uuid, batchSize.toInt)
     }
   }
 
@@ -64,7 +64,7 @@ object ProcessStats extends App {
 
   val outputFile = new File(statsDirectory, "performance.csv")
   val pw = new PrintWriter(new BufferedWriter(new FileWriter(outputFile)))
-  pw.print("uuid,detector,hosts,partitions,alpha,overall_ms,")
+  pw.print("uuid,detector,hosts,partitions,alpha,overall_ms,batchsize,")
   pw.println("reader_thread_ms,phase_threads_ms,io_boss_ms,io_worker_ms,kryo_send_ms,kryo_recv_ms,kryo_send_bytes,kryo_recv_bytes,kryo_send_skew,kryo_recv_skew")
   try {
     for (tf <- timingFiles) {
